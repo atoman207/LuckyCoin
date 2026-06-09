@@ -38,18 +38,44 @@ create table if not exists public.game_rounds (
 create index if not exists game_rounds_user_idx on public.game_rounds (user_id, created_at desc);
 
 -- ---------- purchases ---------------------------------------------------
--- Log of (simulated) crypto purchases of silver coins.
+-- Log of crypto purchases of silver coins, verified directly on-chain.
 create table if not exists public.purchases (
   id          uuid primary key default gen_random_uuid(),
   user_id        uuid not null references public.profiles (id) on delete cascade,
   silver         integer not null,
   usd_amount     numeric not null,                      -- price paid (USD)
-  currency       text,                                  -- chain / coin used to pay
-  wallet_address text,                                  -- payer's wallet address
-  method         text not null default 'crypto-sim',
-  status         text not null default 'completed',
+  currency       text,                                  -- "ASSET · NETWORK" label
+  wallet_address text,                                  -- payer's wallet address (legacy)
+  to_address     text,                                  -- admin address paid to
+  method_id      text,                                  -- payment method id (e.g. usdt-trc20)
+  pay_address    text,                                  -- admin address shown at checkout
+  pay_amount     numeric,                               -- crypto amount the buyer must send
+  pay_currency   text,                                  -- asset the buyer pays in
+  tx_hash        text,                                  -- buyer's on-chain transaction hash
+  credited       boolean not null default false,        -- coins granted for this order?
+  method         text not null default 'crypto-direct',
+  status         text not null default 'awaiting_payment',
   created_at     timestamptz not null default now()
 );
+-- ---------- idempotent upgrades ----------------------------------------
+-- `create table if not exists` above won't touch an EXISTING table, so add
+-- any later columns here — and do it BEFORE the indexes below, which depend
+-- on them (e.g. tx_hash). Harmless on a fresh database (columns already exist).
+alter table public.profiles  add column if not exists avatar_url text;
+
+alter table public.purchases add column if not exists currency       text;
+alter table public.purchases add column if not exists wallet_address text;
+alter table public.purchases add column if not exists to_address     text;
+alter table public.purchases add column if not exists method_id      text;
+alter table public.purchases add column if not exists pay_address    text;
+alter table public.purchases add column if not exists pay_amount     numeric;
+alter table public.purchases add column if not exists pay_currency   text;
+alter table public.purchases add column if not exists tx_hash        text;
+alter table public.purchases add column if not exists credited       boolean not null default false;
+
+-- Indexes (after the columns above are guaranteed to exist).
+-- One payment can only ever credit one order.
+create unique index if not exists purchases_tx_hash_key on public.purchases (tx_hash) where tx_hash is not null;
 create index if not exists purchases_user_idx on public.purchases (user_id, created_at desc);
 
 -- =====================================================================

@@ -7,6 +7,10 @@ import AuthModal from "@/components/AuthModal";
 export const metadata: Metadata = {
   title: "Lucky Coin — Next",
   description: "Pick the lucky coin. Crack it open. Win gold, silver and bronze.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

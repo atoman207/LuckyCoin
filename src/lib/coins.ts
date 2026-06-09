@@ -35,13 +35,13 @@ export const DAILY_BONUS_BRONZE = 5;
 export const STREAK_LENGTH = 7;
 export const STREAK_BONUS_BRONZE = 20;
 
-// Purchase packs — buy silver coins (simulated crypto checkout).
+// Purchase packs — buy silver coins (crypto checkout, verified on-chain).
+// Minimum purchase is 10 silver. Base rate is $0.25 / silver.
 export type CoinPack = { silver: number; usd: number; label: string; tag?: string };
 export const COIN_PACKS: CoinPack[] = [
-  { silver: 1, usd: 0.5, label: "1 Silver" },
-  { silver: 10, usd: 4, label: "10 Silver", tag: "Save 20%" },
-  { silver: 100, usd: 30, label: "100 Silver", tag: "Save 40%" },
-  { silver: 1000, usd: 200, label: "1,000 Silver", tag: "Best value" },
+  { silver: 10, usd: 2, label: "10 Silver", tag: "Save 20%" },
+  { silver: 100, usd: 15, label: "100 Silver", tag: "Save 40%" },
+  { silver: 1000, usd: 100, label: "1,000 Silver", tag: "Best value" },
 ];
 
 export type CoinType = "gold" | "silver" | "bronze";

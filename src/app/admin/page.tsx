@@ -29,6 +29,7 @@ type Txn = {
   usd_amount: number;
   currency: string | null;
   wallet_address: string | null;
+  to_address: string | null;
   method: string;
   status: string;
   created_at: string;
@@ -212,15 +213,16 @@ export default function AdminPage() {
                 <th className="px-4 py-3 text-right">Silver</th>
                 <th className="px-4 py-3 text-right">Price (USD)</th>
                 <th className="px-4 py-3">Currency</th>
-                <th className="px-4 py-3">Wallet address</th>
+                <th className="px-4 py-3">Paid from</th>
+                <th className="px-4 py-3">Paid to</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
               {txns === null ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
               ) : txns.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">No transactions yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No transactions yet.</td></tr>
               ) : (
                 txns.map((t) => (
                   <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.03]">
@@ -233,6 +235,7 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-right font-semibold text-emerald-300">${Number(t.usd_amount).toFixed(2)}</td>
                     <td className="px-4 py-3 text-slate-300">{t.currency ?? "—"}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{t.wallet_address ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-amber-200/80 break-all">{t.to_address ?? "—"}</td>
                     <td className="px-4 py-3"><span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-200">{t.status}</span></td>
                   </tr>
                 ))

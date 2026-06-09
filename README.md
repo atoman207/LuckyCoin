@@ -9,7 +9,7 @@ bronze straight to your account.
 - **Auth** — register (nickname, email, password, nationality, Discord ID) & login via a modal.
 - **The game** — spend 1 silver to scatter 50 coins (1 gold, 5 silver, 44 bronze). Pick one, it cracks open, the prize is credited. The board then reveals where everything was.
 - **Rewards** — 50-coin welcome bonus, +5 bronze daily, +20 bronze for a 7-day login streak (a missed day resets the streak).
-- **Buy** — purchase silver coins with a (simulated) crypto checkout. Packs: 1/$0.50, 10/$4, 100/$30, 1000/$200.
+- **Buy** — purchase silver coins with a crypto checkout (verified on-chain). Minimum 10 silver. Packs: 10/$2, 100/$15, 1,000/$100.
 - **Exchange** — value-preserving conversion between gold/silver/bronze.
 - **Profile** — `/profile`: every user (and the admin) can edit their own info and upload an avatar.
 - **Admin** — `/admin`: full CRUD over all users (create/edit/delete, coins by type, role, login dates) plus a **Transactions** tab showing wallet address, price and date of each purchase.
@@ -42,10 +42,9 @@ against a server price list.
    ```
 
 2. **Database** — open your Supabase project → SQL Editor → paste and run
-   [`supabase/schema.sql`](supabase/schema.sql). If you set the DB up before the
-   avatar/transactions update, also run
-   [`supabase/migrations/001_profiles_and_transactions.sql`](supabase/migrations/001_profiles_and_transactions.sql)
-   (adds `profiles.avatar_url`, `purchases.wallet_address`, `purchases.currency`).
+   [`supabase/schema.sql`](supabase/schema.sql). This single file is the entire
+   schema (tables, indexes, RLS) and is idempotent — safe to run on a fresh
+   project or re-run on an existing one to bring it up to date.
 
 3. **Seed the administrator** — creates/refreshes the built-in admin account
    (idempotent — safe to run any time; it never wipes the admin's coins):
