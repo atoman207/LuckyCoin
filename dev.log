@@ -1,0 +1,24 @@
+
+> lucky-coin-next@0.1.0 dev
+> next dev -p 3100
+
+   ▲ Next.js 15.5.19
+   - Local:        http://localhost:3100
+   - Network:      http://198.18.1.86:3100
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 5.8s
+ ✓ Compiled /middleware in 224ms (168 modules)
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 3s (727 modules)
+ GET /profile 200 in 3636ms
+ ○ Compiling /admin ...
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: EBUSY: resource busy or locked, rename 'E:\My project\Locky Coin\.next\cache\webpack\client-development\1.pack.gz_' -> 'E:\My project\Locky Coin\.next\cache\webpack\client-development\1.pack.gz'
+ ✓ Compiled /admin in 1300ms (734 modules)
+ GET /admin 200 in 1570ms
+ ✓ Compiled /buy in 211ms (729 modules)
+ GET /buy 200 in 367ms
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: EBUSY: resource busy or locked, rename 'E:\My project\Locky Coin\.next\cache\webpack\server-development\0.pack.gz_' -> 'E:\My project\Locky Coin\.next\cache\webpack\server-development\0.pack.gz'
+ ✓ Compiled in 168ms (305 modules)
+ ✓ Compiled in 153ms (305 modules)

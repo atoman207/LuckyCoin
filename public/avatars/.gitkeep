@@ -1,0 +1,2 @@
+# Uploaded user avatars are stored here (served at /avatars/<file>).
+# Only the URL is kept in the database.

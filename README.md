@@ -1,0 +1,100 @@
+# Lucky Coin — "Next" 🪙
+
+A coin-based luck game built with **Next.js 15 (App Router)** + **Supabase**.
+Pick the lucky coin from a board of 50, crack it open, and win gold, silver or
+bronze straight to your account.
+
+## Features
+
+- **Auth** — register (nickname, email, password, nationality, Discord ID) & login via a modal.
+- **The game** — spend 1 silver to scatter 50 coins (1 gold, 5 silver, 44 bronze). Pick one, it cracks open, the prize is credited. The board then reveals where everything was.
+- **Rewards** — 50-coin welcome bonus, +5 bronze daily, +20 bronze for a 7-day login streak (a missed day resets the streak).
+- **Buy** — purchase silver coins with a (simulated) crypto checkout. Packs: 1/$0.50, 10/$4, 100/$30, 1000/$200.
+- **Exchange** — value-preserving conversion between gold/silver/bronze.
+- **Profile** — `/profile`: every user (and the admin) can edit their own info and upload an avatar.
+- **Admin** — `/admin`: full CRUD over all users (create/edit/delete, coins by type, role, login dates) plus a **Transactions** tab showing wallet address, price and date of each purchase.
+- **Avatars** — uploaded files are stored **in the project** at `public/avatars/`; only the URL is saved in the database.
+- Fully responsive, dark, stylish UI. All copy in English.
+
+## Economy
+
+Base unit is **bronze**. `1 silver = 10 bronze`, `1 gold = 500 bronze` (so 1 gold = 50 silver).
+All values are tunable in [`src/lib/coins.ts`](src/lib/coins.ts).
+
+> Note on the spec: the board is **1 gold + 5 silver + 44 bronze = 50** so the
+> counts sum to the 50 scattered coins. Conflicting lines in the brief
+> ("1 gold = 500 silver" vs the exchange page) were reconciled to the exchange-page
+> rule. Each round costs **1 silver**.
+
+## Security model
+
+Coin balances are **only** written by server-side API routes using the Supabase
+service-role key. The browser can read its own profile (Row Level Security) but
+can never update balances directly, the game board is generated and stored
+server-side so picks can't be predicted, and purchase amounts are validated
+against a server price list.
+
+## Setup
+
+1. **Install**
+   ```bash
+   npm install
+   ```
+
+2. **Database** — open your Supabase project → SQL Editor → paste and run
+   [`supabase/schema.sql`](supabase/schema.sql). If you set the DB up before the
+   avatar/transactions update, also run
+   [`supabase/migrations/001_profiles_and_transactions.sql`](supabase/migrations/001_profiles_and_transactions.sql)
+   (adds `profiles.avatar_url`, `purchases.wallet_address`, `purchases.currency`).
+
+3. **Seed the administrator** — creates/refreshes the built-in admin account
+   (idempotent — safe to run any time; it never wipes the admin's coins):
+   ```bash
+   npm run seed
+   ```
+   Admin login: `kindman207@gmail.com` / `LuckyCoin!@#`. This account always has
+   `is_admin = true`, so it gets the **Admin** nav link and dashboard access.
+
+   > Note: `.env.local` is already filled in with your project's keys. For a
+   > fresh clone, copy `.env.example` → `.env.local` and set
+   > `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable key)
+   > and `SUPABASE_SERVICE_ROLE_KEY` (secret key — **server only, never commit**).
+   > The secret key bypasses all security; if it leaks, rotate it in
+   > Supabase → Settings → API.
+
+4. **Run**
+   ```bash
+   npm run dev
+   ```
+   Open the printed URL (http://localhost:3000, or the next free port).
+
+To promote any other player to admin, run in the SQL Editor:
+```sql
+update public.profiles set is_admin = true where email = 'someone@example.com';
+```
+
+## Going to production
+
+- Replace the simulated checkout in [`src/app/api/purchase/route.ts`](src/app/api/purchase/route.ts)
+  with a real crypto provider (Coinbase Commerce / NOWPayments). Credit coins only
+  from a verified webhook, not from the client request.
+- Consider tightening the daily-bonus reset and adding rate limits.
+
+## Project layout
+
+```
+src/
+  app/
+    page.tsx              landing + "Start Game"
+    game/                 the board
+    buy/                  purchase silver
+    exchange/             convert coins
+    admin/                all-users dashboard
+    api/                  register, me, daily-bonus, game/start, game/pick, exchange, purchase, admin/users
+  components/             Nav, AuthModal, UserProvider, CoinIcon, CoinBalance
+  lib/
+    coins.ts             economy constants + board builder
+    auth.ts              requireProfile() helper
+    supabase/            client / server / admin clients
+supabase/schema.sql      database + RLS
+```
