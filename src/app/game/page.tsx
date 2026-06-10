@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
-import { BOARD_SIZE, ROUND_COST_SILVER, type CoinType } from "@/lib/coins";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, type CoinType, type RoundCurrency } from "@/lib/coins";
 
 type Phase = "idle" | "playing" | "revealed";
 
@@ -19,6 +20,20 @@ export default function GamePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Start-option modal: open it, then the player selects exactly one option.
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [choice, setChoice] = useState<RoundCurrency | null>(null);
+
+  function openChooser() {
+    setError(null);
+    setChoice(null);
+    setChooserOpen(true);
+  }
+  function closeChooser() {
+    setChooserOpen(false);
+    setChoice(null);
+  }
 
   // Claim the daily bonus once when the page loads.
   const claimedRef = useRef(false);
@@ -40,11 +55,16 @@ export default function GamePage() {
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
   }
 
-  async function startRound() {
+  async function startRound(currency: RoundCurrency) {
+    closeChooser();
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/game/start", { method: "POST" });
+      const res = await fetch("/api/game/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setProfile(data.profile);
@@ -118,10 +138,8 @@ export default function GamePage() {
     return <div className="py-20 text-center text-slate-400">Loading…</div>;
   }
 
-  // Admins play for free; everyone else pays the silver entry cost.
-  const cost = profile.is_admin ? 0 : ROUND_COST_SILVER;
-  const canAfford = profile.silver >= cost;
-  const playLabel = cost === 0 ? "▶ Play (free)" : `▶ Play (−${cost} silver)`;
+  // A round can be paid with EITHER 1 silver OR 10 bronze. Admins play free.
+  const canPay = (c: RoundCurrency) => profile.is_admin || profile[c] >= ROUND_COST[c];
 
   return (
     <div className="space-y-6">
@@ -132,7 +150,7 @@ export default function GamePage() {
           <p className="text-slate-400">
             {phase === "playing"
               ? "Tap one coin to crack it open."
-              : `One round costs ${cost === 0 ? "nothing for admins" : ROUND_COST_SILVER + " silver"} · 1 gold, 5 silver & 44 bronze hidden among ${BOARD_SIZE}.`}
+              : `One round costs ${profile.is_admin ? "nothing for admins" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze hidden among ${BOARD_SIZE}.`}
           </p>
         </div>
         <CoinBalance profile={profile} size={26} />
@@ -153,17 +171,12 @@ export default function GamePage() {
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">Ready for a round?</h2>
           <p className="max-w-sm text-slate-300">
-            {cost === 0
+            {profile.is_admin
               ? `Scatter ${BOARD_SIZE} coins and take your pick.`
-              : `Spend ${cost} silver to scatter ${BOARD_SIZE} coins and take your pick.`}
+              : `Pay ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze to scatter ${BOARD_SIZE} coins and take your pick.`}
           </p>
-          {!canAfford && (
-            <p className="text-sm text-red-300">
-              You don&apos;t have enough silver. Buy or exchange coins first.
-            </p>
-          )}
-          <button onClick={startRound} disabled={busy || !canAfford} className="btn-gold text-lg !px-7 !py-3">
-            {busy ? "Dealing…" : playLabel}
+          <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
+            {busy ? "Dealing…" : "▶ Start"}
           </button>
         </div>
       )}
@@ -197,11 +210,7 @@ export default function GamePage() {
                     <span className="animate-pop">
                       <CoinIcon type={type} size={40} />
                     </span>
-                  ) : (
-                    <span className="text-xl font-bold text-slate-400 shimmer bg-clip-text">
-                      ?
-                    </span>
-                  )}
+                  ) : null}
                   {revealed && isPick && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-300 px-2 text-[10px] font-bold text-slate-900">
                       YOU
@@ -222,8 +231,8 @@ export default function GamePage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <button onClick={startRound} disabled={busy || !canAfford} className="btn-gold">
-                  {!canAfford ? "Not enough silver" : cost === 0 ? "Play again (free)" : `Play again (−${cost} silver)`}
+                <button onClick={openChooser} disabled={busy} className="btn-gold">
+                  ▶ Play again
                 </button>
                 <button onClick={reset} disabled={busy} className="btn-ghost">
                   🔄 Restart
@@ -232,6 +241,86 @@ export default function GamePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Start-option modal: select exactly one option, then see a message. */}
+      {chooserOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          onClick={closeChooser}
+        >
+          <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            {choice === null ? (
+              <>
+                <h2 className="text-xl font-bold">Choose how to pay</h2>
+                <p className="mt-1 text-sm text-slate-400">Select one option to start a round.</p>
+                <div className="mt-4 grid gap-3">
+                  {(["silver", "bronze"] as RoundCurrency[]).map((c) => {
+                    const ok = canPay(c);
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setChoice(c)}
+                        className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+                      >
+                        <span className="flex items-center gap-3">
+                          <CoinIcon type={c} size={32} />
+                          <span>
+                            <span className="block font-bold">
+                              {ROUND_COST[c]} {c === "silver" ? "Silver" : "Bronze"}
+                            </span>
+                            <span className="block text-xs text-slate-400">
+                              You have {profile[c]} {c}
+                            </span>
+                          </span>
+                        </span>
+                        <span className={`text-xs font-semibold ${ok ? "text-emerald-300" : "text-red-300"}`}>
+                          {profile.is_admin ? "Free" : ok ? "Available" : "Not enough"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={closeChooser} className="btn-ghost mt-4 w-full">
+                  Cancel
+                </button>
+              </>
+            ) : canPay(choice) ? (
+              <>
+                <h2 className="text-xl font-bold">Start a round?</h2>
+                <p className="mt-2 text-slate-300">
+                  {profile.is_admin
+                    ? "Admins play for free."
+                    : `You'll pay ${ROUND_COST[choice]} ${choice} to scatter ${BOARD_SIZE} coins and take your pick.`}
+                </p>
+                <div className="mt-5 flex gap-3">
+                  <button onClick={() => startRound(choice)} disabled={busy} className="btn-gold flex-1">
+                    ▶ Start
+                  </button>
+                  <button onClick={() => setChoice(null)} className="btn-ghost">
+                    Back
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-red-200">Not enough {choice}</h2>
+                <p className="mt-2 text-slate-300">
+                  You don&apos;t have enough {choice} to start a round. Purchase more silver to keep
+                  playing — pay with crypto and it&apos;s credited as soon as the payment confirms.
+                </p>
+                <div className="mt-5 flex flex-col gap-3">
+                  <Link href="/buy" onClick={closeChooser} className="btn-gold text-center">
+                    Go to the purchase page →
+                  </Link>
+                  <button onClick={() => setChoice(null)} className="btn-ghost">
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

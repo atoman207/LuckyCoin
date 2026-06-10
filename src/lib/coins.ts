@@ -7,16 +7,25 @@ export const COIN_VALUE = {
   bronze: 1,
 } as const;
 
-// Cost to start one round (in silver coins).
+// Cost to start one round. A player may pay with EITHER 1 silver OR 10 bronze
+// ("coins") — equal value, since 1 silver = 10 bronze.
 export const ROUND_COST_SILVER = 1;
+export const ROUND_COST_BRONZE = COIN_VALUE.silver; // 10 bronze
 
-// The 50-coin board. Must sum to BOARD_SIZE.
-export const BOARD_SIZE = 50;
+export type RoundCurrency = "silver" | "bronze";
+export const ROUND_COST: Record<RoundCurrency, number> = {
+  silver: ROUND_COST_SILVER,
+  bronze: ROUND_COST_BRONZE,
+};
+
+// The board. Counts must sum to BOARD_SIZE. (Bronze = "copper".)
 export const BOARD_COMPOSITION = {
   gold: 1,
-  silver: 5,
-  bronze: 44,
+  silver: 4,
+  bronze: 20,
 } as const;
+export const BOARD_SIZE =
+  BOARD_COMPOSITION.gold + BOARD_COMPOSITION.silver + BOARD_COMPOSITION.bronze; // 25
 
 // Reward granted when a shell of each type is opened.
 export const SHELL_REWARD = {
@@ -25,15 +34,32 @@ export const SHELL_REWARD = {
   bronze: { gold: 0, silver: 0, bronze: 1 },
 } as const;
 
-// Starting balance for a brand-new account (after the signup reward).
+// Starting balance for a brand-new account. 1 silver lets them play a round
+// right away; bronze comes from the welcome + day-1 daily reward below.
 export const START_SILVER = 1;
-export const START_BRONZE = 10;
-export const SIGNUP_REWARD_BRONZE = 50;
+export const START_BRONZE = 0;
 
-// Daily bonus.
-export const DAILY_BONUS_BRONZE = 5;
-export const STREAK_LENGTH = 7;
-export const STREAK_BONUS_BRONZE = 20;
+// One-time welcome bonus granted on first sign-up (bronze), on top of the
+// day-1 daily reward (so a new account gets 50 + 20 = 70 bronze).
+export const SIGNUP_WELCOME_BRONZE = 50;
+
+// Daily login reward (bronze). Claimable once every 24h; the streak advances
+// only if claimed within the next 24h window — miss it and the streak resets.
+export const DAILY_CLAIM_INTERVAL_MS = 24 * 60 * 60 * 1000; // can claim once / 24h
+export const DAILY_RESET_AFTER_MS = 48 * 60 * 60 * 1000; // > this since last claim ⇒ missed a day
+
+// Reward schedule by streak day:
+//   day 1: 20, then +5 for each of the first two follow-up days (25, 30),
+//   holding at 30, then a fixed 50 from day 7 onward.
+export const DAILY_BASE_REWARD = 20;
+export const DAILY_FIXED_DAY = 7;
+export const DAILY_FIXED_REWARD = 50;
+
+export function dailyReward(streakDay: number): number {
+  if (streakDay >= DAILY_FIXED_DAY) return DAILY_FIXED_REWARD;
+  const day = Math.max(1, streakDay);
+  return DAILY_BASE_REWARD + 5 * Math.min(day - 1, 2); // 20, 25, 30, 30, 30, 30
+}
 
 // Purchase packs — buy silver coins (crypto checkout, verified on-chain).
 // Minimum purchase is 10 silver. Base rate is $0.25 / silver.
@@ -62,7 +88,7 @@ export type Profile = {
   created_at: string;
 };
 
-// Build a freshly shuffled board of 50 shells.
+// Build a freshly shuffled board (counts come from BOARD_COMPOSITION).
 export function buildBoard(): CoinType[] {
   const board: CoinType[] = [];
   (Object.keys(BOARD_COMPOSITION) as CoinType[]).forEach((type) => {

@@ -1,31 +1,36 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { buildBoard, BOARD_SIZE, ROUND_COST_SILVER } from "@/lib/coins";
+import { buildBoard, BOARD_SIZE, ROUND_COST, type RoundCurrency } from "@/lib/coins";
 
-// Start a new round. Costs 1 silver. Generates and stores the 50-coin board
-// server-side, then returns only the round id + size — never the contents.
-export async function POST() {
+// Start a new round. The player chooses to pay with EITHER 1 silver OR 10
+// bronze (equal value). Generates and stores the 50-coin board server-side,
+// then returns only the round id + size — never the contents.
+export async function POST(req: Request) {
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
   const { admin, profile } = ctx;
 
-  // Admins play for free so they can always start a round (no entry cost).
-  const cost = profile.is_admin ? 0 : ROUND_COST_SILVER;
+  const body = await req.json().catch(() => ({}));
+  const currency: RoundCurrency = body.currency === "bronze" ? "bronze" : "silver";
+  const unit = currency === "bronze" ? "bronze" : "silver";
 
-  if (profile.silver < cost) {
+  // Admins play for free; everyone else pays the chosen entry cost.
+  const cost = profile.is_admin ? 0 : ROUND_COST[currency];
+
+  if (!profile.is_admin && profile[unit] < cost) {
     return NextResponse.json(
-      { error: `You need ${cost} silver to play. Buy or exchange coins.` },
+      { error: `You need ${cost} ${unit} to play. Buy more coins to keep playing.`, currency },
       { status: 400 }
     );
   }
 
-  // Deduct the entry cost (zero for admins).
+  // Deduct the entry cost from the chosen balance (zero for admins).
   const { data: charged, error: chargeErr } = await admin
     .from("profiles")
-    .update({ silver: profile.silver - cost })
+    .update({ [unit]: profile[unit] - cost })
     .eq("id", profile.id)
-    .gte("silver", cost) // guard against races
+    .gte(unit, cost) // guard against races
     .select("*")
     .single();
 
@@ -41,10 +46,10 @@ export async function POST() {
     .single();
 
   if (roundErr || !round) {
-    // Refund the silver if the round couldn't be created.
+    // Refund the entry cost if the round couldn't be created.
     await admin
       .from("profiles")
-      .update({ silver: charged.silver + cost })
+      .update({ [unit]: charged[unit] + cost })
       .eq("id", profile.id);
     return NextResponse.json({ error: "Could not start round." }, { status: 500 });
   }

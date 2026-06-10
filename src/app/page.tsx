@@ -68,7 +68,7 @@ export default function Landing() {
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
             { t: "1 · Register & log in", d: "Sign up with your nickname and email. You start with a silver coin, bronze coins and a welcome bonus." },
-            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 50 coins: 1 gold, 5 silver, the rest bronze." },
+            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 25 coins: 1 gold, 4 silver, the rest bronze." },
             { t: "3 · Pick & crack", d: "Choose one coin. It cracks open and the prize is added to your account instantly." },
           ].map((c) => (
             <div key={c.t} className="card p-6">

@@ -18,8 +18,8 @@ create table if not exists public.profiles (
   silver        integer     not null default 0,
   bronze        integer     not null default 0,
   is_admin      boolean     not null default false,
-  streak        integer     not null default 0,        -- consecutive daily-bonus days
-  last_bonus_at date,                                   -- last day the daily bonus was claimed
+  streak        integer     not null default 0,        -- consecutive daily-reward days
+  last_bonus_at timestamptz,                            -- when the daily reward was last claimed (24h timer)
   created_at    timestamptz not null default now()
 );
 
@@ -62,6 +62,20 @@ create table if not exists public.purchases (
 -- any later columns here — and do it BEFORE the indexes below, which depend
 -- on them (e.g. tx_hash). Harmless on a fresh database (columns already exist).
 alter table public.profiles  add column if not exists avatar_url text;
+
+-- The daily reward uses a precise 24h timer, so last_bonus_at must be a
+-- timestamp. Convert it from the older `date` type on existing projects.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles'
+      and column_name = 'last_bonus_at' and data_type = 'date'
+  ) then
+    alter table public.profiles
+      alter column last_bonus_at type timestamptz using last_bonus_at::timestamptz;
+  end if;
+end $$;
 
 alter table public.purchases add column if not exists currency       text;
 alter table public.purchases add column if not exists wallet_address text;

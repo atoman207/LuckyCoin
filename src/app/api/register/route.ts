@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { START_SILVER, START_BRONZE, SIGNUP_REWARD_BRONZE } from "@/lib/coins";
+import { START_SILVER, START_BRONZE, SIGNUP_WELCOME_BRONZE, dailyReward } from "@/lib/coins";
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +43,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create the profile with the starting balance + signup reward.
+    // Create the profile with the starting balance + welcome bonus + the
+    // day-1 daily reward (50 + 20 = 70 bronze). The streak starts at day 1 and
+    // last_bonus_at is set to now, so the next claim is available in 24h.
     const { error: profileErr } = await admin.from("profiles").insert({
       id: created.user.id,
       nickname,
@@ -52,7 +54,9 @@ export async function POST(req: Request) {
       discord_id,
       gold: 0,
       silver: START_SILVER,
-      bronze: START_BRONZE + SIGNUP_REWARD_BRONZE,
+      bronze: START_BRONZE + SIGNUP_WELCOME_BRONZE + dailyReward(1),
+      streak: 1,
+      last_bonus_at: new Date().toISOString(),
     });
 
     if (profileErr) {

@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/components/UserProvider";
+import Avatar from "@/components/Avatar";
 
 type Mode = "login" | "register";
+
+const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB (matches the upload route)
 
 export default function AuthModal() {
   const { authOpen, closeAuth, refresh } = useUser();
@@ -20,10 +24,49 @@ export default function AuthModal() {
     discord_id: "",
   });
 
+  // Avatar chosen during registration (uploaded right after sign-in).
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
   if (!authOpen) return null;
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  function clearAvatar() {
+    setAvatarPreview((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return null;
+    });
+    setAvatarFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!AVATAR_TYPES.includes(file.type)) {
+      setError("Avatar must be a PNG, JPG, WEBP or GIF image.");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setError("Avatar must be 2 MB or smaller.");
+      return;
+    }
+    setError(null);
+    setAvatarPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(file);
+    });
+    setAvatarFile(file);
+  }
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError(null);
+    if (m === "login") clearAvatar();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +91,19 @@ export default function AuthModal() {
       });
       if (signInErr) throw new Error(signInErr.message);
 
+      // Upload the chosen avatar now that the user is authenticated. A failure
+      // here shouldn't undo a successful registration/sign-in.
+      if (mode === "register" && avatarFile) {
+        try {
+          const fd = new FormData();
+          fd.append("avatar", avatarFile);
+          await fetch("/api/profile/avatar", { method: "POST", body: fd });
+        } catch {
+          /* avatar can be set later from the profile page */
+        }
+      }
+
+      clearAvatar();
       await refresh();
       closeAuth();
     } catch (err) {
@@ -88,10 +144,7 @@ export default function AuthModal() {
           {(["login", "register"] as Mode[]).map((m) => (
             <button
               key={m}
-              onClick={() => {
-                setMode(m);
-                setError(null);
-              }}
+              onClick={() => switchMode(m)}
               className={`rounded-lg py-2 text-sm font-semibold capitalize transition ${
                 mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
               }`}
@@ -102,6 +155,34 @@ export default function AuthModal() {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+          {mode === "register" && (
+            <div className="flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="relative rounded-full transition hover:opacity-90"
+                aria-label="Choose an avatar"
+              >
+                <Avatar src={avatarPreview} name={form.nickname || "?"} size={76} />
+                <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-amber-400 text-sm font-bold text-slate-900 ring-2 ring-[#121829]">
+                  ＋
+                </span>
+              </button>
+              <p className="text-xs text-slate-400">Add a profile avatar (optional)</p>
+              {avatarPreview && (
+                <button type="button" onClick={clearAvatar} className="text-xs text-red-300 hover:underline">
+                  Remove
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={onAvatarChange}
+              />
+            </div>
+          )}
           {mode === "register" && (
             <div>
               <label className="label">Nickname</label>
