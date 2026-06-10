@@ -25,6 +25,9 @@ create table if not exists public.profiles (
   game_mode     text,                                  -- restart mode: 'continuous' | 'multiplier'
   game_restarts integer     not null default 0,        -- restarts used this game (max 10)
   last_draw_at  timestamptz,                            -- last daily prize-wheel spin (24h timer)
+  continue_until timestamptz,                           -- persistent 2h "Continue" timer deadline
+  rewards_claimed boolean   not null default false,    -- claimed the sign-up + day-1 bonus?
+  first_login_done boolean  not null default false,    -- completed the email magic-link first login?
   created_at    timestamptz not null default now()
 );
 create index if not exists profiles_created_idx on public.profiles (created_at);
@@ -73,6 +76,18 @@ alter table public.profiles  add column if not exists game_round integer not nul
 alter table public.profiles  add column if not exists game_mode text;
 alter table public.profiles  add column if not exists game_restarts integer not null default 0;
 alter table public.profiles  add column if not exists last_draw_at timestamptz;
+alter table public.profiles  add column if not exists continue_until timestamptz;
+alter table public.profiles  add column if not exists rewards_claimed boolean not null default false;
+alter table public.profiles  add column if not exists first_login_done boolean not null default false;
+-- Existing/established accounts have already logged in — don't gate them.
+update public.profiles set first_login_done = true
+  where first_login_done = false
+    and (is_admin = true or rewards_claimed = true or last_bonus_at is not null
+         or gold > 0 or silver > 0 or bronze > 0);
+-- Existing accounts (any coins or a prior daily claim) count as already claimed,
+-- so the new "Claim Rewards" flow only applies to brand-new sign-ups.
+update public.profiles set rewards_claimed = true
+  where rewards_claimed = false and (last_bonus_at is not null or gold > 0 or silver > 0 or bronze > 0);
 
 -- The daily reward uses a precise 24h timer, so last_bonus_at must be a
 -- timestamp. Convert it from the older `date` type on existing projects.
@@ -139,6 +154,19 @@ create table if not exists public.visits (
 );
 create unique index if not exists visits_visitor_day_key on public.visits (visitor_id, day);
 
+-- ---------- contacts ----------------------------------------------------
+-- Messages submitted through the contact page; shown on the admin page.
+create table if not exists public.contacts (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references public.profiles (id) on delete set null,
+  name       text,
+  email      text,
+  message    text not null,
+  handled    boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists contacts_created_idx on public.contacts (created_at desc);
+
 -- =====================================================================
 --  Row Level Security
 --  Strategy: the browser may only READ its own profile. Every write to
@@ -152,6 +180,8 @@ alter table public.purchases   enable row level security;
 alter table public.sells       enable row level security;
 alter table public.draws       enable row level security;
 alter table public.visits      enable row level security;
+alter table public.contacts    enable row level security;
+-- contacts: no client policy (written/read via the service role only).
 
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile"

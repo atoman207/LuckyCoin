@@ -3,6 +3,8 @@ import { requireProfile } from "@/lib/auth";
 import {
   buildBoardFrom,
   compositionFor,
+  multiplierFor,
+  stageCostMultiplier,
   BASE_COMPOSITION,
   MAX_RESTARTS,
   BOARD_SIZE,
@@ -27,6 +29,9 @@ export async function POST(req: Request) {
   const currency: RoundCurrency = body.currency === "bronze" ? "bronze" : "silver";
   const unit = currency;
   const isRestart = body.action === "restart";
+  const initiate = body.initiate === true; // (re)start the 2-hour Continue timer
+
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
   // Resolve mode + round + restart count.
   let mode: PlayMode | null;
@@ -49,14 +54,19 @@ export async function POST(req: Request) {
     restarts = 0;
   }
 
+  // Board composition per the original rules (1 gold, 4 silver, 20 bronze and
+  // the rest "NO"), or the per-stage composition in Multiplier Play.
   const composition = isRestart && mode ? compositionFor(mode, round) : BASE_COMPOSITION;
+  const increase = multiplierFor(mode, round); // per-round ×N (for display)
 
-  // Entry cost (zero for admins).
-  const cost = profile.is_admin ? 0 : ROUND_COST[currency];
+  // The stake COMPOUNDS each round: cost = base × cumulative multiplier.
+  // (silver: 1,2,4,8,24,72,288,1440,14400,288000; bronze ×10.) Admins free.
+  const costMult = mode === "multiplier" ? stageCostMultiplier(round) : 1;
+  const cost = profile.is_admin ? 0 : Math.ceil(ROUND_COST[currency] * costMult);
   if (!profile.is_admin && profile[unit] < cost) {
     return NextResponse.json(
       {
-        error: `You need ${cost} ${unit} to play, but only have ${profile[unit]}.`,
+        error: `You need ${cost} ${unit} to start this stage (×${increase}), but only have ${profile[unit]}.`,
         currency,
         insufficient: true,
       },
@@ -64,15 +74,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // Charge the entry cost and persist the game state in one update.
+  // Charge the entry cost and persist the game state in one update. Only an
+  // "initiate" (Start, or the auto-restart at 0) resets the 2-hour timer.
+  const update: Record<string, unknown> = {
+    [unit]: profile[unit] - cost,
+    game_round: round,
+    game_mode: mode,
+    game_restarts: restarts,
+  };
+  if (initiate) update.continue_until = new Date(Date.now() + TWO_HOURS_MS).toISOString();
+
   const { data: charged, error: chargeErr } = await admin
     .from("profiles")
-    .update({
-      [unit]: profile[unit] - cost,
-      game_round: round,
-      game_mode: mode,
-      game_restarts: restarts,
-    })
+    .update(update)
     .eq("id", profile.id)
     .gte(unit, cost) // guard against races
     .select("*")
@@ -98,6 +112,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not start round." }, { status: 500 });
   }
 
+  const empty = BOARD_SIZE - (composition.gold + composition.silver + composition.bronze);
   return NextResponse.json({
     roundId: created.id,
     size: BOARD_SIZE,
@@ -106,5 +121,7 @@ export async function POST(req: Request) {
     mode,
     restarts,
     maxRestarts: MAX_RESTARTS,
+    composition: { ...composition, empty },
+    multiplier: increase,
   });
 }

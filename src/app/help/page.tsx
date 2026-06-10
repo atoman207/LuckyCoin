@@ -157,7 +157,8 @@ export default function HelpPage() {
       <Section title="Exchange, buy &amp; sell">
         <p>
           <strong>Exchange</strong> converts coins downward only: gold → silver → bronze (never back
-          up), preserving value.
+          up). Silver→bronze bundles earn a bonus: 10 silver → 110 bronze, 100 silver → 1,500
+          bronze (singles stay 1 → 10).
         </p>
         <p>
           <strong>Buy</strong> silver with crypto (verified on-chain). Packs:{" "}

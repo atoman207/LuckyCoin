@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinBalance from "@/components/CoinBalance";
 import Avatar from "@/components/Avatar";
+import FirstLoginButtons from "@/components/FirstLoginButtons";
 
 const LINKS = [
   { href: "/game", label: "Play" },
@@ -15,6 +16,7 @@ const LINKS = [
   { href: "/sell", label: "Sell" },
   { href: "/exchange", label: "Exchange" },
   { href: "/help", label: "Help" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Nav() {
@@ -64,9 +66,10 @@ export default function Nav() {
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {loading ? null : profile ? (
             <>
+              <FirstLoginButtons />
               <div className="hidden sm:block">
                 <CoinBalance profile={profile} />
               </div>

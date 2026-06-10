@@ -21,6 +21,12 @@ export async function POST() {
   if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
   const { admin, profile } = ctx;
+
+  // New members must claim their sign-up + day-1 reward first (/api/claim).
+  if (!profile.rewards_claimed) {
+    return NextResponse.json({ claimed: false, message: "Claim your sign-up rewards first.", profile });
+  }
+
   const now = Date.now();
   const last = profile.last_bonus_at ? new Date(profile.last_bonus_at).getTime() : null;
 

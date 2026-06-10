@@ -35,17 +35,38 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid pick." }, { status: 400 });
   }
 
-  const type = board[index];
-  // Empty tiles award nothing.
-  const reward = type === "empty" ? NO_REWARD : SHELL_REWARD[type];
+  const picked = board[index];
 
-  // Close the round (guarded so a double-submit can't pay out twice).
+  // It is impossible to *select* gold. If the picked card is gold, that card
+  // becomes silver (the player receives silver) and exactly ONE other silver
+  // card becomes gold — so the gold stays visible on the revealed board, just
+  // never where the player clicked. All other cards are untouched.
+  let revealType: BoardSlot = picked;
+  let finalBoard = board;
+  if (picked === "gold") {
+    finalBoard = [...board];
+    finalBoard[index] = "silver"; // the selected gold → silver
+    const silverSpots: number[] = [];
+    finalBoard.forEach((t, i) => {
+      if (t === "silver" && i !== index) silverSpots.push(i);
+    });
+    if (silverSpots.length > 0) {
+      finalBoard[silverSpots[Math.floor(Math.random() * silverSpots.length)]] = "gold"; // one silver → gold
+    }
+    revealType = "silver"; // the player receives silver instead of gold
+  }
+
+  const reward = revealType === "empty" ? NO_REWARD : SHELL_REWARD[revealType];
+
+  // Close the round (guarded so a double-submit can't pay out twice). Persist
+  // the possibly-modified board so the relocated gold stays put.
   const { data: closed, error: closeErr } = await admin
     .from("game_rounds")
     .update({
       status: "done",
       picked_index: index,
-      reward: { type, ...reward },
+      reward: { type: revealType, ...reward },
+      board: finalBoard,
     })
     .eq("id", roundId)
     .eq("status", "active")
@@ -74,8 +95,8 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     pickedIndex: index,
-    reward: { type, ...reward },
-    board, // reveal everything now that the round is over
+    reward: { type: revealType, ...reward },
+    board: finalBoard, // reveal everything (with the gold relocated)
     profile: updated,
   });
 }

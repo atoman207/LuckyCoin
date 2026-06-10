@@ -1,13 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import SubscriberChart from "@/components/SubscriberChart";
 
 export default function Landing() {
-  const { profile, openAuth } = useUser();
+  const { profile, openAuth, openWelcome } = useUser();
   const router = useRouter();
+
+  // After the email magic-link login lands here, show the welcome message.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("welcome") === "1") {
+      openWelcome();
+      window.history.replaceState({}, "", "/");
+    }
+  }, [openWelcome]);
 
   function startGame() {
     // Logged-out visitors get the free demo on /game (3 rounds, then login).

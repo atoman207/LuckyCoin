@@ -48,14 +48,24 @@ type Txn = {
   profiles: { nickname: string; email: string } | null;
 };
 
+type Contact = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  message: string;
+  handled: boolean;
+  created_at: string;
+};
+
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleString() : "—");
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
 
 export default function AdminPage() {
   const { profile, loading } = useUser();
-  const [tab, setTab] = useState<"users" | "transactions">("users");
+  const [tab, setTab] = useState<"users" | "transactions" | "messages">("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
+  const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -85,12 +95,20 @@ export default function AdminPage() {
     if (res.ok) setStats(data);
   }, []);
 
+  const loadContacts = useCallback(async () => {
+    const res = await fetch("/api/admin/contacts", { cache: "no-store" });
+    const data = await res.json();
+    if (res.ok) setContacts(data.contacts);
+    else setError(data.error);
+  }, []);
+
   useEffect(() => {
     if (!profile?.is_admin) return;
     loadUsers();
     loadTxns();
     loadStats();
-  }, [profile, loadUsers, loadTxns, loadStats]);
+    loadContacts();
+  }, [profile, loadUsers, loadTxns, loadStats, loadContacts]);
 
   if (loading) return <div className="py-20 text-center text-slate-400">Loading…</div>;
   if (!profile?.is_admin) {
@@ -162,7 +180,7 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex gap-2 rounded-xl bg-black/30 p-1">
-          {(["users", "transactions"] as const).map((t) => (
+          {(["users", "transactions", "messages"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -419,6 +437,33 @@ export default function AdminPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "messages" && (
+        <div className="card divide-y divide-white/5 p-0">
+          {contacts === null ? (
+            <div className="px-4 py-8 text-center text-slate-500">Loading…</div>
+          ) : contacts.length === 0 ? (
+            <div className="px-4 py-8 text-center text-slate-500">No messages yet.</div>
+          ) : (
+            contacts.map((c) => (
+              <div key={c.id} className="px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-semibold">
+                    {c.name ?? "Anonymous"}{" "}
+                    {c.email && (
+                      <a href={`mailto:${c.email}`} className="text-sm font-normal text-amber-300 hover:underline">
+                        &lt;{c.email}&gt;
+                      </a>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500">{fmt(c.created_at)}</div>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{c.message}</p>
+              </div>
+            ))
+          )}
         </div>
       )}
 

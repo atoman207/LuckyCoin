@@ -10,13 +10,14 @@ import { INTRO_TEASER } from "@/lib/content";
 
 const KEY = "lc_demo_plays";
 
-// Weighted demo outcome so coins always appear and entice sign-ups:
-//   gold ~10%, silver ~20%, bronze ~70% (every pick is a coin).
-function weightedCoin(): CoinType {
+// Weighted demo outcome for logged-out (trial) users:
+//   gold 10%, silver 30%, bronze 50%, no win 10%.
+function weightedOutcome(): BoardSlot {
   const r = Math.random();
-  if (r < 0.1) return "gold";
-  if (r < 0.3) return "silver";
-  return "bronze";
+  if (r < 0.1) return "gold"; // 10%
+  if (r < 0.4) return "silver"; // 30%
+  if (r < 0.9) return "bronze"; // 50%
+  return "empty"; // 10% — no win
 }
 
 // Free trial for logged-out visitors: up to FREE_PLAYS demo rounds per browser.
@@ -28,7 +29,7 @@ export default function DemoGame() {
   const [plays, setPlays] = useState(0);
   const [board, setBoard] = useState<BoardSlot[] | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const [result, setResult] = useState<CoinType | null>(null);
+  const [result, setResult] = useState<BoardSlot | null>(null);
   const [coinModal, setCoinModal] = useState<CoinType | null>(null);
   const [gateOpen, setGateOpen] = useState(false);
 
@@ -48,13 +49,15 @@ export default function DemoGame() {
 
   function pick(i: number) {
     if (!board || picked !== null) return;
-    const coin = weightedCoin(); // demo always reveals a coin
+    const out = weightedOutcome();
     setPicked(i);
-    setResult(coin);
-    setCoinModal(coin);
+    setResult(out);
+    setCoinModal(out === "empty" ? null : out); // effect modal only for coins
     const next = plays + 1;
     setPlays(next);
     localStorage.setItem(KEY, String(next));
+    // No coin modal on a no-win, so open the login gate here if trial is used up.
+    if (out === "empty" && next >= FREE_PLAYS) setTimeout(() => setGateOpen(true), 800);
   }
 
   // Closing the win modal: if the trial is used up, show the login gate.
@@ -128,7 +131,9 @@ export default function DemoGame() {
 
           {result !== null && !coinModal && (
             <div className="card flex flex-col items-center gap-3 p-6 text-center">
-              <div className="text-xl font-bold capitalize">You found 1 {result} coin! (demo)</div>
+              <div className="text-xl font-bold capitalize">
+                {result === "empty" ? "No win this time (demo)" : `You found 1 ${result} coin! (demo)`}
+              </div>
               <button onClick={start} className="btn-gold">
                 {left > 0 ? `Play again (${left} left)` : "Log in to keep playing"}
               </button>

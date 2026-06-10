@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { COIN_VALUE, EXCHANGE_NEXT, type CoinType } from "@/lib/coins";
+import { COIN_VALUE, EXCHANGE_NEXT, exchangeOutput, type CoinType } from "@/lib/coins";
 
 const TYPES: CoinType[] = ["gold", "silver", "bronze"];
 
-// Convert coins DOWNWARD only — gold → silver, silver → bronze — preserving
-// total bronze value. Upgrading (e.g. bronze → silver) is not allowed.
+// Convert coins DOWNWARD only — gold → silver, silver → bronze. Silver→bronze
+// uses tiered bundle bonuses; upgrading (e.g. bronze → silver) is not allowed.
 export async function POST(req: Request) {
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -30,15 +30,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Not enough ${from} coins.` }, { status: 400 });
   }
 
-  const totalValue = amt * COIN_VALUE[from as CoinType];
-  if (totalValue % COIN_VALUE[to as CoinType] !== 0) {
-    const unit = COIN_VALUE[to as CoinType];
-    return NextResponse.json(
-      { error: `That doesn't convert evenly. Use a multiple worth ${unit} bronze.` },
-      { status: 400 }
-    );
+  if (from === "gold") {
+    const totalValue = amt * COIN_VALUE.gold;
+    if (totalValue % COIN_VALUE.silver !== 0) {
+      return NextResponse.json(
+        { error: `That doesn't convert evenly. Use a multiple worth ${COIN_VALUE.silver} bronze.` },
+        { status: 400 }
+      );
+    }
   }
-  const received = totalValue / COIN_VALUE[to as CoinType];
+
+  const received = exchangeOutput(from as CoinType, to as CoinType, amt);
 
   const next = {
     gold: profile.gold,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
-import { COIN_VALUE, EXCHANGE_NEXT, type CoinType } from "@/lib/coins";
+import { EXCHANGE_NEXT, exchangeOutput, type CoinType } from "@/lib/coins";
 
 // Only downward conversions are allowed: gold → silver, silver → bronze.
 const FROM_TYPES: CoinType[] = ["gold", "silver"];
@@ -28,7 +28,7 @@ export default function ExchangePage() {
   if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
 
   const to = EXCHANGE_NEXT[from] as CoinType; // gold→silver, silver→bronze
-  const received = (amount * COIN_VALUE[from]) / COIN_VALUE[to];
+  const received = amount > 0 ? exchangeOutput(from, to, amount) : 0;
   const enough = profile[from] >= amount && amount > 0;
 
   async function submit() {
@@ -55,7 +55,8 @@ export default function ExchangePage() {
   const presets = [
     { from: "gold" as const, amount: 1, label: "1 gold → 50 silver" },
     { from: "silver" as const, amount: 1, label: "1 silver → 10 bronze" },
-    { from: "silver" as const, amount: 10, label: "10 silver → 100 bronze" },
+    { from: "silver" as const, amount: 10, label: "10 silver → 110 bronze" },
+    { from: "silver" as const, amount: 100, label: "100 silver → 1,500 bronze" },
   ];
 
   return (
@@ -64,8 +65,8 @@ export default function ExchangePage() {
         <div>
           <h1 className="text-3xl font-extrabold">Exchange coins</h1>
           <p className="text-slate-400">
-            Downward only: gold → silver, silver → bronze. Value is always preserved (you can&apos;t
-            convert back up).
+            Downward only: gold → silver, silver → bronze. Bulk silver→bronze bundles earn a bonus
+            (10 → 110, 100 → 1,500). You can&apos;t convert back up.
           </p>
         </div>
         <CoinBalance profile={profile} size={26} />

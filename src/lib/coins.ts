@@ -25,7 +25,11 @@ export const FREE_PLAYS = 3;
 // 20 segments, rewarded in bronze. The pointer NEVER lands on 1000 or 500
 // (those are display-only teasers); wins come from the other segments.
 export const WHEEL_REWARD_COIN: CoinType = "bronze";
-export const WHEEL_SPIN_MS = 10_000; // wheel spins for 10 seconds
+export const DRAW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // one free spin every 24h
+export const WHEEL_SPIN_MS = 10_000; // nominal spin time
+// Time coefficient: compress the elapsed spin to a fraction of a second.
+export const WHEEL_TIME_COEFFICIENT = 0.07;
+export const WHEEL_SPIN_EFFECTIVE_MS = Math.round(WHEEL_SPIN_MS * WHEEL_TIME_COEFFICIENT); // ~700ms
 export const WHEEL_VALUES: number[] = [
   1000, // ×1
   500, 500, // ×2
@@ -38,12 +42,64 @@ export const WHEEL_VALUES: number[] = [
 export const WHEEL_BLOCKED = [1000, 500]; // pointer can never stop here
 export const wheelCanWin = (value: number) => !WHEEL_BLOCKED.includes(value);
 
+// Win probabilities for the daily lottery (percent weights). 1000/500 are
+// never drawn; 100=2%, 50=10%, 10=50%, and the rest is split between 5 and 0.
+export const WHEEL_WIN_WEIGHTS: Record<number, number> = {
+  100: 2,
+  50: 10,
+  10: 50,
+  5: 30,
+  0: 8,
+};
+
+export function drawCooldownLeftMs(lastDrawAt: string | null | undefined, now = Date.now()): number {
+  if (!lastDrawAt) return 0;
+  return Math.max(0, new Date(lastDrawAt).getTime() + DRAW_COOLDOWN_MS - now);
+}
+
+export function formatDrawCountdown(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 // ---- Exchange direction ------------------------------------------------
 // One-way only: gold → silver, silver → bronze. Never the reverse.
 export const EXCHANGE_NEXT: Partial<Record<CoinType, CoinType>> = {
   gold: "silver",
   silver: "bronze",
 };
+
+// Silver → bronze uses tiered bundles (largest first). Singles stay at par.
+export const SILVER_BRONZE_TIERS = [
+  { silver: 100, bronze: 1500 },
+  { silver: 10, bronze: 110 },
+  { silver: 1, bronze: 10 },
+] as const;
+
+export function silverToBronze(amount: number): number {
+  let remaining = amount;
+  let total = 0;
+  for (const tier of SILVER_BRONZE_TIERS) {
+    const chunks = Math.floor(remaining / tier.silver);
+    total += chunks * tier.bronze;
+    remaining %= tier.silver;
+  }
+  return total;
+}
+
+// How many coins you receive when exchanging downward.
+export function exchangeOutput(from: CoinType, to: CoinType, amount: number): number {
+  if (from === "gold" && to === "silver") {
+    return (amount * COIN_VALUE.gold) / COIN_VALUE.silver;
+  }
+  if (from === "silver" && to === "bronze") {
+    return silverToBronze(amount);
+  }
+  throw new Error(`Invalid exchange: ${from} → ${to}`);
+}
 
 // The board: 50 tiles — 1 gold, 4 silver, 20 bronze ("copper") and the rest
 // empty (no win). Counts must sum to BOARD_SIZE.
@@ -76,10 +132,33 @@ export const MULTIPLIER_ROUNDS: Record<number, Composition> = {
   5: { gold: 2, silver: 18, bronze: 30 },
   6: { gold: 3, silver: 7, bronze: 40 },
   7: { gold: 3, silver: 17, bronze: 30 },
-  8: { gold: 4, silver: 16, bronze: 30 },
-  9: { gold: 4, silver: 36, bronze: 10 },
-  10: { gold: 5, silver: 45, bronze: 0 },
+  8: { gold: 5, silver: 40, bronze: 5 },
+  9: { gold: 10, silver: 40, bronze: 0 },
+  10: { gold: 20, silver: 30, bronze: 0 },
 };
+
+// Per-round multiplier INCREASE in Multiplier Play. The entry stake compounds
+// by this each round (so it is shown as "×N" for the round).
+export const MULTIPLIER_FACTORS: Record<number, number> = {
+  1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 6: 3, 7: 3, 8: 4, 9: 4, 10: 5,
+};
+
+// The per-round increase shown for `round` (1 outside Multiplier Play).
+export function multiplierFor(mode: string | null | undefined, round: number): number {
+  if (mode !== "multiplier") return 1;
+  return MULTIPLIER_FACTORS[Math.min(Math.max(round, 1), 10)] ?? 1;
+}
+
+// Cumulative stake multiplier: the product of all increases up to `round`, so
+// the entry cost = base × this. With base = 1 silver / 10 bronze this gives:
+//   silver: 1, 2, 4, 8, 24, 72, 216, 864, 3456, 17280
+//   bronze: 10, 20, 40, 80, 240, 720, 2160, 8640, 34560, 172800
+export function stageCostMultiplier(round: number): number {
+  const r = Math.min(Math.max(round, 1), 10);
+  let m = 1;
+  for (let k = 1; k <= r; k++) m *= MULTIPLIER_FACTORS[k] ?? 1;
+  return m;
+}
 
 // Server-authoritative board composition for a given mode + round.
 // Continuous always uses the base board; Multiplier escalates per the table
@@ -134,6 +213,12 @@ export const COIN_PACKS: CoinPack[] = [
   { silver: 1000, usd: 100, label: "1,000 Silver", tag: "Best value" },
 ];
 
+// Custom purchase: any whole amount of silver from 1 to 100, at the base rate.
+export const CUSTOM_SILVER_MIN = 1;
+export const CUSTOM_SILVER_MAX = 100;
+export const PRICE_PER_SILVER = 0.25; // USD per silver (base rate)
+export const customCost = (silver: number) => Number((silver * PRICE_PER_SILVER).toFixed(2));
+
 export type CoinType = "gold" | "silver" | "bronze";
 // A board tile is a coin or an empty slot (no win).
 export type BoardSlot = CoinType | "empty";
@@ -156,6 +241,9 @@ export type Profile = {
   game_mode?: string | null;
   game_restarts?: number;
   last_draw_at?: string | null;
+  continue_until?: string | null;
+  rewards_claimed?: boolean;
+  first_login_done?: boolean;
 };
 
 // Build a freshly shuffled 50-tile board from a coin composition; any tiles

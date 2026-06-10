@@ -7,13 +7,24 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import NetworkIcon from "@/components/NetworkIcon";
 import CheckoutModal, { type CheckoutOrder } from "@/components/CheckoutModal";
-import { COIN_PACKS, type CoinPack } from "@/lib/coins";
+import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX, customCost } from "@/lib/coins";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/wallets";
+
+type Selection = { silver: number; usd: number; label: string };
 
 export default function BuyPage() {
   const router = useRouter();
   const { profile, loading, openAuth, setProfile } = useUser();
-  const [selected, setSelected] = useState<CoinPack | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
+  const [customSilver, setCustomSilver] = useState(10);
+  const [usingCustom, setUsingCustom] = useState(false);
+
+  function selectCustom(n: number) {
+    const v = Math.max(CUSTOM_SILVER_MIN, Math.min(CUSTOM_SILVER_MAX, Math.floor(n) || CUSTOM_SILVER_MIN));
+    setCustomSilver(v);
+    setUsingCustom(true);
+    setSelected({ silver: v, usd: customCost(v), label: `${v} Silver` });
+  }
   const [method, setMethod] = useState<PaymentMethod>(PAYMENT_METHODS[0]);
   const [order, setOrder] = useState<CheckoutOrder | null>(null);
   const [txHash, setTxHash] = useState("");
@@ -108,11 +119,14 @@ export default function BuyPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COIN_PACKS.map((pack) => {
           const per = pack.usd / pack.silver;
-          const active = selected?.silver === pack.silver;
+          const active = !usingCustom && selected?.silver === pack.silver;
           return (
             <button
               key={pack.silver}
-              onClick={() => setSelected(pack)}
+              onClick={() => {
+                setUsingCustom(false);
+                setSelected({ silver: pack.silver, usd: pack.usd, label: pack.label });
+              }}
               className={`card relative flex flex-col items-center gap-2 p-6 text-center transition ${
                 active ? "border-amber-300 ring-2 ring-amber-300" : "hover:border-white/25"
               }`}
@@ -129,6 +143,28 @@ export default function BuyPage() {
             </button>
           );
         })}
+
+        {/* Custom amount: 1–100 silver */}
+        <div
+          onClick={() => selectCustom(customSilver)}
+          className={`card relative flex cursor-pointer flex-col items-center gap-2 p-6 text-center transition ${
+            usingCustom ? "border-amber-300 ring-2 ring-amber-300" : "hover:border-white/25"
+          }`}
+        >
+          <CoinIcon type="silver" size={48} />
+          <div className="text-lg font-bold">Custom</div>
+          <input
+            type="number"
+            min={CUSTOM_SILVER_MIN}
+            max={CUSTOM_SILVER_MAX}
+            value={customSilver}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => selectCustom(Number(e.target.value))}
+            className="input w-24 text-center text-lg font-bold"
+          />
+          <div className="text-2xl font-extrabold text-amber-300">${customCost(customSilver)}</div>
+          <div className="text-xs text-slate-400">{CUSTOM_SILVER_MIN}–{CUSTOM_SILVER_MAX} silver · $0.25 each</div>
+        </div>
       </div>
 
       {/* Checkout — choose a network, then open the payment modal. */}

@@ -7,9 +7,12 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import DemoGame from "@/components/DemoGame";
 import InsufficientCoinsModal from "@/components/InsufficientCoinsModal";
-import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, type BoardSlot, type RoundCurrency, type PlayMode } from "@/lib/coins";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode } from "@/lib/coins";
 
 type Phase = "idle" | "playing" | "revealed";
+type Composition = { gold: number; silver: number; bronze: number; empty: number };
+type Reward = { type: BoardSlot; gold?: number; silver?: number; bronze?: number; multiplier?: number };
+const nextMultiplier = (round: number) => MULTIPLIER_FACTORS[Math.min(round + 1, 10)] ?? 1;
 
 // Per-slot reveal styling: the glow/ray colours match the coin so the modal
 // looks like it emits light of that colour. Empty is a neutral "no win".
@@ -20,6 +23,61 @@ const COIN_REVEAL: Record<BoardSlot, { glow: string; ray: string; title: string 
   empty: { glow: "rgba(100,116,139,0.45)", ray: "rgba(100,116,139,0.2)", title: "Empty — no coin this time!" },
 };
 
+// Revealed-board borders: gold → gold, silver → silver, bronze → none.
+const COIN_BORDER: Record<CoinType, { tile: string; tilePick: string; coin: string; coinPick: string }> = {
+  gold: {
+    tile: "gold-card bg-black/25",
+    tilePick: "gold-card z-10 bg-amber-300/20 scale-[1.35]",
+    coin: "ring-2 ring-amber-400",
+    coinPick: "tile-flip ring-4 ring-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.65)]",
+  },
+  silver: {
+    tile: "silver-card bg-black/25",
+    tilePick: "silver-card z-10 bg-white/15 scale-[1.35]",
+    coin: "ring-2 ring-slate-300",
+    coinPick: "tile-flip ring-4 ring-slate-200 shadow-[0_0_14px_rgba(226,232,240,0.55)]",
+  },
+  bronze: {
+    tile: "border-white/10 bg-black/25",
+    tilePick: "z-10 border-white/20 bg-white/10 scale-[1.35]",
+    coin: "",
+    coinPick: "tile-flip",
+  },
+};
+
+// Clockwise spiral order (from the outermost ring inward) for the board grid,
+// so tiles deal in starting from the outside. Computed for the desktop layout.
+const SPIRAL_COLS = 10;
+const SPIRAL_ROWS = Math.ceil(BOARD_SIZE / SPIRAL_COLS);
+const DEAL_ANIM_MS = 400;
+const DEAL_STAGGER_MS = Math.floor((1000 - DEAL_ANIM_MS) / (BOARD_SIZE - 1)); // ≈1s total deal
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000; // auto-play resets the game after 2h
+
+function fmtClock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+function buildSpiralOrder(rows: number, cols: number, total: number): number[] {
+  const order = new Array(total).fill(0);
+  let top = 0, bottom = rows - 1, left = 0, right = cols - 1, step = 0;
+  const set = (idx: number) => { if (idx < total) order[idx] = step++; };
+  while (top <= bottom && left <= right) {
+    for (let c = left; c <= right; c++) set(top * cols + c);
+    top++;
+    for (let r = top; r <= bottom; r++) set(r * cols + right);
+    right--;
+    if (top <= bottom) { for (let c = right; c >= left; c--) set(bottom * cols + c); bottom--; }
+    if (left <= right) { for (let r = bottom; r >= top; r--) set(r * cols + left); left--; }
+  }
+  return order;
+}
+const SPIRAL_ORDER = buildSpiralOrder(SPIRAL_ROWS, SPIRAL_COLS, BOARD_SIZE);
+const AUTO_PLAY_KEY = "lc_auto_play";
+
 export default function GamePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
 
@@ -27,8 +85,12 @@ export default function GamePage() {
   const [roundId, setRoundId] = useState<string | null>(null);
   const [board, setBoard] = useState<BoardSlot[] | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const [reward, setReward] = useState<{ type: BoardSlot } | null>(null);
+  const [reward, setReward] = useState<Reward | null>(null);
   const [revealCoin, setRevealCoin] = useState<BoardSlot | null>(null);
+  const [composition, setComposition] = useState<Composition | null>(null);
+  const [multiplier, setMultiplier] = useState(1);
+  const [multModal, setMultModal] = useState<number | null>(null);
+  const [shake, setShake] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -43,6 +105,35 @@ export default function GamePage() {
   const [restartChooserOpen, setRestartChooserOpen] = useState(false);
   const [lowCoins, setLowCoins] = useState<string | null>(null);
   const restartsLeft = MAX_RESTARTS - restarts;
+
+  // Auto-play: the game continues by itself, resetting after a 2-hour timer.
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [autoEndsAt, setAutoEndsAt] = useState<number | null>(null);
+  const [autoLeft, setAutoLeft] = useState(TWO_HOURS_MS);
+  const [sessionReady, setSessionReady] = useState(false);
+  const sessionLoadedRef = useRef(false);
+
+  function toggleAuto() {
+    if (autoPlay) {
+      setAutoPlay(false);
+      setAutoEndsAt(null);
+      localStorage.removeItem(AUTO_PLAY_KEY);
+    } else {
+      setAutoEndsAt(Date.now() + TWO_HOURS_MS);
+      setAutoLeft(TWO_HOURS_MS);
+      setAutoPlay(true);
+      localStorage.setItem(AUTO_PLAY_KEY, "1");
+    }
+  }
+
+  function restoreContinueTimer(continueUntil: string | null) {
+    if (!continueUntil) return;
+    const ends = new Date(continueUntil).getTime();
+    if (ends <= Date.now()) return;
+    setAutoEndsAt(ends);
+    setAutoLeft(ends - Date.now());
+    if (localStorage.getItem(AUTO_PLAY_KEY) === "1") setAutoPlay(true);
+  }
 
   function openChooser() {
     setError(null);
@@ -69,49 +160,200 @@ export default function GamePage() {
     })();
   }, [profile, setProfile]);
 
+  // Restore in-progress game after refresh or navigation.
+  useEffect(() => {
+    if (!profile) {
+      setSessionReady(false);
+      sessionLoadedRef.current = false;
+      return;
+    }
+    if (sessionLoadedRef.current) return;
+    sessionLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/game/state", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        restoreContinueTimer(data.continueUntil ?? null);
+
+        if (data.phase === "playing") {
+          setRoundId(data.roundId);
+          setBoard(null);
+          setPicked(null);
+          setReward(null);
+          setRevealCoin(null);
+          setRestarts(data.restarts ?? 0);
+          setComposition(data.composition ?? null);
+          setMultiplier(data.multiplier ?? 1);
+          setPhase("playing");
+        } else if (data.phase === "revealed") {
+          setRoundId(data.roundId);
+          setBoard(data.board ?? null);
+          setPicked(data.pickedIndex ?? null);
+          setReward(data.reward ?? null);
+          setRevealCoin(null);
+          setRestarts(data.restarts ?? 0);
+          setComposition(data.composition ?? null);
+          setMultiplier(data.multiplier ?? 1);
+          setPhase("revealed");
+        }
+      } catch {
+        // Fall back to idle if restore fails.
+      } finally {
+        setSessionReady(true);
+      }
+    })();
+  }, [profile]);
+
+  // Auto-play loop: idle → start a round, playing → auto-pick, revealed → next.
+  useEffect(() => {
+    if (!autoPlay || !profile) return;
+    if (lowCoins || chooserOpen || restartChooserOpen || revealCoin) return; // paused while a modal is open
+    const cur: RoundCurrency = profile.is_admin || profile.silver >= ROUND_COST.silver ? "silver" : "bronze";
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (phase === "idle") {
+      t = setTimeout(() => startRound(cur, "new"), 700);
+    } else if (phase === "playing" && !busy && roundId) {
+      t = setTimeout(() => pick(Math.floor(Math.random() * BOARD_SIZE)), 2600); // after the deal animation
+    } else if (phase === "revealed" && !busy) {
+      t = setTimeout(() => startRound(cur, "new"), 1400);
+    }
+    return () => {
+      if (t) clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, phase, busy, roundId, lowCoins, chooserOpen, restartChooserOpen, revealCoin, profile]);
+
+  // Persistent 2-hour Continue timer: ticks down whenever it is active. When it
+  // reaches 0 the process restarts from the beginning AND the timer resets to 2h
+  // (an "initiate"). Guarded so it only fires once per expiry.
+  const expiredRef = useRef(false);
+  useEffect(() => {
+    if (!autoEndsAt) return;
+    const id = setInterval(() => {
+      const left = autoEndsAt - Date.now();
+      if (left <= 0) {
+        setAutoLeft(0);
+        setAutoPlay(false);
+        if (!expiredRef.current && phase !== "idle") {
+          expiredRef.current = true;
+          startRound(lastCurrency, "new", undefined, { initiate: true }).finally(() => {
+            expiredRef.current = false;
+          });
+        }
+      } else {
+        expiredRef.current = false;
+        setAutoLeft(left);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEndsAt, phase, lastCurrency]);
+
   function flash(msg: string) {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
   }
 
-  async function startRound(currency: RoundCurrency, action: "new" | "restart" = "new", mode?: PlayMode) {
+  async function startRound(
+    currency: RoundCurrency,
+    action: "new" | "restart" = "new",
+    mode?: PlayMode,
+    options?: { initiate?: boolean },
+  ) {
     closeChooser();
     setRestartChooserOpen(false);
     setError(null);
     setBusy(true);
+    const initiate =
+      options?.initiate ??
+      (action === "new" && phase === "idle" && (!autoPlay || !profile?.continue_until));
     try {
       const res = await fetch("/api/game/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency, action, mode }),
+        body: JSON.stringify({ currency, action, mode, initiate }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.insufficient) {
+          // Stop auto-play and prompt a top-up so they can buy more and resume.
+          setAutoPlay(false);
+          setAutoEndsAt(null);
           setLowCoins(data.error);
           return;
         }
         throw new Error(data.error);
       }
       setProfile(data.profile);
+      if (data.profile?.continue_until) restoreContinueTimer(data.profile.continue_until);
       setRoundId(data.roundId);
       setBoard(null);
       setPicked(null);
       setReward(null);
       setRevealCoin(null);
       setRestarts(data.restarts ?? 0);
+      setComposition(data.composition ?? null);
+      setMultiplier(data.multiplier ?? 1);
       setLastCurrency(currency);
       setPhase("playing");
+      return data;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start.");
     } finally {
       setBusy(false);
     }
+    return null;
+  }
+
+  // Which currency to charge for the next stage: keep using the one in play if
+  // affordable, otherwise fall back to the other (1 silver = 10 bronze). This
+  // lets the multiplier feature run on Bronze as well as Silver.
+  function pickStageCurrency(): RoundCurrency | null {
+    if (!profile) return null;
+    const afford = (c: RoundCurrency) => profile.is_admin || profile[c] >= ROUND_COST[c];
+    if (afford(lastCurrency)) return lastCurrency;
+    const other: RoundCurrency = lastCurrency === "silver" ? "bronze" : "silver";
+    return afford(other) ? other : null;
+  }
+
+  // Advance to the next multiplier stage: shake + multiplier-increase modal.
+  async function nextStage() {
+    const cur = pickStageCurrency();
+    if (!cur) {
+      setRevealCoin(null);
+      setLowCoins(`You need ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze to continue.`);
+      return;
+    }
+    setRevealCoin(null);
+    const data = await startRound(cur, "restart", "multiplier");
+    if (data) {
+      triggerShake();
+      setMultModal(data.multiplier ?? 1);
+      setTimeout(() => setMultModal(null), 1700);
+    }
+  }
+
+  function triggerShake() {
+    setShake(true);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(180);
+    setTimeout(() => setShake(false), 520);
   }
 
   // New Game — reset everything back to the start screen (restart count clears).
-  function newGame() {
+  async function newGame() {
     setRestartChooserOpen(false);
+    setAutoPlay(false);
+    setAutoEndsAt(null);
+    localStorage.removeItem(AUTO_PLAY_KEY);
+    try {
+      const res = await fetch("/api/game/reset", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setProfile(data.profile);
+    } catch {
+      // Still clear local state if the request fails.
+    }
     setRestarts(0);
     reset();
   }
@@ -128,12 +370,19 @@ export default function GamePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      // Flip ALL cards over so the whole board is visible (gold cards glow).
       setBoard(data.board);
       setPicked(index);
       setReward(data.reward);
       setProfile(data.profile);
       setPhase("revealed");
-      setRevealCoin(data.reward.type); // triggers the zoom-in reveal modal
+      // In auto-play just flash a toast; otherwise show the result modal after
+      // a 3-second pause so the revealed board (and the gold cards) is seen first.
+      if (autoPlay) {
+        flash(data.reward.type === "empty" ? "No win" : `+1 ${data.reward.type} coin`);
+      } else {
+        setTimeout(() => setRevealCoin(data.reward.type), 3000);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reveal.");
     } finally {
@@ -157,15 +406,20 @@ export default function GamePage() {
     return <DemoGame />;
   }
 
-  if (loading || !profile) {
+  if (loading || !profile || !sessionReady) {
     return <div className="py-20 text-center text-slate-400">Loading…</div>;
   }
 
   // A round can be paid with EITHER 1 silver OR 10 bronze. Admins play free.
   const canPay = (c: RoundCurrency) => profile.is_admin || profile[c] >= ROUND_COST[c];
+  // The currency the next stage will actually charge (silver or its 10-bronze equivalent).
+  const stageCurrency = pickStageCurrency() ?? lastCurrency;
+  // The stake compounds: next-stage cost = base × cumulative multiplier of the
+  // next round (round = restarts + 2 after another Start Again).
+  const nextStageCost = Math.ceil(ROUND_COST[stageCurrency] * stageCostMultiplier(restarts + 2));
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${shake ? "screen-shake" : ""}`}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -198,9 +452,18 @@ export default function GamePage() {
               ? `Scatter ${BOARD_SIZE} coins and take your pick.`
               : `Pay ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze to scatter ${BOARD_SIZE} coins and take your pick.`}
           </p>
-          <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
-            {busy ? "Dealing…" : "▶ Start"}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
+              {busy ? "Dealing…" : "▶ Start"}
+            </button>
+            <button onClick={toggleAuto} disabled={busy} className="btn-ghost text-lg">
+              🤖 Auto Play <span className="text-xs text-slate-400">(2h)</span>
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            Auto Play keeps the game running by itself and resets after 2 hours. If you run out of
+            coins, you can top up to continue.
+          </p>
         </div>
       )}
 
@@ -209,55 +472,112 @@ export default function GamePage() {
         <>
           {/* Restart / New Game toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-slate-400">
-              {restarts > 0 ? `Restart ${restarts} of ${MAX_RESTARTS}` : "First game"}
-            </span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-amber-300/15 px-2.5 py-1 text-sm font-bold text-amber-200">
+                ×{multiplier} · stage {restarts + 1}/{MAX_RESTARTS}
+              </span>
+              {/* How many left? — hover for the current multiplier + coin counts */}
+              <div className="group relative">
+                <button className="btn-ghost text-sm">❓ How many left?</button>
+                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-white/10 bg-[#121829] p-3 text-xs shadow-xl group-hover:block">
+                  <div className="font-semibold text-amber-200">Current multiplier ×{multiplier}</div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                    {(["gold", "silver", "bronze"] as const).map((t) => (
+                      <div key={t} className="rounded bg-black/30 py-2">
+                        <CoinIcon type={t} size={22} className="mx-auto" />
+                        <div className="mt-1 font-bold">{composition ? composition[t] : "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-slate-400">Coins on the board this stage.</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {/* Continue: advances the stage, shows the persistent 2h timer,
+                  and disappears when the timer reaches 0. */}
+              {autoEndsAt && autoLeft > 0 && (
+                <button
+                  onClick={nextStage}
+                  disabled={busy || phase !== "revealed" || restartsLeft <= 0}
+                  className="btn-gold text-sm"
+                >
+                  ▶ Continue · {fmtClock(autoLeft)}
+                  {restartsLeft <= 0 ? " (max)" : ` (×${nextMultiplier(restarts + 1)})`}
+                </button>
+              )}
+              {/* Restart: start over from the beginning, keeping the 2h timer. */}
               <button
-                onClick={() => setRestartChooserOpen(true)}
-                disabled={busy || restartsLeft <= 0}
+                onClick={() => startRound(lastCurrency, "new")}
+                disabled={busy}
                 className="btn-ghost text-sm"
               >
-                🔄 Restart {restartsLeft <= 0 ? "(limit reached)" : `(${restartsLeft} left)`}
-              </button>
-              <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
-                ✦ New Game
+                🔄 Restart
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-3 md:grid-cols-10">
+          {/* Exact counts for this round, clearly shown. */}
+          {composition && (
+            <div className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm">
+              <span className="text-slate-400">This round:</span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                <CoinIcon type="gold" size={20} /> {composition.gold}
+              </span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                <CoinIcon type="silver" size={20} /> {composition.silver}
+              </span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                <CoinIcon type="bronze" size={20} /> {composition.bronze}
+              </span>
+              <span className="font-semibold text-slate-400">{composition.empty} blank</span>
+            </div>
+          )}
+
+          <div
+            key={roundId ?? "board"}
+            className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-3 md:grid-cols-10"
+          >
             {Array.from({ length: BOARD_SIZE }).map((_, i) => {
               const revealed = phase === "revealed" && board;
               const type = revealed ? board![i] : null;
               const isPick = picked === i;
-              const isGold = type === "gold";
+              const border = type && type !== "empty" ? COIN_BORDER[type] : null;
               return (
                 <button
                   key={i}
                   onClick={() => pick(i)}
                   disabled={phase !== "playing" || busy}
+                  style={{
+                    animationDelay: `${SPIRAL_ORDER[i] * DEAL_STAGGER_MS}ms`,
+                    animationDuration: `${DEAL_ANIM_MS}ms`,
+                  }}
                   className={[
-                    "relative grid aspect-square place-items-center rounded-xl border transition",
+                    "tile-deal relative grid aspect-square place-items-center border transition duration-300",
                     revealed
-                      ? isPick
-                        ? isGold
-                          ? "border-amber-300 bg-amber-300/15 ring-2 ring-amber-300 scale-105"
-                          : "border-amber-300/70 bg-white/10 ring-2 ring-amber-300/70 scale-105"
-                        : "border-white/10 bg-black/20 opacity-50"
+                      ? isPick && border
+                        ? border.tilePick
+                        : border
+                          ? border.tile
+                          : "border-white/10 bg-black/20 opacity-50"
                       : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
                   ].join(" ")}
                 >
                   {revealed && type && type !== "empty" ? (
-                    <span className={isPick ? "tile-flip" : "animate-pop"}>
-                      <CoinIcon type={type} size={40} />
+                    <span
+                      className={[
+                        "inline-flex rounded-full",
+                        isPick ? border!.coinPick : `animate-pop ${border!.coin}`,
+                      ].join(" ")}
+                    >
+                      <CoinIcon type={type} size={40} className="rounded-full" />
                     </span>
                   ) : revealed && type === "empty" ? (
                     <span className={`text-sm font-bold text-slate-500 ${isPick ? "tile-flip" : "animate-pop"}`}>No</span>
                   ) : null}
                   {revealed && isPick && (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-300 px-2 text-[10px] font-bold text-slate-900">
-                      YOU
+                    <span className="absolute -top-2 left-1/2 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-xs font-black text-slate-900 shadow">
+                      ✓
                     </span>
                   )}
                 </button>
@@ -278,17 +598,19 @@ export default function GamePage() {
                     {reward.type === "empty" ? "Result" : "You won"}
                   </div>
                   <div className="text-xl font-bold capitalize">
-                    {reward.type === "empty" ? "Empty — no win" : `1 ${reward.type} coin`}
+                    {reward.type === "empty"
+                      ? "Empty — no win"
+                      : `${reward.type === "gold" ? reward.gold : reward.type === "silver" ? reward.silver : reward.bronze ?? 1} ${reward.type}`}
                   </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
-                  onClick={() => setRestartChooserOpen(true)}
-                  disabled={busy || restartsLeft <= 0}
+                  onClick={nextStage}
+                  disabled={busy || restartsLeft <= 0 || autoPlay}
                   className="btn-gold"
                 >
-                  🔄 Restart {restartsLeft <= 0 ? "(limit reached)" : `(${restartsLeft} left)`}
+                  ▶ Start Again {restartsLeft <= 0 ? "(max)" : `(×${nextMultiplier(restarts + 1)})`}
                 </button>
                 <button onClick={newGame} disabled={busy} className="btn-ghost">
                   ✦ New Game
@@ -359,7 +681,7 @@ export default function GamePage() {
                     : `You'll pay ${ROUND_COST[choice]} ${choice} to scatter ${BOARD_SIZE} coins and take your pick.`}
                 </p>
                 <div className="mt-5 flex gap-3">
-                  <button onClick={() => startRound(choice)} disabled={busy} className="btn-gold flex-1">
+                  <button onClick={() => startRound(choice, "new", undefined, { initiate: true })} disabled={busy} className="btn-gold flex-1">
                     ▶ Start
                   </button>
                   <button onClick={() => setChoice(null)} className="btn-ghost">
@@ -410,16 +732,44 @@ export default function GamePage() {
                 )}
               </div>
             </div>
-            <div className="relative -mt-2 text-center">
+            <div className="relative -mt-2 max-w-sm text-center">
               <p className="text-2xl font-extrabold text-white drop-shadow">{COIN_REVEAL[revealCoin].title}</p>
               <p className="mt-1 text-slate-300">
                 {revealCoin === "empty"
-                  ? "Better luck next round!"
-                  : `1 ${revealCoin} coin added to your balance`}
+                  ? "No coins this stage."
+                  : `+${reward?.[revealCoin] ?? 1} ${revealCoin} added${(reward?.multiplier ?? 1) > 1 ? ` (×${reward?.multiplier})` : ""}`}
               </p>
-              <button onClick={() => setRevealCoin(null)} className="btn-gold mt-5">
-                Continue
-              </button>
+
+              {/* Next-stage prompt: coins consumed + current balances */}
+              <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
+                <p className="font-semibold text-amber-200">Proceed to the next stage?</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
+                  {nextMultiplier(restarts + 1)}
+                </p>
+                <div className="mt-2 flex items-center justify-center gap-4">
+                  {(["gold", "silver", "bronze"] as const).map((t) => (
+                    <span key={t} className="flex items-center gap-1 font-semibold">
+                      <CoinIcon type={t} size={20} /> {profile[t]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-2">
+                {restartsLeft > 0 ? (
+                  <button onClick={nextStage} className="btn-gold w-full">
+                    ▶ Start Again (×{nextMultiplier(restarts + 1)})
+                  </button>
+                ) : (
+                  <button onClick={() => { setRevealCoin(null); newGame(); }} className="btn-gold w-full">
+                    🏆 Max stage reached — New Game
+                  </button>
+                )}
+                <button onClick={() => setRevealCoin(null)} className="btn-ghost w-full text-sm">
+                  Stop here
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -461,6 +811,17 @@ export default function GamePage() {
             <button onClick={() => setRestartChooserOpen(false)} className="btn-ghost mt-4 w-full">
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Multiplier-increase modal (shown briefly on each Start Again). */}
+      {multModal !== null && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
+          <div className="card animate-pop border-amber-300/40 bg-amber-300/10 px-10 py-8 text-center">
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-200">Multiplier increased</p>
+            <p className="mt-1 text-6xl font-black text-amber-300 drop-shadow">×{multModal}</p>
+            <p className="mt-2 text-slate-300">Winnings this stage are multiplied by {multModal}!</p>
           </div>
         </div>
       )}

@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { WHEEL_VALUES, wheelCanWin, WHEEL_REWARD_COIN } from "@/lib/coins";
+import {
+  WHEEL_VALUES,
+  wheelCanWin,
+  WHEEL_REWARD_COIN,
+  WHEEL_WIN_WEIGHTS,
+  DRAW_COOLDOWN_MS,
+  drawCooldownLeftMs,
+  formatDrawCountdown,
+} from "@/lib/coins";
 
 export const runtime = "nodejs";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function formatLeft(ms: number): string {
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -30,23 +30,35 @@ export async function POST() {
 
   const { admin, profile } = ctx;
   const now = Date.now();
-  const last = profile.last_draw_at ? new Date(profile.last_draw_at).getTime() : null;
+  const msLeft = drawCooldownLeftMs(profile.last_draw_at, now);
 
-  if (last !== null && now - last < DAY_MS) {
-    const msLeft = DAY_MS - (now - last);
+  if (msLeft > 0) {
     return NextResponse.json({
       spun: false,
       nextInMs: msLeft,
-      message: `Come back in ${formatLeft(msLeft)} for your next spin.`,
+      message: `Come back in ${formatDrawCountdown(msLeft)} for your next spin.`,
       profile,
     });
   }
 
-  // Random wheel arrangement + a winning segment that can never be 1000/500.
+  // Random wheel arrangement. The winning VALUE is drawn by weighted
+  // probability (100=2%, 50=10%, 10=50%, rest split 5/0; never 1000/500), then
+  // we land the pointer on a segment that shows that value.
   const layout = shuffle(WHEEL_VALUES);
-  const winnable = layout.map((v, i) => ({ v, i })).filter(({ v }) => wheelCanWin(v));
-  const pick = winnable[Math.floor(Math.random() * winnable.length)];
-  const value = pick.v;
+
+  const weights = Object.entries(WHEEL_WIN_WEIGHTS).filter(([v]) => wheelCanWin(Number(v)));
+  const total = weights.reduce((s, [, w]) => s + w, 0);
+  let r = Math.random() * total;
+  let value = Number(weights[weights.length - 1][0]);
+  for (const [v, w] of weights) {
+    if (r < w) { value = Number(v); break; }
+    r -= w;
+  }
+
+  const candidates = layout.map((v, i) => ({ v, i })).filter(({ v }) => v === value);
+  const pick = candidates.length
+    ? candidates[Math.floor(Math.random() * candidates.length)]
+    : layout.map((v, i) => ({ v, i })).filter(({ v }) => wheelCanWin(v))[0];
 
   // Credit + stamp the timer (guarded so a double-submit can't double-spin).
   let q = admin

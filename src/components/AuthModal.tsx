@@ -11,10 +11,11 @@ const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB (matches the upload route)
 
 export default function AuthModal() {
-  const { authOpen, closeAuth, refresh, openWelcome } = useUser();
+  const { authOpen, closeAuth, refresh } = useUser();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     nickname: "",
@@ -65,49 +66,66 @@ export default function AuthModal() {
   function switchMode(m: Mode) {
     setMode(m);
     setError(null);
+    setNotice(null);
     if (m === "login") clearAvatar();
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
     const supabase = createClient();
+    const email = form.email.trim().toLowerCase();
+
+    // Send the login email via our SMTP-backed route (not Supabase email).
+    async function sendMagicLink() {
+      const res = await fetch("/api/auth/magic-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Could not send the login email.");
+    }
 
     try {
       if (mode === "register") {
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+        // Multipart so the avatar is uploaded at sign-up.
+        const fd = new FormData();
+        fd.append("nickname", form.nickname);
+        fd.append("email", email);
+        fd.append("password", form.password);
+        fd.append("nationality", form.nationality);
+        fd.append("discord_id", form.discord_id);
+        if (avatarFile) fd.append("avatar", avatarFile);
+
+        const res = await fetch("/api/register", { method: "POST", body: fd });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Registration failed.");
+
+        // First login is confirmed by an email magic link (sent via SMTP).
+        await sendMagicLink();
+        clearAvatar();
+        setNotice(`Account created! We've emailed a login link to ${email}. Open it to finish your first login.`);
+        return;
       }
 
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-      });
+      // Login with password.
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: form.password });
       if (signInErr) throw new Error(signInErr.message);
 
-      // Upload the chosen avatar now that the user is authenticated. A failure
-      // here shouldn't undo a successful registration/sign-in.
-      if (mode === "register" && avatarFile) {
-        try {
-          const fd = new FormData();
-          fd.append("avatar", avatarFile);
-          await fetch("/api/profile/avatar", { method: "POST", body: fd });
-        } catch {
-          /* avatar can be set later from the profile page */
-        }
+      // First login still needs email confirmation — send the link and sign out.
+      const meRes = await fetch("/api/me", { cache: "no-store" });
+      const me = meRes.ok ? await meRes.json() : null;
+      if (me?.profile && me.profile.first_login_done === false) {
+        await supabase.auth.signOut();
+        await sendMagicLink();
+        setNotice(`For security, your first login must be confirmed by email. We've sent a login link to ${email}.`);
+        return;
       }
 
-      clearAvatar();
       await refresh();
       closeAuth();
-      // Welcome the new member with the lucky-coin message.
-      if (mode === "register") openWelcome();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -213,6 +231,9 @@ export default function AuthModal() {
             </div>
           )}
 
+          {notice && (
+            <p className="rounded-lg bg-emerald-400/15 px-3 py-2 text-sm text-emerald-200">✉️ {notice}</p>
+          )}
           {error && (
             <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>
           )}

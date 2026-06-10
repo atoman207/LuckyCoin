@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { COIN_PACKS } from "@/lib/coins";
+import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX, customCost } from "@/lib/coins";
 import { getPaymentMethod } from "@/lib/wallets";
 import { getChainConfig } from "@/lib/chains";
 import { getUsdPrice } from "@/lib/pricing";
@@ -18,8 +18,23 @@ export async function POST(req: Request) {
   const { admin, profile } = ctx;
   const body = await req.json().catch(() => ({}));
 
-  const pack = COIN_PACKS.find((p) => p.silver === Number(body.silver));
-  if (!pack) return NextResponse.json({ error: "Unknown coin pack." }, { status: 400 });
+  // Accept either a fixed pack or a custom amount (1–100 silver).
+  const reqSilver = Math.floor(Number(body.silver));
+  const pack = COIN_PACKS.find((p) => p.silver === reqSilver);
+  let silver: number;
+  let usd: number;
+  if (pack) {
+    silver = pack.silver;
+    usd = pack.usd;
+  } else if (Number.isInteger(reqSilver) && reqSilver >= CUSTOM_SILVER_MIN && reqSilver <= CUSTOM_SILVER_MAX) {
+    silver = reqSilver;
+    usd = customCost(reqSilver);
+  } else {
+    return NextResponse.json(
+      { error: `Choose a pack, or a custom amount between ${CUSTOM_SILVER_MIN} and ${CUSTOM_SILVER_MAX} silver.` },
+      { status: 400 }
+    );
+  }
 
   const method = getPaymentMethod(typeof body.method_id === "string" ? body.method_id : null);
   const cfg = method ? getChainConfig(method.id) : null;
@@ -39,14 +54,14 @@ export async function POST(req: Request) {
   }
   // Round to the asset's precision (cap at 8 dp for display sanity).
   const dp = Math.min(cfg.decimals, 8);
-  const payAmount = Number((pack.usd / price).toFixed(dp));
+  const payAmount = Number((usd / price).toFixed(dp));
 
   const { data: purchase, error } = await admin
     .from("purchases")
     .insert({
       user_id: profile.id,
-      silver: pack.silver,
-      usd_amount: pack.usd,
+      silver,
+      usd_amount: usd,
       currency: `${method.asset} · ${method.network}`,
       method_id: method.id,
       method: "crypto-direct",
@@ -71,6 +86,7 @@ export async function POST(req: Request) {
     asset: method.asset,
     network: method.network,
     memo: method.memo ?? null,
-    usd: pack.usd,
+    usd,
+    silver,
   });
 }
