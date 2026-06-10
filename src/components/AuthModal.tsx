@@ -5,10 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 
-type Mode = "login" | "register";
+type Mode = "login" | "register" | "forgot";
 
 const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB (matches the upload route)
+const MIN_PASSWORD = 8;
 
 export default function AuthModal() {
   const { authOpen, closeAuth, refresh } = useUser();
@@ -21,6 +22,7 @@ export default function AuthModal() {
     nickname: "",
     email: "",
     password: "",
+    confirm: "",
     nationality: "",
     discord_id: "",
   });
@@ -67,7 +69,7 @@ export default function AuthModal() {
     setMode(m);
     setError(null);
     setNotice(null);
-    if (m === "login") clearAvatar();
+    if (m !== "register") clearAvatar();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -89,7 +91,23 @@ export default function AuthModal() {
     }
 
     try {
+      if (mode === "forgot") {
+        await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        setNotice(`If an account exists for ${email}, we've sent a password-reset link. Open it in this browser.`);
+        return;
+      }
+
       if (mode === "register") {
+        if (form.password.length < MIN_PASSWORD) {
+          throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`);
+        }
+        if (form.password !== form.confirm) {
+          throw new Error("Passwords don't match.");
+        }
         // Multipart so the avatar is uploaded at sign-up.
         const fd = new FormData();
         fd.append("nickname", form.nickname);
@@ -152,27 +170,31 @@ export default function AuthModal() {
         </button>
 
         <h2 className="text-2xl font-bold">
-          {mode === "login" ? "Welcome back" : "Create your account"}
+          {mode === "login" ? "Welcome back" : mode === "register" ? "Create your account" : "Reset your password"}
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           {mode === "login"
             ? "Log in to pick your lucky coin."
-            : "Register and get a starting bonus of coins."}
+            : mode === "register"
+              ? "Register and get a starting bonus of coins."
+              : "Enter your email and we'll send a reset link."}
         </p>
 
-        <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-black/30 p-1">
-          {(["login", "register"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              className={`rounded-lg py-2 text-sm font-semibold capitalize transition ${
-                mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
+        {mode !== "forgot" && (
+          <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-black/30 p-1">
+            {(["login", "register"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => switchMode(m)}
+                className={`rounded-lg py-2 text-sm font-semibold capitalize transition ${
+                  mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-3">
           {mode === "register" && (
@@ -213,10 +235,49 @@ export default function AuthModal() {
             <label className="label">Email</label>
             <input className="input" type="email" value={form.email} onChange={set("email")} required placeholder="you@example.com" />
           </div>
-          <div>
-            <label className="label">Password</label>
-            <input className="input" type="password" value={form.password} onChange={set("password")} required placeholder="••••••••" minLength={6} />
-          </div>
+
+          {mode !== "forgot" && (
+            <div>
+              <label className="label">Password</label>
+              <input
+                className="input"
+                type="password"
+                value={form.password}
+                onChange={set("password")}
+                required
+                placeholder="At least 8 characters"
+                minLength={MIN_PASSWORD}
+              />
+              {mode === "register" && (
+                <p className="mt-1 text-xs text-slate-500">Use at least {MIN_PASSWORD} characters.</p>
+              )}
+            </div>
+          )}
+
+          {mode === "register" && (
+            <div>
+              <label className="label">Confirm password</label>
+              <input
+                className="input"
+                type="password"
+                value={form.confirm}
+                onChange={set("confirm")}
+                required
+                placeholder="Re-enter your password"
+                minLength={MIN_PASSWORD}
+              />
+            </div>
+          )}
+
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => switchMode("forgot")}
+              className="text-xs text-amber-300 hover:underline"
+            >
+              Forgot password?
+            </button>
+          )}
 
           {mode === "register" && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -239,8 +300,24 @@ export default function AuthModal() {
           )}
 
           <button type="submit" className="btn-gold w-full" disabled={loading}>
-            {loading ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+            {loading
+              ? "Please wait…"
+              : mode === "login"
+                ? "Log in"
+                : mode === "register"
+                  ? "Create account"
+                  : "Send reset link"}
           </button>
+
+          {mode === "forgot" && (
+            <button
+              type="button"
+              onClick={() => switchMode("login")}
+              className="block w-full text-center text-xs text-slate-400 hover:underline"
+            >
+              ← Back to login
+            </button>
+          )}
         </form>
       </div>
     </div>
