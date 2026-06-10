@@ -3,14 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
+import SubscriberChart from "@/components/SubscriberChart";
 
 export default function Landing() {
   const { profile, openAuth } = useUser();
   const router = useRouter();
 
   function startGame() {
-    if (profile) router.push("/game");
-    else openAuth();
+    // Logged-out visitors get the free demo on /game (3 rounds, then login).
+    router.push("/game");
   }
 
   return (
@@ -62,13 +63,16 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Live subscriber stats from the database */}
+      <SubscriberChart />
+
       {/* How it works */}
       <section>
         <h2 className="text-center text-3xl font-bold">How it works</h2>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
             { t: "1 · Register & log in", d: "Sign up with your nickname and email. You start with a silver coin, bronze coins and a welcome bonus." },
-            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 25 coins: 1 gold, 4 silver, the rest bronze." },
+            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 50 tiles: 1 gold, 4 silver, 20 bronze — the rest are empty." },
             { t: "3 · Pick & crack", d: "Choose one coin. It cracks open and the prize is added to your account instantly." },
           ].map((c) => (
             <div key={c.t} className="card p-6">

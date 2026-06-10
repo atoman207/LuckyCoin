@@ -3,6 +3,8 @@ import "./globals.css";
 import { UserProvider } from "@/components/UserProvider";
 import Nav from "@/components/Nav";
 import AuthModal from "@/components/AuthModal";
+import WelcomeModal from "@/components/WelcomeModal";
+import VisitTracker from "@/components/VisitTracker";
 
 export const metadata: Metadata = {
   title: "Lucky Coin — Next",
@@ -22,9 +24,11 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen">
         <UserProvider>
+          <VisitTracker />
           <Nav />
           <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
           <AuthModal />
+          <WelcomeModal />
           <footer className="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-slate-500">
             © {new Date().getFullYear()} Lucky Coin · Play responsibly.
           </footer>

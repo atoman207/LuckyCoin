@@ -1,13 +1,13 @@
 # Lucky Coin — "Next" 🪙
 
 A coin-based luck game built with **Next.js 15 (App Router)** + **Supabase**.
-Pick the lucky coin from a board of 25, crack it open, and win gold, silver or
+Pick the lucky coin from a board of 50, crack it open, and win gold, silver or
 bronze straight to your account.
 
 ## Features
 
 - **Auth** — register (nickname, email, password, nationality, Discord ID) & login via a modal.
-- **The game** — spend 1 silver to scatter 25 coins (1 gold, 4 silver, 20 bronze). Pick one, it cracks open, the prize is credited. The board then reveals where everything was.
+- **The game** — spend 1 silver to scatter 50 tiles (1 gold, 4 silver, 20 bronze, 25 empty). Pick one, it cracks open, the prize is credited. The board then reveals where everything was.
 - **Rewards** — 50-coin welcome bonus, +5 bronze daily, +20 bronze for a 7-day login streak (a missed day resets the streak).
 - **Buy** — purchase silver coins with a crypto checkout (verified on-chain). Minimum 10 silver. Packs: 10/$2, 100/$15, 1,000/$100.
 - **Exchange** — value-preserving conversion between gold/silver/bronze.
@@ -21,8 +21,8 @@ bronze straight to your account.
 Base unit is **bronze**. `1 silver = 10 bronze`, `1 gold = 500 bronze` (so 1 gold = 50 silver).
 All values are tunable in [`src/lib/coins.ts`](src/lib/coins.ts).
 
-> Note on the spec: the board is **1 gold + 4 silver + 20 bronze = 25** so the
-> counts sum to the 25 scattered coins. Each round costs **1 silver or 10 bronze**.
+> Note on the spec: the board is **1 gold + 4 silver + 20 bronze + 25 empty = 50**
+> tiles. Empty tiles award nothing. Each round costs **1 silver or 10 bronze**.
 
 ## Security model
 

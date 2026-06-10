@@ -11,7 +11,7 @@ const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB (matches the upload route)
 
 export default function AuthModal() {
-  const { authOpen, closeAuth, refresh } = useUser();
+  const { authOpen, closeAuth, refresh, openWelcome } = useUser();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +106,8 @@ export default function AuthModal() {
       clearAvatar();
       await refresh();
       closeAuth();
+      // Welcome the new member with the lucky-coin message.
+      if (mode === "register") openWelcome();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

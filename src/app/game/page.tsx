@@ -1,22 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
-import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, type CoinType, type RoundCurrency } from "@/lib/coins";
+import DemoGame from "@/components/DemoGame";
+import InsufficientCoinsModal from "@/components/InsufficientCoinsModal";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, type BoardSlot, type RoundCurrency, type PlayMode } from "@/lib/coins";
 
 type Phase = "idle" | "playing" | "revealed";
+
+// Per-slot reveal styling: the glow/ray colours match the coin so the modal
+// looks like it emits light of that colour. Empty is a neutral "no win".
+const COIN_REVEAL: Record<BoardSlot, { glow: string; ray: string; title: string }> = {
+  gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)", title: "JACKPOT — the lucky GOLD coin! 🏆" },
+  silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)", title: "You won a Silver coin!" },
+  bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)", title: "You won a Bronze coin!" },
+  empty: { glow: "rgba(100,116,139,0.45)", ray: "rgba(100,116,139,0.2)", title: "Empty — no coin this time!" },
+};
 
 export default function GamePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [roundId, setRoundId] = useState<string | null>(null);
-  const [board, setBoard] = useState<CoinType[] | null>(null);
+  const [board, setBoard] = useState<BoardSlot[] | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const [reward, setReward] = useState<{ type: CoinType } | null>(null);
+  const [reward, setReward] = useState<{ type: BoardSlot } | null>(null);
+  const [revealCoin, setRevealCoin] = useState<BoardSlot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -24,6 +36,13 @@ export default function GamePage() {
   // Start-option modal: open it, then the player selects exactly one option.
   const [chooserOpen, setChooserOpen] = useState(false);
   const [choice, setChoice] = useState<RoundCurrency | null>(null);
+
+  // Restart / round tracking.
+  const [restarts, setRestarts] = useState(0);
+  const [lastCurrency, setLastCurrency] = useState<RoundCurrency>("silver");
+  const [restartChooserOpen, setRestartChooserOpen] = useState(false);
+  const [lowCoins, setLowCoins] = useState<string | null>(null);
+  const restartsLeft = MAX_RESTARTS - restarts;
 
   function openChooser() {
     setError(null);
@@ -55,29 +74,46 @@ export default function GamePage() {
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
   }
 
-  async function startRound(currency: RoundCurrency) {
+  async function startRound(currency: RoundCurrency, action: "new" | "restart" = "new", mode?: PlayMode) {
     closeChooser();
+    setRestartChooserOpen(false);
     setError(null);
     setBusy(true);
     try {
       const res = await fetch("/api/game/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency }),
+        body: JSON.stringify({ currency, action, mode }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        if (data.insufficient) {
+          setLowCoins(data.error);
+          return;
+        }
+        throw new Error(data.error);
+      }
       setProfile(data.profile);
       setRoundId(data.roundId);
       setBoard(null);
       setPicked(null);
       setReward(null);
+      setRevealCoin(null);
+      setRestarts(data.restarts ?? 0);
+      setLastCurrency(currency);
       setPhase("playing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start.");
     } finally {
       setBusy(false);
     }
+  }
+
+  // New Game — reset everything back to the start screen (restart count clears).
+  function newGame() {
+    setRestartChooserOpen(false);
+    setRestarts(0);
+    reset();
   }
 
   async function pick(index: number) {
@@ -97,11 +133,7 @@ export default function GamePage() {
       setReward(data.reward);
       setProfile(data.profile);
       setPhase("revealed");
-      const label =
-        data.reward.type === "gold"
-          ? "JACKPOT! You found the lucky GOLD coin! 🏆"
-          : `You won a ${data.reward.type} coin!`;
-      flash(label);
+      setRevealCoin(data.reward.type); // triggers the zoom-in reveal modal
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reveal.");
     } finally {
@@ -116,22 +148,13 @@ export default function GamePage() {
     setBoard(null);
     setPicked(null);
     setReward(null);
+    setRevealCoin(null);
     setError(null);
   }
 
-  // ---- Not logged in ------------------------------------------------
+  // ---- Not logged in: free demo (up to 3 rounds, then a login gate) ----
   if (!loading && !profile) {
-    return (
-      <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Log in to play</h1>
-        <p className="mt-2 text-slate-300">
-          You need an account to pick the lucky coin.
-        </p>
-        <button onClick={openAuth} className="btn-gold mt-6">
-          Log in / Register
-        </button>
-      </div>
-    );
+    return <DemoGame />;
   }
 
   if (loading || !profile) {
@@ -184,6 +207,25 @@ export default function GamePage() {
       {/* Board */}
       {(phase === "playing" || phase === "revealed") && (
         <>
+          {/* Restart / New Game toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-slate-400">
+              {restarts > 0 ? `Restart ${restarts} of ${MAX_RESTARTS}` : "First game"}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRestartChooserOpen(true)}
+                disabled={busy || restartsLeft <= 0}
+                className="btn-ghost text-sm"
+              >
+                🔄 Restart {restartsLeft <= 0 ? "(limit reached)" : `(${restartsLeft} left)`}
+              </button>
+              <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
+                ✦ New Game
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-3 md:grid-cols-10">
             {Array.from({ length: BOARD_SIZE }).map((_, i) => {
               const revealed = phase === "revealed" && board;
@@ -206,10 +248,12 @@ export default function GamePage() {
                       : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
                   ].join(" ")}
                 >
-                  {revealed && type ? (
-                    <span className="animate-pop">
+                  {revealed && type && type !== "empty" ? (
+                    <span className={isPick ? "tile-flip" : "animate-pop"}>
                       <CoinIcon type={type} size={40} />
                     </span>
+                  ) : revealed && type === "empty" ? (
+                    <span className={`text-sm font-bold text-slate-500 ${isPick ? "tile-flip" : "animate-pop"}`}>No</span>
                   ) : null}
                   {revealed && isPick && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-300 px-2 text-[10px] font-bold text-slate-900">
@@ -224,18 +268,30 @@ export default function GamePage() {
           {phase === "revealed" && reward && (
             <div className="card flex flex-col items-center gap-3 p-6 text-center">
               <div className="flex items-center gap-3">
-                <CoinIcon type={reward.type} size={48} className="animate-pop" />
+                {reward.type === "empty" ? (
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-white/5 text-base font-bold text-slate-400">No</span>
+                ) : (
+                  <CoinIcon type={reward.type} size={48} className="animate-pop" />
+                )}
                 <div className="text-left">
-                  <div className="text-sm uppercase tracking-wide text-slate-400">You won</div>
-                  <div className="text-xl font-bold capitalize">1 {reward.type} coin</div>
+                  <div className="text-sm uppercase tracking-wide text-slate-400">
+                    {reward.type === "empty" ? "Result" : "You won"}
+                  </div>
+                  <div className="text-xl font-bold capitalize">
+                    {reward.type === "empty" ? "Empty — no win" : `1 ${reward.type} coin`}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <button onClick={openChooser} disabled={busy} className="btn-gold">
-                  ▶ Play again
+                <button
+                  onClick={() => setRestartChooserOpen(true)}
+                  disabled={busy || restartsLeft <= 0}
+                  className="btn-gold"
+                >
+                  🔄 Restart {restartsLeft <= 0 ? "(limit reached)" : `(${restartsLeft} left)`}
                 </button>
-                <button onClick={reset} disabled={busy} className="btn-ghost">
-                  🔄 Restart
+                <button onClick={newGame} disabled={busy} className="btn-ghost">
+                  ✦ New Game
                 </button>
               </div>
             </div>
@@ -260,7 +316,16 @@ export default function GamePage() {
                     return (
                       <button
                         key={c}
-                        onClick={() => setChoice(c)}
+                        onClick={() => {
+                          if (!ok) {
+                            closeChooser();
+                            setLowCoins(
+                              `You need ${ROUND_COST[c]} ${c} to start a round, but only have ${profile[c]}.`
+                            );
+                          } else {
+                            setChoice(c);
+                          }
+                        }}
                         className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
                       >
                         <span className="flex items-center gap-3">
@@ -322,6 +387,86 @@ export default function GamePage() {
           </div>
         </div>
       )}
+
+      {/* Coin reveal — the won coin zooms in, the background darkens, and the
+          modal emits light in the coin's own colour. */}
+      {revealCoin && (
+        <div
+          className="reveal-overlay fixed inset-0 z-50 grid place-items-center bg-black/85 p-4 backdrop-blur-sm"
+          onClick={() => setRevealCoin(null)}
+          style={{ "--glow": COIN_REVEAL[revealCoin].glow, "--ray": COIN_REVEAL[revealCoin].ray } as CSSProperties}
+        >
+          <div className="flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="relative grid h-[300px] w-[300px] place-items-center">
+              <div className="reveal-rays pointer-events-none absolute inset-[-60px] rounded-full opacity-40" />
+              <div className="reveal-glow pointer-events-none absolute inset-0 rounded-full" />
+              <div className="reveal-coin relative drop-shadow-2xl">
+                {revealCoin === "empty" ? (
+                  <span className="grid h-[172px] w-[172px] place-items-center rounded-full border border-white/10 bg-white/5 text-5xl font-extrabold text-slate-400">
+                    No
+                  </span>
+                ) : (
+                  <CoinIcon type={revealCoin} size={172} />
+                )}
+              </div>
+            </div>
+            <div className="relative -mt-2 text-center">
+              <p className="text-2xl font-extrabold text-white drop-shadow">{COIN_REVEAL[revealCoin].title}</p>
+              <p className="mt-1 text-slate-300">
+                {revealCoin === "empty"
+                  ? "Better luck next round!"
+                  : `1 ${revealCoin} coin added to your balance`}
+              </p>
+              <button onClick={() => setRevealCoin(null)} className="btn-gold mt-5">
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restart mode chooser — pick how the next round plays. */}
+      {restartChooserOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onClick={() => setRestartChooserOpen(false)}
+        >
+          <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold">Restart — choose a mode</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {restartsLeft} of {MAX_RESTARTS} restarts left · pays {ROUND_COST[lastCurrency]} {lastCurrency}.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <button
+                onClick={() => startRound(lastCurrency, "restart", "continuous")}
+                disabled={busy}
+                className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+              >
+                <div className="font-bold">Continuous Play</div>
+                <div className="text-xs text-slate-400">
+                  Same board every restart — 1 gold, 4 silver, 20 bronze, the rest empty.
+                </div>
+              </button>
+              <button
+                onClick={() => startRound(lastCurrency, "restart", "multiplier")}
+                disabled={busy}
+                className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+              >
+                <div className="font-bold">Multiplier Play</div>
+                <div className="text-xs text-slate-400">
+                  Rewards escalate each round — more coins and fewer blanks, up to round {MAX_RESTARTS}.
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setRestartChooserOpen(false)} className="btn-ghost mt-4 w-full">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Not-enough-coins notice with a Top Up button + 10s auto-redirect. */}
+      {lowCoins && <InsufficientCoinsModal message={lowCoins} onClose={() => setLowCoins(null)} />}
     </div>
   );
 }

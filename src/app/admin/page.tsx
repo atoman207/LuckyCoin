@@ -17,11 +17,23 @@ type Row = {
   silver: number;
   bronze: number;
   is_admin: boolean;
+  kind: string; // 'real' | 'bot'
   streak: number;
   last_bonus_at: string | null;
   created_at: string;
   last_sign_in_at: string | null;
+  draws: number; // daily prize-wheel spins
 };
+
+type Stats = {
+  visitorsTotal: number;
+  visitorsToday: number;
+  membersTotal: number;
+  membersToday: number;
+};
+
+type SortKey = "created_at" | "nickname" | "last_sign_in_at" | "gold" | "silver" | "bronze";
+const PAGE_SIZE = 20;
 
 type Txn = {
   id: string;
@@ -44,8 +56,13 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"users" | "transactions">("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "real" | "bot">("all");
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc"); // signup order by default
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Row | "new" | null>(null);
 
   const loadUsers = useCallback(async () => {
@@ -62,11 +79,18 @@ export default function AdminPage() {
     else setError(data.error);
   }, []);
 
+  const loadStats = useCallback(async () => {
+    const res = await fetch("/api/admin/stats", { cache: "no-store" });
+    const data = await res.json();
+    if (res.ok) setStats(data);
+  }, []);
+
   useEffect(() => {
     if (!profile?.is_admin) return;
     loadUsers();
     loadTxns();
-  }, [profile, loadUsers, loadTxns]);
+    loadStats();
+  }, [profile, loadUsers, loadTxns, loadStats]);
 
   if (loading) return <div className="py-20 text-center text-slate-400">Loading…</div>;
   if (!profile?.is_admin) {
@@ -78,11 +102,42 @@ export default function AdminPage() {
     );
   }
 
-  const filtered = (rows ?? []).filter(
-    (r) =>
-      r.nickname.toLowerCase().includes(q.toLowerCase()) ||
-      r.email.toLowerCase().includes(q.toLowerCase())
-  );
+  // Search across ALL visible fields, then filter by kind, then sort.
+  const needle = q.trim().toLowerCase();
+  const filtered = (rows ?? [])
+    .filter((r) => (kindFilter === "all" ? true : r.kind === kindFilter))
+    .filter((r) => {
+      if (!needle) return true;
+      const hay = [
+        r.nickname,
+        r.email,
+        r.nationality,
+        r.discord_id,
+        r.kind,
+        r.is_admin ? "admin" : "",
+        String(r.gold),
+        String(r.silver),
+        String(r.bronze),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(needle);
+    });
+
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === "nickname") cmp = a.nickname.localeCompare(b.nickname);
+    else if (sortKey === "gold" || sortKey === "silver" || sortKey === "bronze") cmp = a[sortKey] - b[sortKey];
+    else cmp = new Date(a[sortKey] ?? 0).getTime() - new Date(b[sortKey] ?? 0).getTime();
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount);
+  const pageRows = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  const botCount = (rows ?? []).filter((r) => r.kind === "bot").length;
+  const realCount = (rows ?? []).filter((r) => r.kind === "real").length;
 
   const totals = (rows ?? []).reduce(
     (a, r) => ({ gold: a.gold + r.gold, silver: a.silver + r.silver, bronze: a.bronze + r.bronze }),
@@ -102,7 +157,9 @@ export default function AdminPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">Admin dashboard</h1>
-          <p className="text-slate-400">{rows?.length ?? 0} players · {txns?.length ?? 0} transactions</p>
+          <p className="text-slate-400">
+            {rows?.length ?? 0} players ({realCount} real · {botCount} bot) · {txns?.length ?? 0} transactions
+          </p>
         </div>
         <div className="flex gap-2 rounded-xl bg-black/30 p-1">
           {(["users", "transactions"] as const).map((t) => (
@@ -125,6 +182,24 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Visitor / member stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "Total visitors", value: stats?.visitorsTotal, hint: "tried for free", tone: "text-sky-300" },
+          { label: "Visitors today", value: stats?.visitorsToday, hint: "today", tone: "text-sky-300" },
+          { label: "Total members", value: stats?.membersTotal, hint: "registered", tone: "text-emerald-300" },
+          { label: "Members today", value: stats?.membersToday, hint: "joined/logged in", tone: "text-emerald-300" },
+        ].map((s) => (
+          <div key={s.label} className="card p-5">
+            <div className="text-sm text-slate-400">{s.label}</div>
+            <div className={`mt-1 text-3xl font-extrabold tabular-nums ${s.tone}`}>
+              {s.value === undefined ? "…" : s.value.toLocaleString()}
+            </div>
+            <div className="text-xs text-slate-500">{s.hint}</div>
+          </div>
+        ))}
+      </div>
+
       {tab === "users" && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -139,14 +214,59 @@ export default function AdminPage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <input
-              className="input max-w-xs"
-              placeholder="Search nickname or email…"
+              className="input max-w-xs flex-1"
+              placeholder="Search name, email, country, Discord, type…"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(1);
+              }}
             />
-            <button onClick={() => setEditing("new")} className="btn-gold text-sm">+ New user</button>
+
+            {/* Kind filter */}
+            <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+              {(["all", "real", "bot"] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => {
+                    setKindFilter(k);
+                    setPage(1);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 font-semibold capitalize transition ${
+                    kindFilter === k ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  {k}
+                  {k === "real" && ` (${realCount})`}
+                  {k === "bot" && ` (${botCount})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort */}
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="input max-w-[12rem]"
+            >
+              <option value="created_at">Sort: Signup date</option>
+              <option value="nickname">Sort: Name</option>
+              <option value="last_sign_in_at">Sort: Last login</option>
+              <option value="gold">Sort: Gold</option>
+              <option value="silver">Sort: Silver</option>
+              <option value="bronze">Sort: Bronze</option>
+            </select>
+            <button
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
+              title={sortDir === "asc" ? "Ascending" : "Descending"}
+            >
+              {sortDir === "asc" ? "↑ Asc" : "↓ Desc"}
+            </button>
+
+            <button onClick={() => setEditing("new")} className="btn-gold ml-auto text-sm">+ New user</button>
           </div>
 
           <div className="card overflow-x-auto">
@@ -154,10 +274,12 @@ export default function AdminPage() {
               <thead className="border-b border-white/10 text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Player</th>
+                  <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Country</th>
                   <th className="px-4 py-3">Discord</th>
                   <th className="px-4 py-3">Last login</th>
                   <th className="px-4 py-3">Joined</th>
+                  <th className="px-4 py-3 text-right">Draws</th>
                   <th className="px-4 py-3 text-right">Gold</th>
                   <th className="px-4 py-3 text-right">Silver</th>
                   <th className="px-4 py-3 text-right">Bronze</th>
@@ -167,11 +289,11 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {rows === null ? (
-                  <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">No players found.</td></tr>
+                  <tr><td colSpan={12} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                ) : sorted.length === 0 ? (
+                  <tr><td colSpan={12} className="px-4 py-8 text-center text-slate-500">No players found.</td></tr>
                 ) : (
-                  filtered.map((r) => (
+                  pageRows.map((r) => (
                     <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.03]">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -182,10 +304,22 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            r.kind === "bot"
+                              ? "bg-sky-400/15 text-sky-300"
+                              : "bg-emerald-400/15 text-emerald-300"
+                          }`}
+                        >
+                          {r.kind === "bot" ? "bot" : "real"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-slate-300">{r.nationality ?? "—"}</td>
                       <td className="px-4 py-3 text-slate-300">{r.discord_id ?? "—"}</td>
                       <td className="px-4 py-3 text-slate-400">{fmt(r.last_sign_in_at)}</td>
                       <td className="px-4 py-3 text-slate-400">{fmtDate(r.created_at)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-sky-300">{r.draws}</td>
                       <td className="px-4 py-3 text-right font-semibold text-amber-300">{r.gold}</td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-200">{r.silver}</td>
                       <td className="px-4 py-3 text-right font-semibold text-orange-300">{r.bronze}</td>
@@ -200,6 +334,49 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination — 20 users per page */}
+          {sorted.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+              <span>
+                Showing {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, sorted.length)} of{" "}
+                {sorted.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={current === 1}
+                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                >
+                  « First
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={current === 1}
+                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                >
+                  ‹ Prev
+                </button>
+                <span className="px-2 font-semibold text-slate-200">
+                  Page {current} / {pageCount}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={current === pageCount}
+                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setPage(pageCount)}
+                  disabled={current === pageCount}
+                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                >
+                  Last »
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 

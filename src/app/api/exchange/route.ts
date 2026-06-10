@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { COIN_VALUE, type CoinType } from "@/lib/coins";
+import { COIN_VALUE, EXCHANGE_NEXT, type CoinType } from "@/lib/coins";
 
 const TYPES: CoinType[] = ["gold", "silver", "bronze"];
 
-// Convert coins between types, preserving total bronze value.
-//   gold  -> 500 bronze   (or 50 silver)
-//   silver -> 10 bronze
-//   bronze -> silver/gold  when evenly divisible
+// Convert coins DOWNWARD only — gold → silver, silver → bronze — preserving
+// total bronze value. Upgrading (e.g. bronze → silver) is not allowed.
 export async function POST(req: Request) {
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -17,6 +15,12 @@ export async function POST(req: Request) {
 
   if (!TYPES.includes(from) || !TYPES.includes(to) || from === to) {
     return NextResponse.json({ error: "Invalid coin types." }, { status: 400 });
+  }
+  if (EXCHANGE_NEXT[from as CoinType] !== to) {
+    return NextResponse.json(
+      { error: "Coins can only be exchanged downward: gold → silver, silver → bronze." },
+      { status: 400 }
+    );
   }
   const amt = Number(amount);
   if (!Number.isInteger(amt) || amt <= 0) {

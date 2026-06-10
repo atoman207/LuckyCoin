@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
-import { COIN_VALUE, type CoinType } from "@/lib/coins";
+import { COIN_VALUE, EXCHANGE_NEXT, type CoinType } from "@/lib/coins";
 
-const TYPES: CoinType[] = ["gold", "silver", "bronze"];
+// Only downward conversions are allowed: gold → silver, silver → bronze.
+const FROM_TYPES: CoinType[] = ["gold", "silver"];
 
 export default function ExchangePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
   const [from, setFrom] = useState<CoinType>("gold");
-  const [to, setTo] = useState<CoinType>("bronze");
   const [amount, setAmount] = useState(1);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -27,9 +27,8 @@ export default function ExchangePage() {
   }
   if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
 
-  const totalValue = amount * COIN_VALUE[from];
-  const divisible = from !== to && totalValue % COIN_VALUE[to] === 0;
-  const received = divisible ? totalValue / COIN_VALUE[to] : 0;
+  const to = EXCHANGE_NEXT[from] as CoinType; // gold→silver, silver→bronze
+  const received = (amount * COIN_VALUE[from]) / COIN_VALUE[to];
   const enough = profile[from] >= amount && amount > 0;
 
   async function submit() {
@@ -54,10 +53,9 @@ export default function ExchangePage() {
   }
 
   const presets = [
-    { from: "gold" as const, to: "bronze" as const, amount: 1, label: "Crack 1 gold → 500 bronze" },
-    { from: "silver" as const, to: "bronze" as const, amount: 1, label: "Crack 1 silver → 10 bronze" },
-    { from: "bronze" as const, to: "silver" as const, amount: 10, label: "Forge 10 bronze → 1 silver" },
-    { from: "bronze" as const, to: "gold" as const, amount: 500, label: "Forge 500 bronze → 1 gold" },
+    { from: "gold" as const, amount: 1, label: "1 gold → 50 silver" },
+    { from: "silver" as const, amount: 1, label: "1 silver → 10 bronze" },
+    { from: "silver" as const, amount: 10, label: "10 silver → 100 bronze" },
   ];
 
   return (
@@ -65,7 +63,10 @@ export default function ExchangePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">Exchange coins</h1>
-          <p className="text-slate-400">Gold = 500 bronze · Silver = 10 bronze · Value is always preserved.</p>
+          <p className="text-slate-400">
+            Downward only: gold → silver, silver → bronze. Value is always preserved (you can&apos;t
+            convert back up).
+          </p>
         </div>
         <CoinBalance profile={profile} size={26} />
       </div>
@@ -83,12 +84,8 @@ export default function ExchangePage() {
           <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
             <div>
               <label className="label">From</label>
-              <select
-                className="input"
-                value={from}
-                onChange={(e) => setFrom(e.target.value as CoinType)}
-              >
-                {TYPES.map((t) => (
+              <select className="input" value={from} onChange={(e) => setFrom(e.target.value as CoinType)}>
+                {FROM_TYPES.map((t) => (
                   <option key={t} value={t} className="bg-slate-900">
                     {t} (you have {profile[t]})
                   </option>
@@ -98,17 +95,9 @@ export default function ExchangePage() {
             <div className="pb-2.5 text-2xl text-amber-300">→</div>
             <div>
               <label className="label">To</label>
-              <select
-                className="input"
-                value={to}
-                onChange={(e) => setTo(e.target.value as CoinType)}
-              >
-                {TYPES.map((t) => (
-                  <option key={t} value={t} className="bg-slate-900">
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <div className="input flex items-center gap-2 capitalize">
+                <CoinIcon type={to} size={20} /> {to}
+              </div>
             </div>
           </div>
 
@@ -135,21 +124,9 @@ export default function ExchangePage() {
             </div>
           </div>
 
-          {from === to ? (
-            <p className="mt-3 text-center text-sm text-amber-300/80">Pick two different coin types.</p>
-          ) : !divisible ? (
-            <p className="mt-3 text-center text-sm text-amber-300/80">
-              That amount doesn&apos;t convert evenly — try a multiple worth {COIN_VALUE[to]} bronze.
-            </p>
-          ) : !enough ? (
-            <p className="mt-3 text-center text-sm text-red-300">You don&apos;t have enough {from}.</p>
-          ) : null}
+          {!enough && <p className="mt-3 text-center text-sm text-red-300">You don&apos;t have enough {from}.</p>}
 
-          <button
-            onClick={submit}
-            disabled={busy || !divisible || !enough}
-            className="btn-gold mt-4 w-full text-lg"
-          >
+          <button onClick={submit} disabled={busy || !enough} className="btn-gold mt-4 w-full text-lg">
             {busy ? "Exchanging…" : "Exchange"}
           </button>
         </div>
@@ -163,7 +140,6 @@ export default function ExchangePage() {
                 key={p.label}
                 onClick={() => {
                   setFrom(p.from);
-                  setTo(p.to);
                   setAmount(p.amount);
                 }}
                 className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm transition hover:border-amber-300/40 hover:bg-white/5"
@@ -173,6 +149,9 @@ export default function ExchangePage() {
               </button>
             ))}
           </div>
+          <p className="mt-4 text-xs text-slate-500">
+            Upgrading (bronze → silver → gold) is disabled.
+          </p>
         </div>
       </div>
     </div>

@@ -18,10 +18,16 @@ create table if not exists public.profiles (
   silver        integer     not null default 0,
   bronze        integer     not null default 0,
   is_admin      boolean     not null default false,
+  kind          text        not null default 'real',   -- 'real' (self signed-up) | 'bot' (admin/seeded)
   streak        integer     not null default 0,        -- consecutive daily-reward days
   last_bonus_at timestamptz,                            -- when the daily reward was last claimed (24h timer)
+  game_round    integer     not null default 0,        -- current play round (1 = first game)
+  game_mode     text,                                  -- restart mode: 'continuous' | 'multiplier'
+  game_restarts integer     not null default 0,        -- restarts used this game (max 10)
+  last_draw_at  timestamptz,                            -- last daily prize-wheel spin (24h timer)
   created_at    timestamptz not null default now()
 );
+create index if not exists profiles_created_idx on public.profiles (created_at);
 
 -- ---------- game_rounds -------------------------------------------------
 -- Each round costs 1 silver. The 50-coin board is generated and stored
@@ -62,6 +68,11 @@ create table if not exists public.purchases (
 -- any later columns here — and do it BEFORE the indexes below, which depend
 -- on them (e.g. tx_hash). Harmless on a fresh database (columns already exist).
 alter table public.profiles  add column if not exists avatar_url text;
+alter table public.profiles  add column if not exists kind text not null default 'real';
+alter table public.profiles  add column if not exists game_round integer not null default 0;
+alter table public.profiles  add column if not exists game_mode text;
+alter table public.profiles  add column if not exists game_restarts integer not null default 0;
+alter table public.profiles  add column if not exists last_draw_at timestamptz;
 
 -- The daily reward uses a precise 24h timer, so last_bonus_at must be a
 -- timestamp. Convert it from the older `date` type on existing projects.
@@ -92,6 +103,42 @@ alter table public.purchases add column if not exists credited       boolean not
 create unique index if not exists purchases_tx_hash_key on public.purchases (tx_hash) where tx_hash is not null;
 create index if not exists purchases_user_idx on public.purchases (user_id, created_at desc);
 
+-- ---------- sells -------------------------------------------------------
+-- Coin sell-back requests (gold @ 1,000 USDT each), only during the Sunday
+-- trading windows. USDT payout is fulfilled by the admin (no auto-send).
+create table if not exists public.sells (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles (id) on delete cascade,
+  gold        integer not null,                          -- gold coins sold
+  usdt_amount numeric not null,                          -- gold * 1000
+  status      text not null default 'requested',         -- 'requested' | 'paid'
+  created_at  timestamptz not null default now()
+);
+create index if not exists sells_user_idx on public.sells (user_id, created_at desc);
+
+-- ---------- draws -------------------------------------------------------
+-- Daily prize-wheel results (bronze rewards). Used for the per-player draw
+-- tally on the admin page.
+create table if not exists public.draws (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.profiles (id) on delete cascade,
+  value      integer not null,                          -- bronze won (0 allowed)
+  coin       text not null default 'bronze',
+  created_at timestamptz not null default now()
+);
+create index if not exists draws_user_idx on public.draws (user_id, created_at desc);
+
+-- ---------- visits ------------------------------------------------------
+-- Anonymous visitor pings (one row per browser per UTC day) so the admin can
+-- see how many people tried the service for free.
+create table if not exists public.visits (
+  id         uuid primary key default gen_random_uuid(),
+  visitor_id text not null,                             -- random id stored in the browser
+  day        date not null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists visits_visitor_day_key on public.visits (visitor_id, day);
+
 -- =====================================================================
 --  Row Level Security
 --  Strategy: the browser may only READ its own profile. Every write to
@@ -102,6 +149,9 @@ create index if not exists purchases_user_idx on public.purchases (user_id, crea
 alter table public.profiles    enable row level security;
 alter table public.game_rounds enable row level security;
 alter table public.purchases   enable row level security;
+alter table public.sells       enable row level security;
+alter table public.draws       enable row level security;
+alter table public.visits      enable row level security;
 
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile"
@@ -117,6 +167,17 @@ drop policy if exists "read own purchases" on public.purchases;
 create policy "read own purchases"
   on public.purchases for select
   using ( auth.uid() = user_id );
+
+drop policy if exists "read own sells" on public.sells;
+create policy "read own sells"
+  on public.sells for select
+  using ( auth.uid() = user_id );
+
+drop policy if exists "read own draws" on public.draws;
+create policy "read own draws"
+  on public.draws for select
+  using ( auth.uid() = user_id );
+-- visits: no client policy on purpose (written/read only via the service role).
 
 -- =====================================================================
 --  Administrator: after running this file, seed the built-in admin with

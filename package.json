@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "seed": "node --env-file=.env.local scripts/seed-admin.mjs"
+    "seed": "node --env-file=.env.local scripts/seed-admin.mjs",
+    "seed:bots": "node --env-file=.env.local scripts/seed-bots.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -15,7 +16,8 @@
     "next": "^15.1.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

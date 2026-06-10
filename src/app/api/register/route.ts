@@ -57,6 +57,7 @@ export async function POST(req: Request) {
       bronze: START_BRONZE + SIGNUP_WELCOME_BRONZE + dailyReward(1),
       streak: 1,
       last_bonus_at: new Date().toISOString(),
+      kind: "real", // self-service signup
     });
 
     if (profileErr) {

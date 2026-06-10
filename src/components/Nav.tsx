@@ -10,8 +10,11 @@ import Avatar from "@/components/Avatar";
 
 const LINKS = [
   { href: "/game", label: "Play" },
+  { href: "/draw", label: "Wheel" },
   { href: "/buy", label: "Buy" },
+  { href: "/sell", label: "Sell" },
   { href: "/exchange", label: "Exchange" },
+  { href: "/help", label: "Help" },
 ];
 
 export default function Nav() {

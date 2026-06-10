@@ -1,34 +1,78 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { buildBoard, BOARD_SIZE, ROUND_COST, type RoundCurrency } from "@/lib/coins";
+import {
+  buildBoardFrom,
+  compositionFor,
+  BASE_COMPOSITION,
+  MAX_RESTARTS,
+  BOARD_SIZE,
+  ROUND_COST,
+  type RoundCurrency,
+  type PlayMode,
+} from "@/lib/coins";
 
-// Start a new round. The player chooses to pay with EITHER 1 silver OR 10
-// bronze (equal value). Generates and stores the 50-coin board server-side,
-// then returns only the round id + size — never the contents.
+// Start a round. Two actions:
+//   • "new"     — fresh game: round 1, base board, restart counter reset.
+//   • "restart" — next round in the chosen mode (continuous | multiplier),
+//                 up to MAX_RESTARTS times. The board composition is decided
+//                 SERVER-SIDE from the mode + round so it can't be spoofed.
+// Pay with EITHER 1 silver OR 10 bronze. Admins play free.
 export async function POST(req: Request) {
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
 
   const { admin, profile } = ctx;
-
   const body = await req.json().catch(() => ({}));
+
   const currency: RoundCurrency = body.currency === "bronze" ? "bronze" : "silver";
-  const unit = currency === "bronze" ? "bronze" : "silver";
+  const unit = currency;
+  const isRestart = body.action === "restart";
 
-  // Admins play for free; everyone else pays the chosen entry cost.
+  // Resolve mode + round + restart count.
+  let mode: PlayMode | null;
+  let round: number;
+  let restarts: number;
+  if (isRestart) {
+    const used = profile.game_restarts ?? 0;
+    if (used >= MAX_RESTARTS) {
+      return NextResponse.json(
+        { error: `Restart limit reached (${MAX_RESTARTS}). Start a New Game.` },
+        { status: 400 }
+      );
+    }
+    mode = body.mode === "multiplier" ? "multiplier" : "continuous";
+    round = (profile.game_round ?? 1) + 1;
+    restarts = used + 1;
+  } else {
+    mode = null; // fresh game
+    round = 1;
+    restarts = 0;
+  }
+
+  const composition = isRestart && mode ? compositionFor(mode, round) : BASE_COMPOSITION;
+
+  // Entry cost (zero for admins).
   const cost = profile.is_admin ? 0 : ROUND_COST[currency];
-
   if (!profile.is_admin && profile[unit] < cost) {
     return NextResponse.json(
-      { error: `You need ${cost} ${unit} to play. Buy more coins to keep playing.`, currency },
+      {
+        error: `You need ${cost} ${unit} to play, but only have ${profile[unit]}.`,
+        currency,
+        insufficient: true,
+      },
       { status: 400 }
     );
   }
 
-  // Deduct the entry cost from the chosen balance (zero for admins).
+  // Charge the entry cost and persist the game state in one update.
   const { data: charged, error: chargeErr } = await admin
     .from("profiles")
-    .update({ [unit]: profile[unit] - cost })
+    .update({
+      [unit]: profile[unit] - cost,
+      game_round: round,
+      game_mode: mode,
+      game_restarts: restarts,
+    })
     .eq("id", profile.id)
     .gte(unit, cost) // guard against races
     .select("*")
@@ -38,14 +82,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not start round." }, { status: 400 });
   }
 
-  const board = buildBoard();
-  const { data: round, error: roundErr } = await admin
+  const board = buildBoardFrom(composition);
+  const { data: created, error: roundErr } = await admin
     .from("game_rounds")
     .insert({ user_id: profile.id, board, status: "active" })
     .select("id")
     .single();
 
-  if (roundErr || !round) {
+  if (roundErr || !created) {
     // Refund the entry cost if the round couldn't be created.
     await admin
       .from("profiles")
@@ -55,8 +99,12 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({
-    roundId: round.id,
+    roundId: created.id,
     size: BOARD_SIZE,
     profile: charged,
+    round,
+    mode,
+    restarts,
+    maxRestarts: MAX_RESTARTS,
   });
 }

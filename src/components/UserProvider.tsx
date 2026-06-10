@@ -15,10 +15,13 @@ type Ctx = {
   profile: Profile | null;
   loading: boolean;
   authOpen: boolean;
+  welcomeOpen: boolean;
   setProfile: (p: Profile | null) => void;
   refresh: () => Promise<void>;
   openAuth: () => void;
   closeAuth: () => void;
+  openWelcome: () => void;
+  closeWelcome: () => void;
   signOut: () => Promise<void>;
 };
 
@@ -29,6 +32,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authOpen, setAuthOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  const openWelcome = useCallback(() => setWelcomeOpen(true), []);
+  const closeWelcome = useCallback(() => setWelcomeOpen(false), []);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/me", { cache: "no-store" });
@@ -71,10 +78,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     profile,
     loading,
     authOpen,
+    welcomeOpen,
     setProfile,
     refresh,
     openAuth: () => setAuthOpen(true),
     closeAuth: () => setAuthOpen(false),
+    openWelcome,
+    closeWelcome,
     signOut,
   };
 

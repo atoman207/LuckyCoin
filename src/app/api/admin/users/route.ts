@@ -28,15 +28,22 @@ export async function GET() {
 
   const { data, error } = await ctx.admin
     .from("profiles")
-    .select("id, nickname, email, nationality, discord_id, avatar_url, gold, silver, bronze, is_admin, streak, last_bonus_at, created_at")
-    .order("created_at", { ascending: false });
+    .select("id, nickname, email, nationality, discord_id, avatar_url, gold, silver, bronze, is_admin, kind, streak, last_bonus_at, created_at")
+    .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const dates = await authDatesMap();
+
+  // Per-player draw tally (consolidated view of daily prize-wheel spins).
+  const drawCount = new Map<string, number>();
+  const { data: draws } = await ctx.admin.from("draws").select("user_id");
+  for (const d of draws ?? []) drawCount.set(d.user_id, (drawCount.get(d.user_id) ?? 0) + 1);
+
   const users = (data ?? []).map((u) => ({
     ...u,
     last_sign_in_at: dates.get(u.id)?.last_sign_in_at ?? null,
+    draws: drawCount.get(u.id) ?? 0,
   }));
 
   return NextResponse.json({ users });
@@ -79,6 +86,7 @@ export async function POST(req: Request) {
     silver: Math.max(0, Math.floor(Number(b.silver) || 0)),
     bronze: Math.max(0, Math.floor(Number(b.bronze) || 0)),
     is_admin: !!b.is_admin,
+    kind: "bot", // created by the administrator
   });
   if (profErr) {
     await ctx.admin.auth.admin.deleteUser(created.user.id);
