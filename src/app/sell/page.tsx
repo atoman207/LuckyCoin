@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import { SELL_PRICE_USDT, SELL_HOURS_LABEL, sellStatus } from "@/lib/selling";
+import { PAYMENT_METHODS, getPaymentMethod } from "@/lib/wallets";
 
 export default function SellPage() {
   const { profile, loading, openAuth, setProfile } = useUser();
@@ -12,6 +13,19 @@ export default function SellPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Payout wallet: the crypto/network and the address to receive funds.
+  const [method, setMethod] = useState<string>(PAYMENT_METHODS[0].id);
+  const [address, setAddress] = useState("");
+  const [savingWallet, setSavingWallet] = useState(false);
+  const [walletMsg, setWalletMsg] = useState<string | null>(null);
+
+  // Prefill from the registered wallet once the profile loads.
+  useEffect(() => {
+    if (!profile) return;
+    if (profile.payout_method) setMethod(profile.payout_method);
+    setAddress((a) => a || profile.payout_address || "");
+  }, [profile]);
 
   // Re-check the trading window every 30s so the UI opens/closes on time.
   useEffect(() => {
@@ -29,6 +43,28 @@ export default function SellPage() {
   }
   if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
 
+  async function saveWallet() {
+    if (!address.trim()) return;
+    setSavingWallet(true);
+    setWalletMsg(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payout_method: method, payout_address: address.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.profile) setProfile(data.profile);
+      setWalletMsg("✓ Wallet saved.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the wallet.");
+    } finally {
+      setSavingWallet(false);
+    }
+  }
+
   async function sell() {
     setBusy(true);
     setError(null);
@@ -37,7 +73,7 @@ export default function SellPage() {
       const res = await fetch("/api/sell", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gold: amount }),
+        body: JSON.stringify({ gold: amount, method_id: method, payout_address: address.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -52,7 +88,9 @@ export default function SellPage() {
   }
 
   const gold = profile.gold;
-  const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold;
+  const registered = profile.payout_address || null;
+  const hasAddress = !!address.trim();
+  const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold && hasAddress;
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -64,16 +102,8 @@ export default function SellPage() {
       </div>
 
       {/* Trading window banner */}
-      <div
-        className={`rounded-xl border px-4 py-3 text-sm ${
-          status.open
-            ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-200"
-            : "border-amber-300/30 bg-amber-300/10 text-amber-200"
-        }`}
-      >
-        <span className="font-semibold">{status.open ? "● Open now" : "● Closed"}</span> — selling hours are{" "}
-        {SELL_HOURS_LABEL}.
-        {!status.open && " Please wait until the following Sunday."}
+      <div className="rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
+        <span className="font-semibold">● Open now</span> — sell your gold {SELL_HOURS_LABEL}.
       </div>
 
       {done && (
@@ -83,6 +113,63 @@ export default function SellPage() {
       )}
       {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
 
+      {/* Payout wallet — choose the crypto/network and address. Editable any time,
+          even with no gold, so you can register it in advance. */}
+      <div className="card space-y-4 p-6">
+        <h2 className="text-lg font-bold">Payout wallet</h2>
+
+        <div>
+          <label className="label">Receive as</label>
+          <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+            {PAYMENT_METHODS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} — {m.network}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">Your wallet address</label>
+          <div className="flex items-center gap-2">
+            <input
+              className="input font-mono text-sm"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Paste your wallet address"
+              spellCheck={false}
+            />
+            <button
+              onClick={saveWallet}
+              disabled={savingWallet || !hasAddress}
+              className="btn-ghost shrink-0 text-sm"
+            >
+              {savingWallet ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {walletMsg && <p className="mt-1 text-xs text-emerald-300">{walletMsg}</p>}
+
+          {/* Registered-wallet / prompt messaging */}
+          {registered ? (
+            <p className="mt-2 text-xs text-slate-400">
+              Registered wallet{getPaymentMethod(profile.payout_method)?.label ? ` (${getPaymentMethod(profile.payout_method)!.label})` : ""}:{" "}
+              <span className="font-mono text-slate-300 break-all">{registered}</span>. If you don&apos;t
+              change it, your payout will be sent there.
+            </p>
+          ) : !hasAddress ? (
+            <p className="mt-2 text-xs text-amber-300">
+              No wallet address is registered yet — please enter a wallet address to receive payouts.
+            </p>
+          ) : null}
+
+          <p className="mt-2 text-xs text-amber-200/90">
+            ⚠ Please double-check that the wallet address is correct — crypto payouts are irreversible
+            and sent to exactly this address.
+          </p>
+        </div>
+      </div>
+
+      {/* Sell */}
       <div className="card p-6">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-slate-300">
@@ -101,7 +188,7 @@ export default function SellPage() {
               value={amount}
               onChange={(e) => setAmount(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
               className="input"
-              disabled={!status.open || gold < 1}
+              disabled={gold < 1}
             />
             <button
               onClick={() => setAmount(Math.max(1, gold))}
@@ -123,10 +210,10 @@ export default function SellPage() {
         <button onClick={sell} disabled={busy || !canSell} className="btn-gold mt-5 w-full text-lg">
           {busy
             ? "Processing…"
-            : !status.open
-              ? "Selling is closed"
-              : gold < 1
-                ? "No gold to sell"
+            : gold < 1
+              ? "No gold to sell"
+              : !hasAddress
+                ? "Enter a wallet address"
                 : `Sell ${Math.min(amount, gold)} gold`}
         </button>
 

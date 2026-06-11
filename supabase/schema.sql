@@ -79,6 +79,9 @@ alter table public.profiles  add column if not exists last_draw_at timestamptz;
 alter table public.profiles  add column if not exists continue_until timestamptz;
 alter table public.profiles  add column if not exists rewards_claimed boolean not null default false;
 alter table public.profiles  add column if not exists first_login_done boolean not null default false;
+-- Registered payout wallet for selling gold back.
+alter table public.profiles  add column if not exists payout_address text;
+alter table public.profiles  add column if not exists payout_method  text;
 -- Existing/established accounts have already logged in — don't gate them.
 update public.profiles set first_login_done = true
   where first_login_done = false
@@ -126,9 +129,13 @@ create table if not exists public.sells (
   user_id     uuid not null references public.profiles (id) on delete cascade,
   gold        integer not null,                          -- gold coins sold
   usdt_amount numeric not null,                          -- gold * 1000
+  method_id      text,                                   -- payout crypto/network (PaymentMethod id)
+  payout_address text,                                   -- wallet the payout is sent to
   status      text not null default 'requested',         -- 'requested' | 'paid'
   created_at  timestamptz not null default now()
 );
+alter table public.sells add column if not exists method_id      text;
+alter table public.sells add column if not exists payout_address text;
 create index if not exists sells_user_idx on public.sells (user_id, created_at desc);
 
 -- ---------- draws -------------------------------------------------------

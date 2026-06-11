@@ -122,7 +122,7 @@ export default function CheckoutModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm" onClick={onCancel}>
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0f1422] text-slate-100 shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-[2px] border border-white/10 bg-black text-slate-100 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -138,10 +138,10 @@ export default function CheckoutModal({
           </button>
         </div>
 
-        <div className="max-h-[78vh] space-y-4 overflow-y-auto p-5">
+        <div className="max-h-[85vh] space-y-3 overflow-y-auto p-4">
           {/* Order summary */}
-          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Order summary</p>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Order summary</p>
             <div className="space-y-2">
               <Row label="Item">{order.item}</Row>
               <Row label="Pay with">
@@ -159,7 +159,7 @@ export default function CheckoutModal({
           </div>
 
           {/* Payment panel */}
-          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-4">
+          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium text-slate-400">Amount due</p>
@@ -170,9 +170,9 @@ export default function CheckoutModal({
               <CopyButton text={String(order.pay_amount)} label="amount" />
             </div>
 
-            <div className="mt-4 flex justify-center">
-              <div className="rounded-xl bg-white p-3">
-                <QRCodeSVG value={order.address} size={150} level="M" />
+            <div className="mt-3 flex justify-center">
+              <div className="rounded-xl bg-white p-2">
+                <QRCodeSVG value={order.address} size={124} level="M" />
               </div>
             </div>
             <p className="mt-2 text-center text-xs text-slate-500">Scan to pay, or copy the address below</p>
@@ -206,10 +206,19 @@ export default function CheckoutModal({
             </div>
           ) : (
             <>
+              {/* Payment is detected automatically while this modal is open. */}
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-200">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                </span>
+                Waiting for your payment — you&apos;ll be credited automatically the moment it arrives.
+              </div>
+
               <div className="h-px bg-white/10" />
               <div>
                 <label className="text-xs font-medium text-slate-400">
-                  Already paid? Paste your transaction hash to confirm
+                  Not detected automatically? Paste your transaction hash to confirm
                 </label>
                 <input
                   value={txHash}

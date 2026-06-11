@@ -114,9 +114,7 @@ export default function DrawPage() {
         >
           {spinning ? "Spinning…" : canSpinNow ? "▶ Start" : formatDrawCountdown(msUntilNext)}
         </button>
-        {!canSpinNow && !spinning && (
-          <p className="text-sm text-slate-400">Next free spin in {formatDrawCountdown(msUntilNext)}</p>
-        )}
+
       </div>
 
       <p className="text-xs text-slate-500">

@@ -86,6 +86,13 @@ table { border-radius: 4px; }
 .btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.06); }
 .btn-coin:active { transform: scale(0.97); }
 
+/* Modal panels (a card inside a full-screen overlay): solid black at 100%
+   opacity so the page behind never shows through, with a 2px corner radius. */
+.fixed.inset-0 .card {
+  background-color: #000 !important;
+  border-radius: 2px !important;
+}
+
 /* Reusable bits ------------------------------------------------------- */
 @layer components {
   .btn {

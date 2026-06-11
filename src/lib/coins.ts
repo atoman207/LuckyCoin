@@ -101,13 +101,13 @@ export function exchangeOutput(from: CoinType, to: CoinType, amount: number): nu
   throw new Error(`Invalid exchange: ${from} → ${to}`);
 }
 
-// The board: 50 tiles — 1 gold, 4 silver, 20 bronze ("copper") and the rest
-// empty (no win). Counts must sum to BOARD_SIZE.
+// The board: 50 tiles — the round-1 composition (2 gold, 38 silver, 5 bronze
+// and 5 empty). Counts must sum to BOARD_SIZE.
 export const BOARD_COMPOSITION = {
-  gold: 1,
-  silver: 4,
-  bronze: 20,
-  empty: 25,
+  gold: 2,
+  silver: 38,
+  bronze: 5,
+  empty: 5,
 } as const;
 export const BOARD_SIZE =
   BOARD_COMPOSITION.gold +
@@ -120,21 +120,26 @@ export type PlayMode = "continuous" | "multiplier";
 export const MAX_RESTARTS = 10;
 
 export type Composition = { gold: number; silver: number; bronze: number };
-export const BASE_COMPOSITION: Composition = { gold: 1, silver: 4, bronze: 20 };
+export const BASE_COMPOSITION: Composition = { gold: 2, silver: 38, bronze: 5 };
 
-// Multiplier Play: the board gets richer each round (the rest of the 50 tiles
-// stay empty). Round 1 is the base; rounds 2–10 follow the spec.
+// Per-round board composition (rounds 1–10). The remaining tiles of the 50 are
+// empty ("No"). Round 1 is the entry board; each Continue advances the round.
+//   1: 2/38/5  (5 blank)   6: 12/28/10
+//   2: 3/37/10             7: 15/25/10
+//   3: 4/36/10             8: 20/30/0
+//   4: 5/35/10             9: 25/20/0  (5 blank)
+//   5: 10/30/10           10: 30/20/0
 export const MULTIPLIER_ROUNDS: Record<number, Composition> = {
-  1: { gold: 1, silver: 4, bronze: 20 },
-  2: { gold: 1, silver: 4, bronze: 25 },
-  3: { gold: 1, silver: 9, bronze: 25 },
-  4: { gold: 2, silver: 8, bronze: 40 },
-  5: { gold: 2, silver: 18, bronze: 30 },
-  6: { gold: 3, silver: 7, bronze: 40 },
-  7: { gold: 3, silver: 17, bronze: 30 },
-  8: { gold: 5, silver: 40, bronze: 5 },
-  9: { gold: 10, silver: 40, bronze: 0 },
-  10: { gold: 20, silver: 30, bronze: 0 },
+  1: { gold: 2, silver: 38, bronze: 5 },
+  2: { gold: 3, silver: 37, bronze: 10 },
+  3: { gold: 4, silver: 36, bronze: 10 },
+  4: { gold: 5, silver: 35, bronze: 10 },
+  5: { gold: 10, silver: 30, bronze: 10 },
+  6: { gold: 12, silver: 28, bronze: 10 },
+  7: { gold: 15, silver: 25, bronze: 10 },
+  8: { gold: 20, silver: 30, bronze: 0 },
+  9: { gold: 25, silver: 20, bronze: 0 },
+  10: { gold: 30, silver: 20, bronze: 0 },
 };
 
 // Per-round multiplier INCREASE in Multiplier Play. The entry stake compounds
@@ -244,6 +249,8 @@ export type Profile = {
   continue_until?: string | null;
   rewards_claimed?: boolean;
   first_login_done?: boolean;
+  payout_address?: string | null; // registered wallet for sell-back payouts
+  payout_method?: string | null; // chosen payout crypto/network (PaymentMethod id)
 };
 
 // Build a freshly shuffled 50-tile board from a coin composition; any tiles

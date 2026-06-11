@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { isSellOpen, sellStatus, SELL_PRICE_USDT } from "@/lib/selling";
+import { getPaymentMethod } from "@/lib/wallets";
 
 export const runtime = "nodejs";
 
@@ -28,12 +29,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `You only have ${profile.gold} gold.` }, { status: 400 });
   }
 
+  // Resolve the payout wallet: the one entered now, or the registered one.
+  const enteredAddress =
+    typeof body.payout_address === "string" ? body.payout_address.trim() : "";
+  const payoutAddress = enteredAddress || profile.payout_address || "";
+  if (!payoutAddress) {
+    return NextResponse.json(
+      { error: "Please enter a wallet address to receive your payout.", needWallet: true },
+      { status: 400 }
+    );
+  }
+
+  // Resolve the payout crypto/network: the one chosen now, or the registered one.
+  const methodId =
+    (typeof body.method_id === "string" && getPaymentMethod(body.method_id)?.id) ||
+    profile.payout_method ||
+    null;
+
   const usdt = gold * SELL_PRICE_USDT;
 
-  // Deduct the gold (race-guarded) before recording the payout request.
+  // Deduct the gold (race-guarded) and register the payout wallet for next time.
   const { data: updated, error } = await admin
     .from("profiles")
-    .update({ gold: profile.gold - gold })
+    .update({ gold: profile.gold - gold, payout_address: payoutAddress, payout_method: methodId })
     .eq("id", profile.id)
     .gte("gold", gold)
     .select("*")
@@ -47,13 +65,18 @@ export async function POST(req: Request) {
     user_id: profile.id,
     gold,
     usdt_amount: usdt,
+    method_id: methodId,
+    payout_address: payoutAddress,
     status: "requested",
   });
 
+  const methodLabel = getPaymentMethod(methodId)?.label;
   return NextResponse.json({
     ok: true,
     usdt,
-    message: `Sold ${gold} gold for ${usdt.toLocaleString()} USDT. Your payout will be sent to your wallet.`,
+    message: `Sold ${gold} gold for ${usdt.toLocaleString()} USDT. Your payout will be sent to ${
+      methodLabel ? `${methodLabel} · ` : ""
+    }${payoutAddress}.`,
     profile: updated,
   });
 }

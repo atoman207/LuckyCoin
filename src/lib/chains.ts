@@ -83,6 +83,89 @@ export function getChainConfig(methodId: string): ChainConfig | null {
   return CHAIN_CONFIG[methodId] ?? null;
 }
 
+// =====================================================================
+//  Address scanning — list recent transaction hashes that paid OUR
+//  receiving address for a given method, newest first. Used by the
+//  auto-detect polling (/api/purchase/scan): each candidate is then run
+//  through verifyPayment() for the authoritative amount/confirmation/
+//  window/uniqueness checks before any coins are credited.
+//  EVM-native (plain ETH/BNB sends) has no efficient incoming index over
+//  public RPC, so it returns [] — those orders fall back to manual hash.
+// =====================================================================
+export async function scanIncoming(methodId: string): Promise<string[]> {
+  const cfg = CHAIN_CONFIG[methodId];
+  if (!cfg) return [];
+  try {
+    let hashes: string[] = [];
+    switch (cfg.kind) {
+      case "tron-token": hashes = await scanTronToken(cfg); break;
+      case "tron-native": hashes = await scanTronNative(cfg); break;
+      case "evm-token": hashes = await scanEvmToken(cfg); break;
+      case "btc": hashes = await scanBtc(cfg); break;
+      case "sol-token":
+      case "sol-native": hashes = await scanSol(cfg); break;
+      case "xrp": hashes = await scanXrp(cfg); break;
+      case "xlm": hashes = await scanXlm(cfg); break;
+      default: hashes = [];
+    }
+    return [...new Set(hashes.filter(Boolean))].slice(0, 15);
+  } catch {
+    return []; // transient explorer/RPC error — the next poll retries
+  }
+}
+
+async function scanTronToken(cfg: ChainConfig): Promise<string[]> {
+  const j = await getJson(
+    `${TRON_API}/v1/accounts/${cfg.address}/transactions/trc20?only_to=true&limit=30&contract_address=${cfg.tokenContract}`
+  );
+  return (j?.data ?? []).map((t: any) => t.transaction_id);
+}
+
+async function scanTronNative(cfg: ChainConfig): Promise<string[]> {
+  const j = await getJson(`${TRON_API}/v1/accounts/${cfg.address}/transactions?only_to=true&limit=30`);
+  return (j?.data ?? []).map((t: any) => t.txID);
+}
+
+async function scanEvmToken(cfg: ChainConfig): Promise<string[]> {
+  const head = await rpc(cfg.rpc!, "eth_blockNumber", []);
+  const fromBlock = "0x" + (BigInt(head) - BigInt(800)).toString(16); // ~last hour, well over the 10-min window
+  const topicTo = "0x" + cfg.address.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+  const logs = await rpc(cfg.rpc!, "eth_getLogs", [
+    { fromBlock, toBlock: "latest", address: cfg.tokenContract, topics: [ERC20_TRANSFER, null, topicTo] },
+  ]);
+  // Logs come oldest-first; reverse so the newest candidates are tried first.
+  return (logs ?? []).map((l: any) => l.transactionHash).reverse();
+}
+
+async function scanBtc(cfg: ChainConfig): Promise<string[]> {
+  const txs = await getJson(`https://blockstream.info/api/address/${cfg.address}/txs`);
+  return (txs ?? [])
+    .filter((tx: any) => (tx.vout ?? []).some((v: any) => v.scriptpubkey_address === cfg.address))
+    .map((tx: any) => tx.txid);
+}
+
+async function scanSol(cfg: ChainConfig): Promise<string[]> {
+  const sigs = await rpc(SOL_RPC, "getSignaturesForAddress", [cfg.address, { limit: 30 }]);
+  return (sigs ?? []).map((s: any) => s.signature);
+}
+
+async function scanXrp(cfg: ChainConfig): Promise<string[]> {
+  const j = await getJson("https://s1.ripple.com:51234/", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      method: "account_tx",
+      params: [{ account: cfg.address, limit: 20, ledger_index_min: -1, ledger_index_max: -1 }],
+    }),
+  });
+  return (j?.result?.transactions ?? []).map((t: any) => t.tx?.hash ?? t.hash);
+}
+
+async function scanXlm(cfg: ChainConfig): Promise<string[]> {
+  const j = await getJson(`https://horizon.stellar.org/accounts/${cfg.address}/payments?order=desc&limit=20`);
+  return (j?._embedded?.records ?? []).map((r: any) => r.transaction_hash);
+}
+
 // --- dispatch ---------------------------------------------------------
 
 export async function verifyPayment(

@@ -7,7 +7,7 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import DemoGame from "@/components/DemoGame";
 import InsufficientCoinsModal from "@/components/InsufficientCoinsModal";
-import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode } from "@/lib/coins";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, compositionFor, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode } from "@/lib/coins";
 
 type Phase = "idle" | "playing" | "revealed";
 type Composition = { gold: number; silver: number; bronze: number; empty: number };
@@ -323,14 +323,30 @@ export default function GamePage() {
   const nextStageCost = Math.ceil(ROUND_COST[stageCurrency] * stageCostMultiplier(restarts + 2));
   // A saved multiplier exists when there is persisted progress to resume.
   const hasSaved = (profile.game_round ?? 0) > 0 && restartsLeft > 0;
+  // The board the player gets on the NEXT round — shown alongside the multiplier
+  // to keep them engaged (a richer board to look forward to).
+  const nextRoundComp = (() => {
+    const c = compositionFor("multiplier", Math.min(restarts + 2, MAX_RESTARTS));
+    return { ...c, empty: BOARD_SIZE - c.gold - c.silver - c.bronze };
+  })();
+
+  // During play the whole view is height-constrained to a single screen so the
+  // board (and the action buttons) never overflow; the board flexes to fill.
+  const playing = phase === "playing" || phase === "revealed";
 
   return (
-    <div className={`space-y-6 ${shake ? "screen-shake" : ""}`}>
+    <div
+      className={`${
+        playing
+          ? "flex h-[calc(100dvh-var(--header-h)-4rem)] flex-col gap-3 overflow-hidden"
+          : "space-y-6"
+      } ${shake ? "screen-shake" : ""}`}
+    >
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold">Pick the lucky coin</h1>
-          <p className="text-slate-400">
+          <h1 className="text-2xl font-extrabold sm:text-3xl">Pick the lucky coin</h1>
+          <p className="hidden text-slate-400 sm:block">
             {phase === "playing"
               ? "Tap one coin to crack it open."
               : `One round costs ${profile.is_admin ? "nothing for admins" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze hidden among ${BOARD_SIZE}.`}
@@ -381,7 +397,7 @@ export default function GamePage() {
       {(phase === "playing" || phase === "revealed") && (
         <>
           {/* Restart / New Game toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="rounded bg-amber-300/15 px-2.5 py-1 text-sm font-bold text-amber-200">
                 ×{multiplier} · stage {restarts + 1}/{MAX_RESTARTS}
@@ -421,9 +437,10 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* Exact counts for this round, clearly shown. */}
+          {/* Exact counts for this round (hidden on mobile to save space — the
+              same info is in the "How many left?" tooltip). */}
           {composition && (
-            <div className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm">
+            <div className="hidden shrink-0 flex-wrap items-center justify-center gap-4 rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm sm:flex">
               <span className="text-slate-400">This round:</span>
               <span className="flex items-center gap-1.5 font-semibold">
                 <CoinIcon type="gold" size={20} /> {composition.gold}
@@ -438,85 +455,91 @@ export default function GamePage() {
             </div>
           )}
 
-          <div
-            key={roundId ?? "board"}
-            className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-3 md:grid-cols-10"
-          >
-            {Array.from({ length: BOARD_SIZE }).map((_, i) => {
-              const revealed = phase === "revealed" && board;
-              const type = revealed ? board![i] : null;
-              const isPick = picked === i;
-              const border = type && type !== "empty" ? COIN_BORDER[type] : null;
-              return (
-                <button
-                  key={i}
-                  onClick={() => pick(i)}
-                  disabled={phase !== "playing" || busy}
-                  style={{
-                    animationDelay: `${SPIRAL_ORDER[i] * DEAL_STAGGER_MS}ms`,
-                    animationDuration: `${DEAL_ANIM_MS}ms`,
-                  }}
-                  className={[
-                    "tile-deal relative grid aspect-square place-items-center border transition duration-300",
-                    revealed
-                      ? isPick && border
-                        ? border.tilePick
-                        : border
-                          ? border.tile
-                          : "border-white/10 bg-black/20 opacity-50"
-                      : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
-                  ].join(" ")}
-                >
-                  {revealed && type && type !== "empty" ? (
-                    <span
-                      className={[
-                        "inline-flex rounded-full",
-                        isPick ? border!.coinPick : `animate-pop ${border!.coin}`,
-                      ].join(" ")}
-                    >
-                      <CoinIcon type={type} size={40} className="rounded-full" />
-                    </span>
-                  ) : revealed && type === "empty" ? (
-                    <span className={`text-sm font-bold text-slate-500 ${isPick ? "tile-flip" : "animate-pop"}`}>No</span>
-                  ) : null}
-                  {revealed && isPick && (
-                    <span className="absolute -top-2 left-1/2 grid h-5 w-5 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-xs font-black text-slate-900 shadow">
-                      ✓
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Board fills the remaining height; rows share it equally so the whole
+              board (and the buttons below) always fit on one screen. */}
+          <div className="min-h-0 flex-1">
+            <div
+              key={roundId ?? "board"}
+              className="grid h-full w-full auto-rows-fr grid-cols-5 gap-1.5 sm:grid-cols-8 sm:gap-2 md:grid-cols-10"
+            >
+              {Array.from({ length: BOARD_SIZE }).map((_, i) => {
+                const revealed = phase === "revealed" && board;
+                const type = revealed ? board![i] : null;
+                const isPick = picked === i;
+                const border = type && type !== "empty" ? COIN_BORDER[type] : null;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => pick(i)}
+                    disabled={phase !== "playing" || busy}
+                    style={{
+                      animationDelay: `${SPIRAL_ORDER[i] * DEAL_STAGGER_MS}ms`,
+                      animationDuration: `${DEAL_ANIM_MS}ms`,
+                    }}
+                    className={[
+                      "tile-deal relative grid h-full w-full min-h-0 place-items-center border transition duration-300",
+                      revealed
+                        ? isPick && border
+                          ? border.tilePick
+                          : border
+                            ? border.tile
+                            : "border-white/10 bg-black/20 opacity-50"
+                        : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
+                    ].join(" ")}
+                  >
+                    {revealed && type && type !== "empty" ? (
+                      <span className="flex h-full w-full items-center justify-center p-[8%]">
+                        <CoinIcon
+                          type={type}
+                          responsive
+                          className={[
+                            "rounded-full",
+                            isPick ? border!.coinPick : `animate-pop ${border!.coin}`,
+                          ].join(" ")}
+                        />
+                      </span>
+                    ) : revealed && type === "empty" ? (
+                      <span className={`text-xs font-bold text-slate-500 sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>No</span>
+                    ) : null}
+                    {revealed && isPick && (
+                      <span className="absolute -top-1.5 left-1/2 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-[10px] font-black text-slate-900 shadow sm:h-5 sm:w-5 sm:text-xs">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {phase === "revealed" && reward && (
-            <div className="card flex flex-col items-center gap-3 p-6 text-center">
+            <div className="card flex shrink-0 flex-wrap items-center justify-between gap-3 p-3">
               <div className="flex items-center gap-3">
                 {reward.type === "empty" ? (
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-white/5 text-base font-bold text-slate-400">No</span>
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-sm font-bold text-slate-400">No</span>
                 ) : (
-                  <CoinIcon type={reward.type} size={48} className="animate-pop" />
+                  <CoinIcon type={reward.type} size={40} className="animate-pop" />
                 )}
                 <div className="text-left">
-                  <div className="text-sm uppercase tracking-wide text-slate-400">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">
                     {reward.type === "empty" ? "Result" : "You won"}
                   </div>
-                  <div className="text-xl font-bold capitalize">
+                  <div className="text-lg font-bold capitalize">
                     {reward.type === "empty"
                       ? "Empty — no win"
                       : `${reward.type === "gold" ? reward.gold : reward.type === "silver" ? reward.silver : reward.bronze ?? 1} ${reward.type}`}
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={nextStage}
                   disabled={busy || restartsLeft <= 0}
-                  className="btn-gold"
+                  className="btn-gold text-sm"
                 >
                   ▶ Continue {restartsLeft <= 0 ? "(max)" : `(×${nextMultiplier(restarts + 1)})`}
                 </button>
-                <button onClick={newGame} disabled={busy} className="btn-ghost">
+                <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
                   ↺ Start Over
                 </button>
               </div>
@@ -644,21 +667,27 @@ export default function GamePage() {
                   : `+${reward?.[revealCoin] ?? 1} ${revealCoin} added${(reward?.multiplier ?? 1) > 1 ? ` (×${reward?.multiplier})` : ""}`}
               </p>
 
-              {/* Next-stage prompt: coins consumed + current balances */}
-              <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
-                <p className="font-semibold text-amber-200">Proceed to the next stage?</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
-                  {nextMultiplier(restarts + 1)}
-                </p>
-                <div className="mt-2 flex items-center justify-center gap-4">
-                  {(["gold", "silver", "bronze"] as const).map((t) => (
-                    <span key={t} className="flex items-center gap-1 font-semibold">
-                      <CoinIcon type={t} size={20} /> {profile[t]}
-                    </span>
-                  ))}
+              {/* Next-stage prompt: cost + the NEXT round's board (to entice). */}
+              {restartsLeft > 0 && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
+                  <p className="font-semibold text-amber-200">Proceed to the next stage?</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
+                    {nextMultiplier(restarts + 1)}
+                  </p>
+                  <p className="mt-2 text-xs uppercase tracking-wide text-amber-200/80">Next board</p>
+                  <div className="mt-1 flex items-center justify-center gap-4">
+                    {(["gold", "silver", "bronze"] as const).map((t) => (
+                      <span key={t} className="flex items-center gap-1 font-bold">
+                        <CoinIcon type={t} size={20} /> {nextRoundComp[t]}
+                      </span>
+                    ))}
+                    {nextRoundComp.empty > 0 && (
+                      <span className="text-slate-400">{nextRoundComp.empty} blank</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="mt-5 flex flex-col gap-2">
                 {restartsLeft > 0 ? (
@@ -728,6 +757,21 @@ export default function GamePage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-amber-200">Multiplier increased</p>
             <p className="mt-1 text-6xl font-black text-amber-300 drop-shadow">×{multModal}</p>
             <p className="mt-2 text-slate-300">Winnings this stage are multiplied by {multModal}!</p>
+            {composition && (
+              <>
+                <p className="mt-4 text-xs uppercase tracking-wide text-amber-200/80">Coins on this board</p>
+                <div className="mt-1 flex items-center justify-center gap-4">
+                  {(["gold", "silver", "bronze"] as const).map((t) => (
+                    <span key={t} className="flex items-center gap-1 font-bold">
+                      <CoinIcon type={t} size={22} /> {composition[t]}
+                    </span>
+                  ))}
+                  {composition.empty > 0 && (
+                    <span className="text-sm text-slate-400">{composition.empty} blank</span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

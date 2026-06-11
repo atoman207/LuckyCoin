@@ -113,12 +113,38 @@ export default function HelpPage() {
             <strong>Continuous Play</strong> — the same board every restart.
           </li>
           <li>
-            <strong>Multiplier Play</strong> — richer boards each round, e.g. round 2 ={" "}
-            {MULTIPLIER_ROUNDS[2].gold}/{MULTIPLIER_ROUNDS[2].silver}/{MULTIPLIER_ROUNDS[2].bronze},
-            up to round {MAX_RESTARTS} = {MULTIPLIER_ROUNDS[10].gold}/{MULTIPLIER_ROUNDS[10].silver}/
-            {MULTIPLIER_ROUNDS[10].bronze} (gold/silver/bronze).
+            <strong>Multiplier Play</strong> — the board gets richer each round (more gold &amp;
+            silver), up to round {MAX_RESTARTS}. The exact coins per round:
           </li>
         </ul>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-white/5 text-amber-200">
+              <tr>
+                <th className="px-3 py-2">Round</th>
+                <th className="px-3 py-2">Gold</th>
+                <th className="px-3 py-2">Silver</th>
+                <th className="px-3 py-2">Bronze</th>
+                <th className="px-3 py-2">Blank</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-300">
+              {Array.from({ length: MAX_RESTARTS }, (_, i) => i + 1).map((r) => {
+                const c = MULTIPLIER_ROUNDS[r];
+                const blank = BOARD_SIZE - c.gold - c.silver - c.bronze;
+                return (
+                  <tr key={r} className="border-t border-white/10">
+                    <td className="px-3 py-1.5 font-semibold text-amber-100">{r}</td>
+                    <td className="px-3 py-1.5">{c.gold}</td>
+                    <td className="px-3 py-1.5">{c.silver}</td>
+                    <td className="px-3 py-1.5">{c.bronze}</td>
+                    <td className="px-3 py-1.5">{blank}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section title="Daily login reward">
@@ -165,8 +191,8 @@ export default function HelpPage() {
           {COIN_PACKS.map((p) => `${p.silver}/$${p.usd}`).join(", ")}.
         </p>
         <p>
-          <strong>Sell</strong> gold for <strong>{SELL_PRICE_USDT.toLocaleString()} USDT each</strong>,
-          open only {SELL_HOURS_LABEL}. Outside those hours, you must wait until the following Sunday.
+          <strong>Sell</strong> gold for <strong>{SELL_PRICE_USDT.toLocaleString()} USDT each</strong> —
+          available {SELL_HOURS_LABEL}, so you can sell immediately.
         </p>
       </Section>
 

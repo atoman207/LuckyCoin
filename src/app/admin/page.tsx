@@ -5,6 +5,7 @@ import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 import CoinIcon from "@/components/CoinIcon";
 import { COIN_VALUE } from "@/lib/coins";
+import { getPaymentMethod } from "@/lib/wallets";
 
 type Row = {
   id: string;
@@ -57,14 +58,26 @@ type Contact = {
   created_at: string;
 };
 
+type Sell = {
+  id: string;
+  gold: number;
+  usdt_amount: number;
+  method_id: string | null;
+  payout_address: string | null;
+  status: string;
+  created_at: string;
+  profiles: { nickname: string; email: string } | null;
+};
+
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleString() : "—");
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
 
 export default function AdminPage() {
   const { profile, loading } = useUser();
-  const [tab, setTab] = useState<"users" | "transactions" | "messages">("users");
+  const [tab, setTab] = useState<"users" | "transactions" | "sells" | "messages">("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
+  const [sells, setSells] = useState<Sell[] | null>(null);
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,13 +115,32 @@ export default function AdminPage() {
     else setError(data.error);
   }, []);
 
+  const loadSells = useCallback(async () => {
+    const res = await fetch("/api/admin/sells", { cache: "no-store" });
+    const data = await res.json();
+    if (res.ok) setSells(data.sells);
+    else setError(data.error);
+  }, []);
+
   useEffect(() => {
     if (!profile?.is_admin) return;
     loadUsers();
     loadTxns();
     loadStats();
     loadContacts();
-  }, [profile, loadUsers, loadTxns, loadStats, loadContacts]);
+    loadSells();
+  }, [profile, loadUsers, loadTxns, loadStats, loadContacts, loadSells]);
+
+  async function markSell(id: string, status: "paid" | "requested") {
+    const res = await fetch("/api/admin/sells", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    const data = await res.json();
+    if (!res.ok) return setError(data.error);
+    loadSells();
+  }
 
   if (loading) return <div className="py-20 text-center text-slate-400">Loading…</div>;
   if (!profile?.is_admin) {
@@ -178,11 +210,11 @@ export default function AdminPage() {
         <div>
           <h1 className="text-3xl font-extrabold">Admin dashboard</h1>
           <p className="text-slate-400">
-            {rows?.length ?? 0} players ({realCount} real · {botCount} bot) · {txns?.length ?? 0} transactions
+            {rows?.length ?? 0} players ({realCount} real · {botCount} bot) · {txns?.length ?? 0} transactions · {sells?.length ?? 0} sell requests
           </p>
         </div>
         <div className="flex gap-2 rounded-xl bg-black/30 p-1">
-          {(["users", "transactions", "messages"] as const).map((t) => (
+          {(["users", "transactions", "sells", "messages"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -436,6 +468,63 @@ export default function AdminPage() {
                     <td className="px-4 py-3"><span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-200">{t.status}</span></td>
                   </tr>
                 ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "sells" && (
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="border-b border-white/10 text-slate-400">
+              <tr>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Seller</th>
+                <th className="px-4 py-3 text-right">Gold</th>
+                <th className="px-4 py-3 text-right">Payout (USDT)</th>
+                <th className="px-4 py-3">Receive as</th>
+                <th className="px-4 py-3">Wallet address</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sells === null ? (
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+              ) : sells.length === 0 ? (
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No sell requests yet.</td></tr>
+              ) : (
+                sells.map((s) => {
+                  const method = getPaymentMethod(s.method_id);
+                  const paid = s.status === "paid";
+                  return (
+                    <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.03]">
+                      <td className="px-4 py-3 text-slate-400">{fmt(s.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{s.profiles?.nickname ?? "—"}</div>
+                        <div className="text-xs text-slate-500">{s.profiles?.email ?? ""}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-amber-300">{s.gold.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-300">{Number(s.usdt_amount).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-slate-300">{method?.label ?? s.method_id ?? "—"}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{s.payout_address ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${paid ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"}`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => markSell(s.id, paid ? "requested" : "paid")}
+                          className="btn-ghost text-xs"
+                        >
+                          {paid ? "Mark unpaid" : "Mark paid"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
