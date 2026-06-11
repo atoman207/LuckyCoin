@@ -120,7 +120,7 @@ export default function SubscriberChart() {
   };
 
   return (
-    <section className="card p-6 sm:p-8">
+    <section className="p-6 sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">New subscribers</h2>
@@ -231,10 +231,7 @@ export default function SubscriberChart() {
         )}
       </div>
 
-      <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-        Live from the database · refreshes automatically
-      </p>
+
     </section>
   );
 }

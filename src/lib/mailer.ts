@@ -12,6 +12,10 @@ function transporter() {
     port,
     secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // Fail fast instead of hanging the request if the SMTP server is slow.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   return cached;
 }

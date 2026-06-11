@@ -2,6 +2,12 @@
 
 :root {
   color-scheme: dark;
+  --header-h: 64px; /* header height (mobile/tablet) */
+}
+@media (min-width: 1024px) {
+  :root {
+    --header-h: 104px; /* taller header on PC */
+  }
 }
 
 html,
@@ -23,17 +29,62 @@ body {
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: #2a3350; border-radius: 999px; }
 
-/* All buttons and tables use a small 2–5px corner radius. */
-button,
+/* Action buttons are finished to look like struck coins/tokens (pill/disc with a
+   beveled, ridged rim). Other raw buttons — game tiles, segmented toggles, menu
+   rows — keep the small radius so layouts don't break. */
 .btn,
 .btn-gold,
 .btn-ghost,
 .btn-silver,
-.btn-bronze {
+.btn-bronze,
+.btn-coin {
+  border-radius: 9999px !important;
+}
+button:not(.btn):not(.btn-gold):not(.btn-ghost):not(.btn-silver):not(.btn-bronze):not(.btn-coin) {
   border-radius: 4px !important;
 }
 table { border-radius: 4px; }
 .card:has(table) { border-radius: 4px; }
+
+/* Coin relief shared by the metallic buttons: a top highlight, a bottom shade,
+   and a double rim ring that reads as a milled coin edge. */
+.btn-gold,
+.btn-silver,
+.btn-bronze,
+.btn-coin {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.22),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.12),
+    0 8px 22px -8px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.btn-ghost {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.1),
+    0 8px 20px -10px rgba(0, 0, 0, 0.6);
+}
+.btn-gold:hover,
+.btn-silver:hover,
+.btn-bronze:hover { filter: brightness(1.06); }
+
+/* The hero "PLAY" button — a round struck coin. */
+.btn-coin {
+  display: inline-grid;
+  place-items: center;
+  width: 7.5rem;
+  height: 7.5rem;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.08em;
+  color: #5a3a06;
+  background: radial-gradient(circle at 35% 30%, #fff3c4 0%, #ffd874 24%, #f5b73d 56%, #d9921c 100%);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.06); }
+.btn-coin:active { transform: scale(0.97); }
 
 /* Reusable bits ------------------------------------------------------- */
 @layer components {
@@ -69,8 +120,8 @@ table { border-radius: 4px; }
     box-shadow: 0 8px 24px -8px rgba(205, 127, 50, 0.6);
   }
   .card {
-    @apply rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur
-           shadow-[0_10px_40px_-15px_rgba(0,0,0,0.6)];
+    /* Flat panels — no shadow, blur or other card effects. */
+    @apply rounded-2xl border border-white/10 bg-white/[0.04];
   }
   .input {
     @apply w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2.5
@@ -81,6 +132,26 @@ table { border-radius: 4px; }
     @apply mb-1 block text-sm font-medium text-slate-300;
   }
 }
+
+/* Header attention icons -------------------------------------------- */
+/* Gentle floating bob so the corner icons are easy to spot. */
+@keyframes floatBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.anim-bob { animation: floatBob 2s ease-in-out infinite; }
+
+/* The Daily Draw wheel spins continuously. */
+@keyframes coinSpin { to { transform: rotate(360deg); } }
+.anim-spin-slow { animation: coinSpin 8s linear infinite; }
+
+/* The question mark wiggles to draw the eye. */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
+.anim-wiggle { animation: wiggle 1.6s ease-in-out infinite; }
 
 /* Coin flip + reveal animations -------------------------------------- */
 @keyframes pop {

@@ -6,9 +6,10 @@ import AuthModal from "@/components/AuthModal";
 import WelcomeModal from "@/components/WelcomeModal";
 import VisitTracker from "@/components/VisitTracker";
 import ContactWidget from "@/components/ContactWidget";
+import BackToTop from "@/components/BackToTop";
 
 export const metadata: Metadata = {
-  title: "Lucky Coin — Next",
+  title: "Lucky Coin — Good Luck",
   description: "Pick the lucky coin. Crack it open. Win gold, silver and bronze.",
   icons: {
     icon: "/favicon.png",
@@ -27,10 +28,11 @@ export default function RootLayout({
         <UserProvider>
           <VisitTracker />
           <Nav />
-          <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+          <main className="mx-auto w-full max-w-[1280px] px-4 py-8">{children}</main>
           <AuthModal />
           <WelcomeModal />
           <ContactWidget />
+          <BackToTop />
           <footer className="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-slate-500">
             © {new Date().getFullYear()} Lucky Coin · Play responsibly.
           </footer>

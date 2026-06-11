@@ -38,24 +38,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const closeWelcome = useCallback(() => setWelcomeOpen(false), []);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/me", { cache: "no-store" });
-    if (res.ok) {
-      const { profile } = await res.json();
-      setProfile(profile);
-    } else {
-      setProfile(null);
+    try {
+      const res = await fetch("/api/me", { cache: "no-store" });
+      if (res.ok) {
+        const { profile } = await res.json();
+        setProfile(profile);
+      } else {
+        setProfile(null);
+      }
+    } catch {
+      // Network hiccup (e.g. tab regaining focus, offline, or a Supabase auth
+      // visibility-change refresh). Keep the last known profile instead of
+      // throwing an unhandled "Failed to fetch" that crashes the app.
     }
   }, []);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!active) return;
-      if (session) await refresh();
-      setLoading(false);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!active) return;
+        if (session) await refresh();
+      } catch {
+        // Don't let a transient auth/network error leave the app stuck in the
+        // loading state — otherwise the header never shows the balance/avatar.
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
