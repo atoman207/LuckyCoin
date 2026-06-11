@@ -13,7 +13,7 @@ create table if not exists public.profiles (
   email         text        not null,
   nationality   text,
   discord_id    text,
-  avatar_url    text,                                   -- URL only; file lives in /public/avatars
+  avatar_url    text,                                   -- public URL; file lives in the "avatar" storage bucket
   gold          integer     not null default 0,
   silver        integer     not null default 0,
   bronze        integer     not null default 0,

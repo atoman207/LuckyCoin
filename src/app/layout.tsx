@@ -5,6 +5,7 @@ import Nav from "@/components/Nav";
 import AuthModal from "@/components/AuthModal";
 import WelcomeModal from "@/components/WelcomeModal";
 import VisitTracker from "@/components/VisitTracker";
+import ContactWidget from "@/components/ContactWidget";
 
 export const metadata: Metadata = {
   title: "Lucky Coin — Next",
@@ -29,6 +30,7 @@ export default function RootLayout({
           <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
           <AuthModal />
           <WelcomeModal />
+          <ContactWidget />
           <footer className="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-slate-500">
             © {new Date().getFullYear()} Lucky Coin · Play responsibly.
           </footer>

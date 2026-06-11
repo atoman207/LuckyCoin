@@ -9,23 +9,42 @@ import CoinBalance from "@/components/CoinBalance";
 import Avatar from "@/components/Avatar";
 import FirstLoginButtons from "@/components/FirstLoginButtons";
 
-const LINKS = [
+// Always visible in the top bar (desktop).
+const NAV_LINKS = [
   { href: "/game", label: "Play" },
   { href: "/draw", label: "Wheel" },
+];
+
+// Moved into the avatar dropdown menu.
+const MENU_LINKS = [
   { href: "/buy", label: "Buy" },
   { href: "/sell", label: "Sell" },
   { href: "/exchange", label: "Exchange" },
-  { href: "/help", label: "Help" },
-  { href: "/contact", label: "Contact" },
 ];
+
+const HELP_HREF = "/help";
 
 export default function Nav() {
   const { profile, loading, openAuth, signOut } = useUser();
   const pathname = usePathname();
   const [menu, setMenu] = useState(false);
 
+  const topLink = (href: string, label: string) => (
+    <Link
+      key={href}
+      href={href}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+        pathname === href
+          ? "bg-white/10 text-white"
+          : "text-slate-300 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b0f1a]/80 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-black backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link href="/" className="flex shrink-0 items-center">
           <Image
@@ -40,19 +59,20 @@ export default function Nav() {
 
         {profile && (
           <div className="ml-2 hidden items-center gap-1 sm:flex">
-            {LINKS.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                  pathname === l.href
-                    ? "bg-white/10 text-white"
-                    : "text-slate-300 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {l.label}
-              </Link>
-            ))}
+            {NAV_LINKS.map((l) => topLink(l.href, l.label))}
+            {/* Help is shown as a question-mark icon. */}
+            <Link
+              href={HELP_HREF}
+              aria-label="Help"
+              title="Help & rules"
+              className={`grid h-8 w-8 place-items-center rounded-full text-sm font-bold transition ${
+                pathname === HELP_HREF
+                  ? "bg-white/10 text-white"
+                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              ?
+            </Link>
             {profile.is_admin && (
               <Link
                 href="/admin"
@@ -70,10 +90,19 @@ export default function Nav() {
           {loading ? null : profile ? (
             <>
               <FirstLoginButtons />
+              {/* Mobile: icons only, quantity in a hover/tap tooltip. */}
+              <div className="sm:hidden">
+                <CoinBalance profile={profile} compact size={24} />
+              </div>
+              {/* Desktop: full chips with the number. */}
               <div className="hidden sm:block">
                 <CoinBalance profile={profile} />
               </div>
-              <div className="relative">
+              <div
+                className="relative"
+                onMouseEnter={() => setMenu(true)}
+                onMouseLeave={() => setMenu(false)}
+              >
                 <button
                   onClick={() => setMenu((m) => !m)}
                   className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-sm hover:bg-white/10"
@@ -82,25 +111,44 @@ export default function Nav() {
                   <span className="hidden max-w-[10ch] truncate sm:inline">{profile.nickname}</span>
                 </button>
                 {menu && (
-                  <div
-                    className="absolute right-0 mt-2 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#121829] shadow-xl"
-                    onMouseLeave={() => setMenu(false)}
-                  >
+                  <div className="absolute right-0 top-full w-48 pt-2">
+                   <div className="overflow-hidden rounded-xl border border-white/10 bg-[#121829] shadow-xl">
+                    {/* Mobile-only: coin balance + the top-bar links. */}
                     <div className="px-3 py-2 sm:hidden">
                       <CoinBalance profile={profile} />
                     </div>
-                    <div className="flex flex-col sm:hidden">
-                      {LINKS.map((l) => (
+                    <div className="flex flex-col border-b border-white/10 sm:hidden">
+                      {NAV_LINKS.map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMenu(false)} className="px-3 py-2 text-sm hover:bg-white/5">
                           {l.label}
                         </Link>
                       ))}
+                      <Link href={HELP_HREF} onClick={() => setMenu(false)} className="px-3 py-2 text-sm hover:bg-white/5">
+                        Help
+                      </Link>
                       {profile.is_admin && (
                         <Link href="/admin" onClick={() => setMenu(false)} className="px-3 py-2 text-sm text-amber-300 hover:bg-white/5">
                           Admin
                         </Link>
                       )}
                     </div>
+
+                    {/* Buy / Sell / Exchange — all screen sizes. */}
+                    <div className="flex flex-col">
+                      {MENU_LINKS.map((l) => (
+                        <Link
+                          key={l.href}
+                          href={l.href}
+                          onClick={() => setMenu(false)}
+                          className={`px-3 py-2 text-sm hover:bg-white/5 ${
+                            pathname === l.href ? "bg-white/10 text-white" : ""
+                          }`}
+                        >
+                          {l.label}
+                        </Link>
+                      ))}
+                    </div>
+
                     <Link
                       href="/profile"
                       onClick={() => setMenu(false)}
@@ -117,6 +165,7 @@ export default function Nav() {
                     >
                       Sign out
                     </button>
+                   </div>
                   </div>
                 )}
               </div>

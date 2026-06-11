@@ -29,9 +29,6 @@ export async function POST(req: Request) {
   const currency: RoundCurrency = body.currency === "bronze" ? "bronze" : "silver";
   const unit = currency;
   const isRestart = body.action === "restart";
-  const initiate = body.initiate === true; // (re)start the 2-hour Continue timer
-
-  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
   // Resolve mode + round + restart count.
   let mode: PlayMode | null;
@@ -74,15 +71,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // Charge the entry cost and persist the game state in one update. Only an
-  // "initiate" (Start, or the auto-restart at 0) resets the 2-hour timer.
+  // Charge the entry cost and persist the game state (round/mode/restarts) in
+  // one update. The saved round IS the saved multiplier — there is no time
+  // limit, so a "Continue" resumes exactly where the player left off.
   const update: Record<string, unknown> = {
     [unit]: profile[unit] - cost,
     game_round: round,
     game_mode: mode,
     game_restarts: restarts,
   };
-  if (initiate) update.continue_until = new Date(Date.now() + TWO_HOURS_MS).toISOString();
 
   const { data: charged, error: chargeErr } = await admin
     .from("profiles")

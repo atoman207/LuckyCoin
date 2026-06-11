@@ -13,7 +13,7 @@ bronze straight to your account.
 - **Exchange** — value-preserving conversion between gold/silver/bronze.
 - **Profile** — `/profile`: every user (and the admin) can edit their own info and upload an avatar.
 - **Admin** — `/admin`: full CRUD over all users (create/edit/delete, coins by type, role, login dates) plus a **Transactions** tab showing wallet address, price and date of each purchase.
-- **Avatars** — uploaded files are stored **in the project** at `public/avatars/`; only the URL is saved in the database.
+- **Avatars** — uploaded files are stored in the **Supabase Storage** `avatar` bucket (must be public); only the URL is saved in the database. Works on read-only serverless hosts like Vercel.
 - Fully responsive, dark, stylish UI. All copy in English.
 
 ## Economy

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { saveAvatarFile } from "@/lib/avatar";
 
-export const runtime = "nodejs"; // needs the filesystem for the avatar
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     let avatar_url: string | null = null;
     if (avatar instanceof File && avatar.size > 0) {
       try {
-        avatar_url = await saveAvatarFile(created.user.id, avatar);
+        avatar_url = await saveAvatarFile(admin, created.user.id, avatar);
       } catch {
         /* invalid/oversized image — proceed without an avatar */
       }

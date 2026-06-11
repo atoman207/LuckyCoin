@@ -171,7 +171,9 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-6">
+    // Break out of the layout's centered max-w container to full width, with
+    // 3vw left/right margins instead.
+    <div className="space-y-6 mx-[calc(50%-50vw)] w-screen px-[3vw]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">Admin dashboard</h1>

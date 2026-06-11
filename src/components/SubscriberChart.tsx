@@ -29,6 +29,43 @@ type Granularity = "day" | "month" | "year";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const PIE_COLORS = ["#f5b73d", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb923c", "#22d3ee", "#facc15", "#4ade80", "#f87171", "#c084fc", "#2dd4bf"];
 
+// Renders a single bar as a stack of golden coins instead of a flat column.
+function CoinStack(props: { x?: number; y?: number; width?: number; height?: number }) {
+  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  if (height < 1 || width < 1) return null;
+
+  const rx = Math.min(width, 46) / 2; // coin radius
+  const ry = Math.max(2.5, rx * 0.22); // perspective squash for the elliptical face
+  const cx = x + width / 2;
+  const bottom = y + height;
+
+  const stepH = Math.max(8, rx * 0.7); // body height of each coin
+  const n = Math.max(1, Math.round(height / stepH));
+  const step = height / n; // exact step so coins fill the bar
+
+  const coins = [];
+  for (let i = 0; i < n; i++) {
+    const cyBot = bottom - i * step;
+    const cyTop = cyBot - step;
+    const off = (i % 2 === 0 ? -1 : 1) * Math.min(2, rx * 0.06); // subtle hand-stacked wobble
+    const ccx = cx + off;
+    coins.push(
+      <g key={i}>
+        {/* cylinder body */}
+        <path
+          d={`M ${ccx - rx} ${cyTop} L ${ccx - rx} ${cyBot} A ${rx} ${ry} 0 0 0 ${ccx + rx} ${cyBot} L ${ccx + rx} ${cyTop} A ${rx} ${ry} 0 0 1 ${ccx - rx} ${cyTop} Z`}
+          fill="url(#coinSide)"
+        />
+        {/* top face */}
+        <ellipse cx={ccx} cy={cyTop} rx={rx} ry={ry} fill="url(#coinFace)" stroke="rgba(150,100,15,0.55)" strokeWidth={0.75} />
+        {/* engraved ring */}
+        <ellipse cx={ccx} cy={cyTop} rx={rx * 0.58} ry={ry * 0.58} fill="none" stroke="rgba(150,100,15,0.4)" strokeWidth={0.75} />
+      </g>
+    );
+  }
+  return <g>{coins}</g>;
+}
+
 // Roll the daily series up to the chosen granularity.
 function aggregate(series: { date: string; count: number }[], gran: Granularity) {
   if (gran === "day") {
@@ -145,11 +182,22 @@ export default function SubscriberChart() {
           <ResponsiveContainer width="100%" height="100%">
             {type === "bar" ? (
               <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -16 }}>
+                <defs>
+                  <linearGradient id="coinFace" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ffe9a8" />
+                    <stop offset="55%" stopColor="#f7c64b" />
+                    <stop offset="100%" stopColor="#e0a52e" />
+                  </linearGradient>
+                  <linearGradient id="coinSide" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#e9aa2f" />
+                    <stop offset="100%" stopColor="#a96f17" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={tooltipStyle} />
-                <Bar dataKey="value" name="Sign-ups" fill="#f5b73d" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                <Bar dataKey="value" name="Sign-ups" fill="#f5b73d" maxBarSize={46} shape={<CoinStack />} activeBar={<CoinStack />} />
               </BarChart>
             ) : type === "line" ? (
               <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: -16 }}>

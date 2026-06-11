@@ -51,15 +51,6 @@ const SPIRAL_COLS = 10;
 const SPIRAL_ROWS = Math.ceil(BOARD_SIZE / SPIRAL_COLS);
 const DEAL_ANIM_MS = 400;
 const DEAL_STAGGER_MS = Math.floor((1000 - DEAL_ANIM_MS) / (BOARD_SIZE - 1)); // ≈1s total deal
-const TWO_HOURS_MS = 2 * 60 * 60 * 1000; // auto-play resets the game after 2h
-
-function fmtClock(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
 
 function buildSpiralOrder(rows: number, cols: number, total: number): number[] {
   const order = new Array(total).fill(0);
@@ -76,7 +67,6 @@ function buildSpiralOrder(rows: number, cols: number, total: number): number[] {
   return order;
 }
 const SPIRAL_ORDER = buildSpiralOrder(SPIRAL_ROWS, SPIRAL_COLS, BOARD_SIZE);
-const AUTO_PLAY_KEY = "lc_auto_play";
 
 export default function GamePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
@@ -106,34 +96,8 @@ export default function GamePage() {
   const [lowCoins, setLowCoins] = useState<string | null>(null);
   const restartsLeft = MAX_RESTARTS - restarts;
 
-  // Auto-play: the game continues by itself, resetting after a 2-hour timer.
-  const [autoPlay, setAutoPlay] = useState(false);
-  const [autoEndsAt, setAutoEndsAt] = useState<number | null>(null);
-  const [autoLeft, setAutoLeft] = useState(TWO_HOURS_MS);
   const [sessionReady, setSessionReady] = useState(false);
   const sessionLoadedRef = useRef(false);
-
-  function toggleAuto() {
-    if (autoPlay) {
-      setAutoPlay(false);
-      setAutoEndsAt(null);
-      localStorage.removeItem(AUTO_PLAY_KEY);
-    } else {
-      setAutoEndsAt(Date.now() + TWO_HOURS_MS);
-      setAutoLeft(TWO_HOURS_MS);
-      setAutoPlay(true);
-      localStorage.setItem(AUTO_PLAY_KEY, "1");
-    }
-  }
-
-  function restoreContinueTimer(continueUntil: string | null) {
-    if (!continueUntil) return;
-    const ends = new Date(continueUntil).getTime();
-    if (ends <= Date.now()) return;
-    setAutoEndsAt(ends);
-    setAutoLeft(ends - Date.now());
-    if (localStorage.getItem(AUTO_PLAY_KEY) === "1") setAutoPlay(true);
-  }
 
   function openChooser() {
     setError(null);
@@ -175,8 +139,6 @@ export default function GamePage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        restoreContinueTimer(data.continueUntil ?? null);
-
         if (data.phase === "playing") {
           setRoundId(data.roundId);
           setBoard(null);
@@ -206,51 +168,6 @@ export default function GamePage() {
     })();
   }, [profile]);
 
-  // Auto-play loop: idle → start a round, playing → auto-pick, revealed → next.
-  useEffect(() => {
-    if (!autoPlay || !profile) return;
-    if (lowCoins || chooserOpen || restartChooserOpen || revealCoin) return; // paused while a modal is open
-    const cur: RoundCurrency = profile.is_admin || profile.silver >= ROUND_COST.silver ? "silver" : "bronze";
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (phase === "idle") {
-      t = setTimeout(() => startRound(cur, "new"), 700);
-    } else if (phase === "playing" && !busy && roundId) {
-      t = setTimeout(() => pick(Math.floor(Math.random() * BOARD_SIZE)), 2600); // after the deal animation
-    } else if (phase === "revealed" && !busy) {
-      t = setTimeout(() => startRound(cur, "new"), 1400);
-    }
-    return () => {
-      if (t) clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, phase, busy, roundId, lowCoins, chooserOpen, restartChooserOpen, revealCoin, profile]);
-
-  // Persistent 2-hour Continue timer: ticks down whenever it is active. When it
-  // reaches 0 the process restarts from the beginning AND the timer resets to 2h
-  // (an "initiate"). Guarded so it only fires once per expiry.
-  const expiredRef = useRef(false);
-  useEffect(() => {
-    if (!autoEndsAt) return;
-    const id = setInterval(() => {
-      const left = autoEndsAt - Date.now();
-      if (left <= 0) {
-        setAutoLeft(0);
-        setAutoPlay(false);
-        if (!expiredRef.current && phase !== "idle") {
-          expiredRef.current = true;
-          startRound(lastCurrency, "new", undefined, { initiate: true }).finally(() => {
-            expiredRef.current = false;
-          });
-        }
-      } else {
-        expiredRef.current = false;
-        setAutoLeft(left);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoEndsAt, phase, lastCurrency]);
-
   function flash(msg: string) {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
@@ -260,34 +177,27 @@ export default function GamePage() {
     currency: RoundCurrency,
     action: "new" | "restart" = "new",
     mode?: PlayMode,
-    options?: { initiate?: boolean },
   ) {
     closeChooser();
     setRestartChooserOpen(false);
     setError(null);
     setBusy(true);
-    const initiate =
-      options?.initiate ??
-      (action === "new" && phase === "idle" && (!autoPlay || !profile?.continue_until));
     try {
       const res = await fetch("/api/game/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency, action, mode, initiate }),
+        body: JSON.stringify({ currency, action, mode }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.insufficient) {
-          // Stop auto-play and prompt a top-up so they can buy more and resume.
-          setAutoPlay(false);
-          setAutoEndsAt(null);
+          // Prompt a top-up so they can buy more and resume.
           setLowCoins(data.error);
           return;
         }
         throw new Error(data.error);
       }
       setProfile(data.profile);
-      if (data.profile?.continue_until) restoreContinueTimer(data.profile.continue_until);
       setRoundId(data.roundId);
       setBoard(null);
       setPicked(null);
@@ -341,12 +251,10 @@ export default function GamePage() {
     setTimeout(() => setShake(false), 520);
   }
 
-  // New Game — reset everything back to the start screen (restart count clears).
+  // Start Over — reset everything back to the start screen, clearing the saved
+  // multiplier (restart count and round both reset to the beginning).
   async function newGame() {
     setRestartChooserOpen(false);
-    setAutoPlay(false);
-    setAutoEndsAt(null);
-    localStorage.removeItem(AUTO_PLAY_KEY);
     try {
       const res = await fetch("/api/game/reset", { method: "POST" });
       const data = await res.json();
@@ -376,13 +284,9 @@ export default function GamePage() {
       setReward(data.reward);
       setProfile(data.profile);
       setPhase("revealed");
-      // In auto-play just flash a toast; otherwise show the result modal after
-      // a 3-second pause so the revealed board (and the gold cards) is seen first.
-      if (autoPlay) {
-        flash(data.reward.type === "empty" ? "No win" : `+1 ${data.reward.type} coin`);
-      } else {
-        setTimeout(() => setRevealCoin(data.reward.type), 3000);
-      }
+      // Show the result modal after a 3-second pause so the revealed board (and
+      // the gold cards) is seen first.
+      setTimeout(() => setRevealCoin(data.reward.type), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reveal.");
     } finally {
@@ -417,6 +321,8 @@ export default function GamePage() {
   // The stake compounds: next-stage cost = base × cumulative multiplier of the
   // next round (round = restarts + 2 after another Start Again).
   const nextStageCost = Math.ceil(ROUND_COST[stageCurrency] * stageCostMultiplier(restarts + 2));
+  // A saved multiplier exists when there is persisted progress to resume.
+  const hasSaved = (profile.game_round ?? 0) > 0 && restartsLeft > 0;
 
   return (
     <div className={`space-y-6 ${shake ? "screen-shake" : ""}`}>
@@ -454,15 +360,19 @@ export default function GamePage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
-              {busy ? "Dealing…" : "▶ Start"}
+              {busy ? "Dealing…" : "↺ Start Over"}
             </button>
-            <button onClick={toggleAuto} disabled={busy} className="btn-ghost text-lg">
-              🤖 Auto Play <span className="text-xs text-slate-400">(2h)</span>
-            </button>
+            {hasSaved && (
+              <button onClick={nextStage} disabled={busy} className="btn-ghost text-lg">
+                ▶ Continue <span className="text-xs text-amber-200">(×{nextMultiplier(restarts + 1)})</span>
+              </button>
+            )}
           </div>
-          <p className="text-xs text-slate-500">
-            Auto Play keeps the game running by itself and resets after 2 hours. If you run out of
-            coins, you can top up to continue.
+          <p className="max-w-md text-xs text-slate-500">
+            <b>Start Over</b> begins a fresh run at ×1.
+            {hasSaved
+              ? " Continue resumes your saved multiplier and keeps increasing it — no time limit."
+              : " Play a round and your multiplier is saved, so you can Continue building it up later."}
           </p>
         </div>
       )}
@@ -494,25 +404,19 @@ export default function GamePage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {/* Continue: advances the stage, shows the persistent 2h timer,
-                  and disappears when the timer reaches 0. */}
-              {autoEndsAt && autoLeft > 0 && (
-                <button
-                  onClick={nextStage}
-                  disabled={busy || phase !== "revealed" || restartsLeft <= 0}
-                  className="btn-gold text-sm"
-                >
-                  ▶ Continue · {fmtClock(autoLeft)}
-                  {restartsLeft <= 0 ? " (max)" : ` (×${nextMultiplier(restarts + 1)})`}
-                </button>
-              )}
-              {/* Restart: start over from the beginning, keeping the 2h timer. */}
+              {/* Continue: advance the stage and increase the (saved) multiplier.
+                  Available once the current board has been revealed. */}
               <button
-                onClick={() => startRound(lastCurrency, "new")}
-                disabled={busy}
-                className="btn-ghost text-sm"
+                onClick={nextStage}
+                disabled={busy || phase !== "revealed" || restartsLeft <= 0}
+                className="btn-gold text-sm"
               >
-                🔄 Restart
+                ▶ Continue
+                {restartsLeft <= 0 ? " (max)" : ` (×${nextMultiplier(restarts + 1)})`}
+              </button>
+              {/* Start Over: reset the multiplier and return to the start screen. */}
+              <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
+                ↺ Start Over
               </button>
             </div>
           </div>
@@ -607,13 +511,13 @@ export default function GamePage() {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   onClick={nextStage}
-                  disabled={busy || restartsLeft <= 0 || autoPlay}
+                  disabled={busy || restartsLeft <= 0}
                   className="btn-gold"
                 >
-                  ▶ Start Again {restartsLeft <= 0 ? "(max)" : `(×${nextMultiplier(restarts + 1)})`}
+                  ▶ Continue {restartsLeft <= 0 ? "(max)" : `(×${nextMultiplier(restarts + 1)})`}
                 </button>
                 <button onClick={newGame} disabled={busy} className="btn-ghost">
-                  ✦ New Game
+                  ↺ Start Over
                 </button>
               </div>
             </div>
@@ -681,7 +585,7 @@ export default function GamePage() {
                     : `You'll pay ${ROUND_COST[choice]} ${choice} to scatter ${BOARD_SIZE} coins and take your pick.`}
                 </p>
                 <div className="mt-5 flex gap-3">
-                  <button onClick={() => startRound(choice, "new", undefined, { initiate: true })} disabled={busy} className="btn-gold flex-1">
+                  <button onClick={() => startRound(choice, "new")} disabled={busy} className="btn-gold flex-1">
                     ▶ Start
                   </button>
                   <button onClick={() => setChoice(null)} className="btn-ghost">
@@ -759,15 +663,17 @@ export default function GamePage() {
               <div className="mt-5 flex flex-col gap-2">
                 {restartsLeft > 0 ? (
                   <button onClick={nextStage} className="btn-gold w-full">
-                    ▶ Start Again (×{nextMultiplier(restarts + 1)})
+                    ▶ Continue (×{nextMultiplier(restarts + 1)})
                   </button>
                 ) : (
                   <button onClick={() => { setRevealCoin(null); newGame(); }} className="btn-gold w-full">
-                    🏆 Max stage reached — New Game
+                    🏆 Max stage reached — Start Over
                   </button>
                 )}
-                <button onClick={() => setRevealCoin(null)} className="btn-ghost w-full text-sm">
-                  Stop here
+                {/* Stop here keeps the saved multiplier and returns to the hub,
+                    where the player can Continue later or Start Over. */}
+                <button onClick={() => { setRevealCoin(null); reset(); }} className="btn-ghost w-full text-sm">
+                  Stop &amp; save
                 </button>
               </div>
             </div>
