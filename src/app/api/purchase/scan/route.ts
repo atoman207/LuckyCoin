@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX } from "@/lib/coins";
-import { verifyPayment, scanIncoming, PAYMENT_WINDOW_MS } from "@/lib/chains";
+import { verifyPayment, scanIncoming, findPayment, PAYMENT_WINDOW_MS } from "@/lib/chains";
 
 export const runtime = "nodejs";
 
@@ -43,8 +43,16 @@ export async function POST(req: Request) {
     (Number.isInteger(silver) && silver >= CUSTOM_SILVER_MIN && silver <= CUSTOM_SILVER_MAX);
   if (!validSilver) return NextResponse.json({ error: "Invalid order." }, { status: 400 });
 
-  // Recent incoming transactions to our address for this method.
-  const candidates = await scanIncoming(order.method_id);
+  // Fast path: a dedicated address-indexed endpoint (Etherscan V2 / TronGrid)
+  // returns a fully-validated matching hash in one call. Falls back to the
+  // generic address scan for other chains or when no API key is configured.
+  const matchedHash = await findPayment(
+    order.method_id,
+    Number(order.pay_amount),
+    createdAtMs
+  ).catch(() => null);
+
+  const candidates = matchedHash ? [matchedHash] : await scanIncoming(order.method_id);
   if (candidates.length === 0) return NextResponse.json({ ok: false, pending: true });
 
   // Drop any hash already used by any order (one payment can't credit twice).
@@ -53,8 +61,11 @@ export async function POST(req: Request) {
   const fresh = candidates.filter((h) => !usedSet.has(h));
 
   for (const hash of fresh) {
-    const result = await verifyPayment(order.method_id, hash, Number(order.pay_amount), createdAtMs);
-    if (!result.ok) continue;
+    // The fast-path hash is already validated; scanned candidates still need it.
+    if (hash !== matchedHash) {
+      const result = await verifyPayment(order.method_id, hash, Number(order.pay_amount), createdAtMs);
+      if (!result.ok) continue;
+    }
 
     // Atomic claim: first writer with credited=false wins; the unique tx_hash
     // index blocks reusing one payment across orders.

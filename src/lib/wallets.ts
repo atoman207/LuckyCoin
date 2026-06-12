@@ -27,13 +27,14 @@ export type PaymentMethod = {
   memo?: string; // note for chains that need a destination tag / memo
 };
 
-// Order matters — USDT options lead because every pack is priced in USDT.
-// `address` is the live receiving address shown at checkout; on-chain
-// verification (see chains.ts) confirms the buyer actually paid it.
+// Order matters — USDT options lead because every pack is priced in USDT, and
+// BEP-20 is first so it is the default network. `address` is the live receiving
+// address shown at checkout; on-chain verification (see chains.ts) confirms the
+// buyer actually paid it on the SELECTED network.
 export const PAYMENT_METHODS: PaymentMethod[] = [
+  { id: "usdt-bep20", label: "USDT · BEP-20", asset: "USDT", network: "BNB Smart Chain (BEP-20)", address: RECEIVING_WALLETS.evm },
   { id: "usdt-trc20", label: "USDT · TRC-20", asset: "USDT", network: "TRON (TRC-20)", address: RECEIVING_WALLETS.tron },
   { id: "usdt-erc20", label: "USDT · ERC-20", asset: "USDT", network: "Ethereum (ERC-20)", address: RECEIVING_WALLETS.evm },
-  { id: "usdt-bep20", label: "USDT · BEP-20", asset: "USDT", network: "BNB Smart Chain (BEP-20)", address: RECEIVING_WALLETS.evm },
   { id: "usdt-spl", label: "USDT · Solana", asset: "USDT", network: "Solana (SPL)", address: RECEIVING_WALLETS.sol },
   { id: "btc", label: "Bitcoin", asset: "BTC", network: "Bitcoin", address: RECEIVING_WALLETS.btc },
   { id: "eth", label: "Ethereum", asset: "ETH", network: "Ethereum", address: RECEIVING_WALLETS.evm },

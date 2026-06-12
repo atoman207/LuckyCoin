@@ -222,7 +222,13 @@ export default function GamePage() {
   // lets the multiplier feature run on Bronze as well as Silver.
   function pickStageCurrency(): RoundCurrency | null {
     if (!profile) return null;
-    const afford = (c: RoundCurrency) => profile.is_admin || profile[c] >= ROUND_COST[c];
+    // Check against the ACTUAL compounded next-stage cost (not the base cost),
+    // so we switch to the other currency when the current one can't cover it.
+    // Only returns null — which triggers the "insufficient" message — once
+    // NEITHER silver NOR bronze can pay.
+    const mult = stageCostMultiplier(restarts + 2);
+    const afford = (c: RoundCurrency) =>
+      profile.is_admin || profile[c] >= Math.ceil(ROUND_COST[c] * mult);
     if (afford(lastCurrency)) return lastCurrency;
     const other: RoundCurrency = lastCurrency === "silver" ? "bronze" : "silver";
     return afford(other) ? other : null;
@@ -233,7 +239,10 @@ export default function GamePage() {
     const cur = pickStageCurrency();
     if (!cur) {
       setRevealCoin(null);
-      setLowCoins(`You need ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze to continue.`);
+      const mult = stageCostMultiplier(restarts + 2);
+      const needSilver = Math.ceil(ROUND_COST.silver * mult);
+      const needBronze = Math.ceil(ROUND_COST.bronze * mult);
+      setLowCoins(`You need ${needSilver} silver or ${needBronze} bronze to continue.`);
       return;
     }
     setRevealCoin(null);

@@ -49,6 +49,7 @@ type ChainConfig = {
   tokenContract?: string; // EVM/Tron token contract (USDT)
   tokenMint?: string; // Solana SPL mint (USDT)
   decimals: number; // token/native decimals
+  chainId?: number; // EVM chain id for the Etherscan V2 account API (1 ETH, 56 BSC)
 };
 
 // USDT contracts / mints per network.
@@ -64,23 +65,125 @@ const BSC_RPC = process.env.BSC_RPC_URL || "https://bsc-dataseed.binance.org";
 const TRON_API = process.env.TRON_API_URL || "https://api.trongrid.io";
 const SOL_RPC = process.env.SOL_RPC_URL || "https://api.mainnet-beta.solana.com";
 
+// Dedicated address-indexed endpoints for the FASTEST, most reliable detection:
+// one Etherscan V2 key works across all EVM chains (via the chainid param), and
+// a TronGrid key lifts TRON rate limits. When set, findPayment() uses these to
+// read your wallet's incoming transfers directly in a single call.
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const ETHERSCAN_V2 = "https://api.etherscan.io/v2/api";
+const TRONGRID_API_KEY = process.env.TRONGRID_API_KEY || "";
+
 // Verification config keyed by payment-method id (see PAYMENT_METHODS).
+// minConfirmations is kept at the minimum safe value (1 = the transaction is
+// included in a block, or finalized for Solana/XRP/Stellar) so payments are
+// credited as fast as possible once they land on-chain.
 export const CHAIN_CONFIG: Record<string, ChainConfig> = {
-  "usdt-trc20": { kind: "tron-token", address: RECEIVING_WALLETS.tron, coingeckoId: "tether", decimals: 6, tokenContract: USDT.trc20, minConfirmations: 19 },
-  "usdt-erc20": { kind: "evm-token", address: RECEIVING_WALLETS.evm, coingeckoId: "tether", decimals: 6, tokenContract: USDT.erc20, rpc: ETH_RPC, minConfirmations: 6 },
-  "usdt-bep20": { kind: "evm-token", address: RECEIVING_WALLETS.evm, coingeckoId: "tether", decimals: 18, tokenContract: USDT.bep20, rpc: BSC_RPC, minConfirmations: 12 },
+  "usdt-trc20": { kind: "tron-token", address: RECEIVING_WALLETS.tron, coingeckoId: "tether", decimals: 6, tokenContract: USDT.trc20, minConfirmations: 1 },
+  "usdt-erc20": { kind: "evm-token", address: RECEIVING_WALLETS.evm, coingeckoId: "tether", decimals: 6, tokenContract: USDT.erc20, rpc: ETH_RPC, chainId: 1, minConfirmations: 1 },
+  "usdt-bep20": { kind: "evm-token", address: RECEIVING_WALLETS.evm, coingeckoId: "tether", decimals: 18, tokenContract: USDT.bep20, rpc: BSC_RPC, chainId: 56, minConfirmations: 1 },
   "usdt-spl": { kind: "sol-token", address: RECEIVING_WALLETS.sol, coingeckoId: "tether", decimals: 6, tokenMint: USDT.spl, minConfirmations: 1 },
   btc: { kind: "btc", address: RECEIVING_WALLETS.btc, coingeckoId: "bitcoin", decimals: 8, minConfirmations: 1 },
-  eth: { kind: "evm-native", address: RECEIVING_WALLETS.evm, coingeckoId: "ethereum", decimals: 18, rpc: ETH_RPC, minConfirmations: 6 },
-  bnb: { kind: "evm-native", address: RECEIVING_WALLETS.evm, coingeckoId: "binancecoin", decimals: 18, rpc: BSC_RPC, minConfirmations: 12 },
+  eth: { kind: "evm-native", address: RECEIVING_WALLETS.evm, coingeckoId: "ethereum", decimals: 18, rpc: ETH_RPC, chainId: 1, minConfirmations: 1 },
+  bnb: { kind: "evm-native", address: RECEIVING_WALLETS.evm, coingeckoId: "binancecoin", decimals: 18, rpc: BSC_RPC, chainId: 56, minConfirmations: 1 },
   sol: { kind: "sol-native", address: RECEIVING_WALLETS.sol, coingeckoId: "solana", decimals: 9, minConfirmations: 1 },
-  trx: { kind: "tron-native", address: RECEIVING_WALLETS.tron, coingeckoId: "tron", decimals: 6, minConfirmations: 19 },
+  trx: { kind: "tron-native", address: RECEIVING_WALLETS.tron, coingeckoId: "tron", decimals: 6, minConfirmations: 1 },
   xrp: { kind: "xrp", address: RECEIVING_WALLETS.xrp, coingeckoId: "ripple", decimals: 6, minConfirmations: 1 },
   xlm: { kind: "xlm", address: RECEIVING_WALLETS.xlm, coingeckoId: "stellar", decimals: 7, minConfirmations: 1 },
 };
 
 export function getChainConfig(methodId: string): ChainConfig | null {
   return CHAIN_CONFIG[methodId] ?? null;
+}
+
+// =====================================================================
+//  Fast path — read OUR wallet's incoming transactions from a dedicated
+//  address-indexed endpoint and return the hash of one that already pays
+//  this order's exact amount, within the window, on the right network.
+//  The returned hash is fully validated here, so the caller can credit it
+//  directly (no extra RPC round-trips). Returns null when no dedicated
+//  endpoint is configured for the chain, so the caller falls back to the
+//  generic scan + verify path.
+// =====================================================================
+export async function findPayment(
+  methodId: string,
+  expectedAmount: number,
+  orderCreatedAtMs: number
+): Promise<string | null> {
+  const cfg = CHAIN_CONFIG[methodId];
+  if (!cfg) return null;
+  try {
+    if ((cfg.kind === "evm-token" || cfg.kind === "evm-native") && cfg.chainId && ETHERSCAN_API_KEY) {
+      return await findEvmViaEtherscan(cfg, expectedAmount, orderCreatedAtMs);
+    }
+    if (cfg.kind === "tron-token") {
+      return await findTronTokenViaGrid(cfg, expectedAmount, orderCreatedAtMs);
+    }
+  } catch {
+    return null; // transient endpoint error — the next poll retries
+  }
+  return null;
+}
+
+// True if `tsMs` falls inside the order's payment window (with clock skew).
+function withinWindow(tsMs: number, sinceMs: number): boolean {
+  return tsMs >= sinceMs - CLOCK_SKEW_MS && tsMs <= sinceMs + PAYMENT_WINDOW_MS + CLOCK_SKEW_MS;
+}
+
+async function findEvmViaEtherscan(
+  cfg: ChainConfig,
+  expected: number,
+  sinceMs: number
+): Promise<string | null> {
+  const isToken = cfg.kind === "evm-token";
+  const base =
+    `${ETHERSCAN_V2}?chainid=${cfg.chainId}&module=account&address=${cfg.address}` +
+    `&page=1&offset=50&sort=desc&apikey=${ETHERSCAN_API_KEY}`;
+  const url = isToken ? `${base}&action=tokentx&contractaddress=${cfg.tokenContract}` : `${base}&action=txlist`;
+  const j = await getJson(url);
+  if (!j || !Array.isArray(j.result)) return null; // status "0"/"No transactions found" => skip
+
+  const min = expected * (1 - AMOUNT_TOLERANCE) - 1e-12;
+  for (const t of j.result) {
+    if ((t.to ?? "").toLowerCase() !== cfg.address.toLowerCase()) continue;
+    if (isToken) {
+      if ((t.contractAddress ?? "").toLowerCase() !== cfg.tokenContract!.toLowerCase()) continue;
+    } else if (t.isError !== "0") {
+      continue; // failed native tx
+    }
+    const decimals = isToken ? Number(t.tokenDecimal ?? cfg.decimals) : 18;
+    const amount = Number(t.value) / 10 ** decimals;
+    if (amount < min) continue;
+    if (Number(t.confirmations ?? 0) < cfg.minConfirmations) continue;
+    if (!withinWindow(Number(t.timeStamp) * 1000, sinceMs)) continue;
+    return t.hash;
+  }
+  return null;
+}
+
+async function findTronTokenViaGrid(
+  cfg: ChainConfig,
+  expected: number,
+  sinceMs: number
+): Promise<string | null> {
+  const headers: Record<string, string> = {};
+  if (TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = TRONGRID_API_KEY;
+  // TronGrid only returns confirmed, successful transfers — presence == finality.
+  const j = await getJson(
+    `${TRON_API}/v1/accounts/${cfg.address}/transactions/trc20?only_to=true&limit=50&contract_address=${cfg.tokenContract}`,
+    { headers }
+  );
+  if (!j || !Array.isArray(j.data)) return null;
+
+  const min = expected * (1 - AMOUNT_TOLERANCE) - 1e-12;
+  for (const t of j.data) {
+    if ((t.to ?? "") !== cfg.address) continue;
+    const decimals = Number(t.token_info?.decimals ?? cfg.decimals);
+    const amount = Number(t.value) / 10 ** decimals;
+    if (amount < min) continue;
+    if (!withinWindow(Number(t.block_timestamp ?? 0), sinceMs)) continue; // block_timestamp is ms
+    return t.transaction_id;
+  }
+  return null;
 }
 
 // =====================================================================
@@ -100,7 +203,9 @@ export async function scanIncoming(methodId: string): Promise<string[]> {
     switch (cfg.kind) {
       case "tron-token": hashes = await scanTronToken(cfg); break;
       case "tron-native": hashes = await scanTronNative(cfg); break;
-      case "evm-token": hashes = await scanEvmToken(cfg); break;
+      // When an Etherscan key is set, findPayment() handles EVM via the
+      // dedicated endpoint — skip the public-RPC log scan entirely.
+      case "evm-token": hashes = ETHERSCAN_API_KEY && cfg.chainId ? [] : await scanEvmToken(cfg); break;
       case "btc": hashes = await scanBtc(cfg); break;
       case "sol-token":
       case "sol-native": hashes = await scanSol(cfg); break;
@@ -261,6 +366,26 @@ async function rpc(url: string, method: string, params: unknown[]): Promise<any>
   return j.result;
 }
 
+// EVM JSON-RPC call that prefers Etherscan V2's reliable proxy (when a key +
+// chainId are configured) and otherwise uses the plain RPC endpoint. This makes
+// both auto-detect AND the manual "verify by hash" use the dedicated endpoint.
+async function evmRpc(cfg: ChainConfig, method: string, params: unknown[]): Promise<any> {
+  if (ETHERSCAN_API_KEY && cfg.chainId) {
+    const base = `${ETHERSCAN_V2}?chainid=${cfg.chainId}&module=proxy&apikey=${ETHERSCAN_API_KEY}`;
+    let url: string | null = null;
+    if (method === "eth_getTransactionByHash") url = `${base}&action=eth_getTransactionByHash&txhash=${params[0]}`;
+    else if (method === "eth_getTransactionReceipt") url = `${base}&action=eth_getTransactionReceipt&txhash=${params[0]}`;
+    else if (method === "eth_blockNumber") url = `${base}&action=eth_blockNumber`;
+    else if (method === "eth_getBlockByNumber") url = `${base}&action=eth_getBlockByNumber&tag=${params[0]}&boolean=false`;
+    if (url) {
+      const j = await getJson(url);
+      if (j && j.error) throw new Error(j.error.message || "Explorer RPC error.");
+      return j ? j.result : null;
+    }
+  }
+  return rpc(cfg.rpc!, method, params);
+}
+
 // Base58 decode (for converting a TRON base58 address to its hex form).
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 function base58Decode(str: string): number[] {
@@ -320,12 +445,12 @@ async function verifyBtc(cfg: ChainConfig, txid: string): Promise<VerifyResult> 
 // --- EVM (Ethereum / BNB Smart Chain) --------------------------------
 
 async function evmBlockInfo(
-  rpcUrl: string,
+  cfg: ChainConfig,
   blockNumberHex: string | null
 ): Promise<{ confirmations: number; timestamp: number }> {
   if (!blockNumberHex) return { confirmations: 0, timestamp: 0 };
-  const head = await rpc(rpcUrl, "eth_blockNumber", []);
-  const block = await rpc(rpcUrl, "eth_getBlockByNumber", [blockNumberHex, false]);
+  const head = await evmRpc(cfg, "eth_blockNumber", []);
+  const block = await evmRpc(cfg, "eth_getBlockByNumber", [blockNumberHex, false]);
   return {
     confirmations: Number(BigInt(head) - BigInt(blockNumberHex)) + 1,
     timestamp: block?.timestamp ? Number(BigInt(block.timestamp)) : 0,
@@ -333,9 +458,9 @@ async function evmBlockInfo(
 }
 
 async function verifyEvmNative(cfg: ChainConfig, hash: string): Promise<VerifyResult> {
-  const tx = await rpc(cfg.rpc!, "eth_getTransactionByHash", [hash]);
+  const tx = await evmRpc(cfg, "eth_getTransactionByHash", [hash]);
   if (!tx) return fail("Transaction not found.");
-  const receipt = await rpc(cfg.rpc!, "eth_getTransactionReceipt", [hash]);
+  const receipt = await evmRpc(cfg, "eth_getTransactionReceipt", [hash]);
   if (!receipt) return { ok: true, paid: 0, confirmed: false };
   if (receipt.status !== "0x1") return fail("Transaction failed on-chain.");
 
@@ -343,17 +468,17 @@ async function verifyEvmNative(cfg: ChainConfig, hash: string): Promise<VerifyRe
     return fail("This transaction does not pay the expected address.");
   }
   const paid = Number(BigInt(tx.value)) / 10 ** cfg.decimals;
-  const { confirmations, timestamp } = await evmBlockInfo(cfg.rpc!, tx.blockNumber);
+  const { confirmations, timestamp } = await evmBlockInfo(cfg, tx.blockNumber);
   return { ok: true, paid, confirmed: confirmations >= cfg.minConfirmations, timestamp };
 }
 
 const ERC20_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
 async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyResult> {
-  const receipt = await rpc(cfg.rpc!, "eth_getTransactionReceipt", [hash]);
+  const receipt = await evmRpc(cfg, "eth_getTransactionReceipt", [hash]);
   if (!receipt) {
     // Maybe still pending — distinguish "unknown" from "not yet mined".
-    const tx = await rpc(cfg.rpc!, "eth_getTransactionByHash", [hash]);
+    const tx = await evmRpc(cfg, "eth_getTransactionByHash", [hash]);
     if (!tx) return fail("Transaction not found.");
     return { ok: true, paid: 0, confirmed: false };
   }
@@ -371,7 +496,7 @@ async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyRes
   }
   if (units === BigInt(0)) return fail("This transaction does not transfer USDT to the expected address.");
 
-  const { confirmations, timestamp } = await evmBlockInfo(cfg.rpc!, receipt.blockNumber);
+  const { confirmations, timestamp } = await evmBlockInfo(cfg, receipt.blockNumber);
   return {
     ok: true,
     paid: Number(units) / 10 ** cfg.decimals,
