@@ -74,7 +74,7 @@ const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : "�
 
 export default function AdminPage() {
   const { profile, loading } = useUser();
-  const [tab, setTab] = useState<"users" | "transactions" | "sells" | "messages">("users");
+  const [tab, setTab] = useState<"users" | "transactions" | "sells" | "messages" | "bots">("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
   const [sells, setSells] = useState<Sell[] | null>(null);
@@ -214,7 +214,7 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex gap-2 rounded-xl bg-black/30 p-1">
-          {(["users", "transactions", "sells", "messages"] as const).map((t) => (
+          {(["users", "transactions", "sells", "messages", "bots"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -558,6 +558,8 @@ export default function AdminPage() {
         </div>
       )}
 
+      {tab === "bots" && <BotsPanel onError={setError} />}
+
       {editing && (
         <UserModal
           row={editing === "new" ? null : editing}
@@ -569,6 +571,159 @@ export default function AdminPage() {
           onError={setError}
         />
       )}
+    </div>
+  );
+}
+
+// -------- Bots: daily drip settings + today's progress ------------------
+type BotConfig = { enabled: boolean; min: number; max: number };
+type BotToday = { day: string; target: number; added: number; updated_at: string } | null;
+
+function BotsPanel({ onError }: { onError: (m: string) => void }) {
+  const [config, setConfig] = useState<BotConfig | null>(null);
+  const [today, setToday] = useState<BotToday>(null);
+  const [counts, setCounts] = useState<{ bots: number; total: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin/bot-config", { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok) return onError(data.error);
+    setConfig(data.config);
+    setToday(data.today);
+    setCounts(data.counts);
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save() {
+    if (!config) return;
+    if (config.max < config.min) return onError("Max must be ≥ min.");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/bot-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSavedAt(new Date());
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!config) return <div className="card p-6 text-slate-400">Loading bot settings…</div>;
+
+  const pct = today && today.target > 0 ? Math.min(100, Math.round((today.added / today.target) * 100)) : 0;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Settings */}
+      <div className="card space-y-5 p-6">
+        <div>
+          <h2 className="text-lg font-bold">Daily bot drip</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            New players are added throughout each day (hourly, via the GitHub Action). The day&apos;s
+            count is a random number in the range below; coins are random (gold ≤ 10, silver &amp;
+            bronze &lt; 1,000,000).
+          </p>
+        </div>
+
+        <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+          <span className="text-sm font-semibold">Enabled</span>
+          <input
+            type="checkbox"
+            checked={config.enabled}
+            onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
+            className="h-5 w-5"
+          />
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Min users / day</label>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              value={config.min}
+              onChange={(e) => setConfig({ ...config, min: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+            />
+          </div>
+          <div>
+            <label className="label">Max users / day</label>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              value={config.max}
+              onChange={(e) => setConfig({ ...config, max: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button onClick={save} className="btn-gold" disabled={saving}>
+            {saving ? "Saving…" : "Save settings"}
+          </button>
+          {savedAt && <span className="text-xs text-emerald-300">Saved {savedAt.toLocaleTimeString()}</span>}
+        </div>
+        <p className="text-xs text-slate-500">
+          Note: changing the range affects future days. Today&apos;s target was already rolled and is
+          shown on the right.
+        </p>
+      </div>
+
+      {/* Today's progress + totals */}
+      <div className="card space-y-5 p-6">
+        <h2 className="text-lg font-bold">Today</h2>
+        {today ? (
+          <>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-sm text-slate-400">Added / target ({today.day})</div>
+                <div className="text-3xl font-extrabold tabular-nums">
+                  {today.added.toLocaleString()}{" "}
+                  <span className="text-lg font-medium text-slate-400">/ {today.target.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-emerald-300">{pct}%</div>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="text-xs text-slate-500">Last run: {new Date(today.updated_at).toLocaleString()}</div>
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">
+            No run yet today. The first hourly run will roll today&apos;s target and begin adding players.
+          </p>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+          <div>
+            <div className="text-sm text-slate-400">Total players</div>
+            <div className="text-2xl font-extrabold tabular-nums text-emerald-300">
+              {counts?.total.toLocaleString() ?? "…"}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-slate-400">Bot players</div>
+            <div className="text-2xl font-extrabold tabular-nums text-sky-300">
+              {counts?.bots.toLocaleString() ?? "…"}
+            </div>
+          </div>
+        </div>
+        <button onClick={load} className="btn-ghost text-sm">Refresh</button>
+      </div>
     </div>
   );
 }

@@ -459,7 +459,7 @@ function tronJsonHeaders(): Record<string, string> {
 // division of e.g. 100 USDT BEP-20 (10^20 raw) would silently corrupt digits.
 // Solution: scale to 8 d.p. inside BigInt first, then divide a small integer.
 function bigIntToAmount(units: bigint, decimals: number): number {
-  const SCALE = 100_000_000n; // 10^8 → 8 decimal places of precision
+  const SCALE = BigInt(100_000_000); // 10^8 → 8 decimal places of precision
   const divisor = BigInt(10) ** BigInt(decimals);
   return Number(units * SCALE / divisor) / 100_000_000;
 }

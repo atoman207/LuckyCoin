@@ -8,7 +8,8 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "seed": "node --env-file=.env.local scripts/seed-admin.mjs",
-    "seed:bots": "node --env-file=.env.local scripts/seed-bots.mjs"
+    "seed:bots": "node --env-file=.env.local scripts/seed-bots.mjs",
+    "bots:run": "node --env-file=.env.local scripts/daily-bots.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

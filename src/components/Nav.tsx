@@ -36,6 +36,16 @@ export default function Nav() {
           />
         </Link>
 
+        {/* Public rankings / notice board — visible to everyone. */}
+        <Link
+          href="/notice"
+          className={`ml-3 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition hover:bg-white/10 ${
+            pathname === "/notice" ? "bg-white/10 text-amber-300" : "text-slate-200"
+          }`}
+        >
+          <span aria-hidden>🏆</span> <span className="hidden sm:inline">Rankings</span>
+        </Link>
+
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {loading ? null : profile ? (
             <>

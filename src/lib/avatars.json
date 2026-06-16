@@ -1,0 +1,8 @@
+{
+  "provider": "DiceBear",
+  "version": "9.x",
+  "style": "adventurer",
+  "format": "png",
+  "baseUrl": "https://api.dicebear.com/9.x/adventurer/png",
+  "note": "Avatars are generated per-user by DiceBear from a stable seed (the user's display name): `${baseUrl}?seed=<seed>`. Unlimited unique images, free, no API key, no storage. Verified 200 image/png on 2026-06-16."
+}

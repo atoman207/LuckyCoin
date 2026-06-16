@@ -174,6 +174,38 @@ create table if not exists public.contacts (
 );
 create index if not exists contacts_created_idx on public.contacts (created_at desc);
 
+-- ---------- app_config --------------------------------------------------
+-- Simple key/value store for server-side settings the admin can tune at
+-- runtime (no redeploy). Currently drives the daily bot-subscriber drip:
+--   bot_enabled    'true' | 'false'  — master on/off switch
+--   bot_daily_min  lower bound of the random daily target (default 100)
+--   bot_daily_max  upper bound of the random daily target (default 500)
+-- Written/read only via the service role (see RLS below).
+create table if not exists public.app_config (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now()
+);
+-- Seed the bot defaults once (do nothing if an admin already changed them).
+insert into public.app_config (key, value) values
+  ('bot_enabled',   'true'),
+  ('bot_daily_min', '100'),
+  ('bot_daily_max', '500')
+on conflict (key) do nothing;
+
+-- ---------- bot_plan ----------------------------------------------------
+-- One row per UTC day. The daily target is chosen ONCE (random in
+-- [bot_daily_min, bot_daily_max]); each hourly bot run then tops `added` up
+-- toward `target` so new "users" trickle in across the 24h window instead of
+-- all at once. Re-running an hour is safe — it only adds the shortfall.
+create table if not exists public.bot_plan (
+  day        date primary key,
+  target     integer not null,
+  added      integer not null default 0,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
 -- =====================================================================
 --  Row Level Security
 --  Strategy: the browser may only READ its own profile. Every write to
@@ -188,7 +220,10 @@ alter table public.sells       enable row level security;
 alter table public.draws       enable row level security;
 alter table public.visits      enable row level security;
 alter table public.contacts    enable row level security;
--- contacts: no client policy (written/read via the service role only).
+alter table public.app_config  enable row level security;
+alter table public.bot_plan    enable row level security;
+-- contacts / app_config / bot_plan: no client policy on purpose
+-- (written and read only through the service role).
 
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile"

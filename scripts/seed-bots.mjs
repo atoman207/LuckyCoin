@@ -11,6 +11,15 @@
 // randomly but deterministically generated (seeded by index).
 
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+// Avatar resource library — same config the app's src/lib/avatars.ts imports.
+// DiceBear generates a unique, deterministic avatar per seed (the display name).
+const HERE = dirname(fileURLToPath(import.meta.url));
+const AVATAR_CFG = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8"));
+const avatarUrl = (seed) => `${AVATAR_CFG.baseUrl}?seed=${encodeURIComponent(seed || "anon")}`;
 
 // --- config ----------------------------------------------------------------
 const LAUNCH = Date.UTC(2026, 5, 1); // June 1, 2026 (month is 0-based)
@@ -47,12 +56,14 @@ function buildBots() {
       const rnd = mulberry32(n * 2654435761);
       // Spread sign-ups through the day in order.
       const created = new Date(dayStart + ((k + 0.5) / count) * 86_400_000);
+      const nickname = `${pick(rnd, FIRST)}${pick(rnd, LAST)}${Math.floor(rnd() * 900 + 100)}`;
       bots.push({
         index: n,
         email: emailFor(n),
-        nickname: `${pick(rnd, FIRST)}${pick(rnd, LAST)}${Math.floor(rnd() * 900 + 100)}`,
+        nickname,
         nationality: pick(rnd, COUNTRIES),
         discord_id: rnd() < 0.6 ? `${pick(rnd, FIRST).toLowerCase()}_${Math.floor(rnd() * 9000 + 1000)}` : null,
+        avatar_url: avatarUrl(nickname),
         gold: Math.floor(rnd() * 3),
         silver: Math.floor(rnd() * 40),
         bronze: Math.floor(rnd() * 600),
@@ -103,6 +114,7 @@ async function seedOne(bot, emailMap) {
       email: bot.email,
       nationality: bot.nationality,
       discord_id: bot.discord_id,
+      avatar_url: bot.avatar_url,
       gold: bot.gold,
       silver: bot.silver,
       bronze: bot.bronze,
