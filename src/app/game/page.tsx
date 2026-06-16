@@ -104,6 +104,39 @@ export default function GamePage() {
   const [sessionReady, setSessionReady] = useState(false);
   const sessionLoadedRef = useRef(false);
 
+  // Board intro animation: face-up (1 s) → flip-scatter (2 s) → off.
+  const [introStage, setIntroStage] = useState<"off" | "faceup" | "flipping">("off");
+  const [introBoard, setIntroBoard] = useState<BoardSlot[] | null>(null);
+  type IntroOffset = { introDelay: number; flipDelay: number; fx: number; fy: number };
+  const introOffsets = useRef<IntroOffset[]>([]);
+
+  function triggerBoardIntro(comp: Composition) {
+    // Build a client-side shuffled board for the face-up reveal display only.
+    // (The real server board stays hidden; this only drives the 1-second preview.)
+    const slots: BoardSlot[] = [
+      ...Array(comp.gold).fill("gold" as BoardSlot),
+      ...Array(comp.silver).fill("silver" as BoardSlot),
+      ...Array(comp.bronze).fill("bronze" as BoardSlot),
+      ...Array(comp.gem ?? 0).fill("gem" as BoardSlot),
+      ...Array(comp.empty).fill("empty" as BoardSlot),
+    ];
+    for (let k = slots.length - 1; k > 0; k--) {
+      const j = Math.floor(Math.random() * (k + 1));
+      [slots[k], slots[j]] = [slots[j], slots[k]];
+    }
+    setIntroBoard(slots);
+
+    introOffsets.current = Array.from({ length: BOARD_SIZE }, (_, i) => ({
+      introDelay: Math.floor(SPIRAL_ORDER[i] * 6),            // spiral in ~300 ms
+      flipDelay:  Math.floor(Math.random() * 1500),           // 0–1500 ms random
+      fx:         Math.round((Math.random() - 0.5) * 22),     // ±11 px scatter
+      fy:         Math.round((Math.random() - 0.5) * 22),
+    }));
+    setIntroStage("faceup");
+    setTimeout(() => setIntroStage("flipping"), 1000);
+    setTimeout(() => { setIntroStage("off"); setIntroBoard(null); }, 3100);
+  }
+
   function openChooser() {
     setError(null);
     setChoice(null);
@@ -213,6 +246,7 @@ export default function GamePage() {
       setMultiplier(data.multiplier ?? 1);
       setLastCurrency(currency);
       setPhase("playing");
+      if (data.composition) triggerBoardIntro(data.composition);
       return data;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start.");
@@ -496,17 +530,32 @@ export default function GamePage() {
                 const isGem = type === "gem";
                 const border = type && type !== "empty" && type !== "gem" ? COIN_BORDER[type] : null;
                 const tileVariant = `coin-board-tile-v${(i % 6) + 1}`;
+                const off = introOffsets.current[i];
+                const inIntro = introStage !== "off";
+                const introType = introStage === "faceup" && introBoard ? introBoard[i] : null;
+                const tileStyle: React.CSSProperties = inIntro
+                  ? introStage === "faceup"
+                    ? ({ "--intro-delay": `${off?.introDelay ?? 0}ms` } as React.CSSProperties)
+                    : ({
+                        "--flip-delay": `${off?.flipDelay ?? 0}ms`,
+                        "--fx": `${off?.fx ?? 0}px`,
+                        "--fy": `${off?.fy ?? 0}px`,
+                      } as React.CSSProperties)
+                  : {
+                      animationDelay: `${SPIRAL_ORDER[i] * DEAL_STAGGER_MS}ms`,
+                      animationDuration: `${DEAL_ANIM_MS}ms`,
+                    };
                 return (
                   <button
                     key={i}
                     onClick={() => pick(i)}
-                    disabled={phase !== "playing" || busy}
-                    style={{
-                      animationDelay: `${SPIRAL_ORDER[i] * DEAL_STAGGER_MS}ms`,
-                      animationDuration: `${DEAL_ANIM_MS}ms`,
-                    }}
+                    disabled={phase !== "playing" || busy || inIntro}
+                    style={tileStyle}
                     className={[
-                      "coin-board-tile tile-deal relative grid place-items-center border transition duration-300",
+                      "coin-board-tile relative grid place-items-center border transition duration-300",
+                      inIntro ? "" : "tile-deal",
+                      introStage === "faceup"   ? "tile-intro-faceup" : "",
+                      introStage === "flipping" ? "tile-intro-flip"   : "",
                       tileVariant,
                       revealed
                         ? isGem
@@ -521,7 +570,15 @@ export default function GamePage() {
                         : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
                     ].join(" ")}
                   >
-                    {revealed && isGem ? (
+                    {introType === "gem" ? (
+                      <JewelIcon className="h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
+                    ) : introType === "empty" ? (
+                      <span className="text-xs font-bold text-slate-400/70 sm:text-sm">No</span>
+                    ) : introType ? (
+                      <span className="flex h-full w-full items-center justify-center p-[8%]">
+                        <CoinIcon type={introType as CoinType} responsive className="rounded-full" />
+                      </span>
+                    ) : revealed && isGem ? (
                       <JewelIcon className={`h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)] ${isPick ? "tile-flip" : "animate-pop"}`} />
                     ) : revealed && type && type !== "empty" && type !== "gem" ? (
                       <span className="flex h-full w-full items-center justify-center p-[8%]">

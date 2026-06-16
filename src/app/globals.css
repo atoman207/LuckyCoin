@@ -280,6 +280,51 @@ table { border-radius: 4px; }
   box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.16);
 }
 
+/* ---- Board intro animation ------------------------------------------ */
+/* Phase 1 (0–1 s): all 50 tiles appear face-up with a warm golden shimmer  */
+@keyframes tileIntroReveal {
+  0%   { opacity: 0; transform: scale(0.45); }
+  65%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Phase 2 (1–3 s): each tile flips face-down; scaleX collapses then reopens
+   as the dark unselected style. A random translate (--fx / --fy) gives each
+   tile a slight scatter so the board looks like it was reshuffled. */
+@keyframes tileIntroFlip {
+  0%  {
+    transform: scale(1) translateX(0) translateY(0);
+    background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98));
+    border-color: rgba(251,191,36,0.55);
+  }
+  42% {
+    transform: scaleX(0) translateX(var(--fx,0px)) translateY(var(--fy,0px));
+    background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98));
+    border-color: rgba(251,191,36,0.55);
+  }
+  43% {
+    transform: scaleX(0) translateX(var(--fx,0px)) translateY(var(--fy,0px));
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.10);
+  }
+  100% {
+    transform: scale(1) translateX(0) translateY(0);
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.10);
+  }
+}
+
+.tile-intro-faceup {
+  background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98)) !important;
+  border-color: rgba(251,191,36,0.55) !important;
+  box-shadow: 0 0 0 1px rgba(251,191,36,0.18), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  animation: tileIntroReveal 0.45s ease-out var(--intro-delay, 0ms) both;
+}
+
+.tile-intro-flip {
+  animation: tileIntroFlip 0.7s cubic-bezier(0.4,0,0.2,1) var(--flip-delay, 0ms) both;
+}
+
 /* Pulsing gold border so revealed gold-coin cards stand out. */
 @keyframes goldBorder {
   0%, 100% { box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.9), 0 0 12px 2px rgba(251, 191, 36, 0.45); }

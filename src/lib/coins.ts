@@ -101,13 +101,14 @@ export function exchangeOutput(from: CoinType, to: CoinType, amount: number): nu
   throw new Error(`Invalid exchange: ${from} → ${to}`);
 }
 
-// The board: 50 tiles — the round-1 composition (2 gold, 38 silver, 5 bronze
-// and 5 empty). Counts must sum to BOARD_SIZE.
+// The board: 50 tiles — round-1 base (before gems): 2 gold, 25 silver, 20 bronze,
+// 3 empty. With 5 gems replacing 5 silver: 2 gold, 20 silver, 20 bronze, 5 gems,
+// 3 blank. Counts must sum to BOARD_SIZE.
 export const BOARD_COMPOSITION = {
   gold: 2,
-  silver: 38,
-  bronze: 5,
-  empty: 5,
+  silver: 25,
+  bronze: 20,
+  empty: 3,
 } as const;
 export const BOARD_SIZE =
   BOARD_COMPOSITION.gold +
@@ -120,16 +121,15 @@ export type PlayMode = "continuous" | "multiplier";
 export const MAX_RESTARTS = 10;
 
 export type Composition = { gold: number; silver: number; bronze: number; gem?: number };
-export const BASE_COMPOSITION: Composition = { gold: 2, silver: 38, bronze: 5 };
+export const BASE_COMPOSITION: Composition = { gold: 2, silver: 25, bronze: 20 };
 
 // ---- Gems (Multiplier Play) -------------------------------------------
 // Gems only appear in Multiplier Play.
-// Round 1 has a special starter board: 7 gems total (2 replacing empty slots,
-// and 5 replacing silver). From round 2 onward, gems scale as:
+// Round 1: 5 gems (replace 5 silver). From round 2 onward:
 //   turn 2 → 1 gem, turn 3 → 2 gems, … turn 10 → 9 gems (replacing silver).
 export function gemsForRound(mode: PlayMode | null | undefined, round: number): number {
   if (mode !== "multiplier") return 0;
-  if (round <= 1) return 7;
+  if (round <= 1) return 5;
   return Math.max(0, Math.min(round, MAX_RESTARTS) - 1);
 }
 
@@ -165,13 +165,14 @@ export function gemRewardLabel(r: GemReward): string {
 
 // Per-round board composition (rounds 1–10). The remaining tiles of the 50 are
 // empty ("No"). Round 1 is the entry board; each Continue advances the round.
-//   1: 2/38/5  (5 blank)   6: 12/28/10
-//   2: 3/37/10             7: 15/25/10
-//   3: 4/36/10             8: 20/30/0
-//   4: 5/35/10             9: 25/20/0  (5 blank)
-//   5: 10/30/10           10: 30/20/0
+//   1: 2/20/20 + 5 gems (3 blank)   6: 12/28/10
+//   2: 3/37/10                       7: 15/25/10
+//   3: 4/36/10                       8: 20/30/0
+//   4: 5/35/10                       9: 25/20/0 (5 blank)
+//   5: 10/30/10                     10: 30/20/0
+// Note: round-1 silver is 25 here; compositionWithGems() replaces 5 with gems.
 export const MULTIPLIER_ROUNDS: Record<number, Composition> = {
-  1: { gold: 2, silver: 38, bronze: 5 },
+  1: { gold: 2, silver: 25, bronze: 20 },
   2: { gold: 3, silver: 37, bronze: 10 },
   3: { gold: 4, silver: 36, bronze: 10 },
   4: { gold: 5, silver: 35, bronze: 10 },
@@ -223,11 +224,6 @@ export function compositionWithGems(mode: string | null | undefined, round: numb
   const base = compositionFor((mode as PlayMode) ?? "continuous", round);
   const gem = gemsForRound(mode as PlayMode, round);
   if (gem <= 0) return { ...base, gem: 0 };
-  // Round 1 special case: 7 gems where 5 replace silver and 2 replace empty.
-  // (Empty is derived from BOARD_SIZE minus filled tiles by callers.)
-  if ((mode as PlayMode) === "multiplier" && round <= 1) {
-    return { ...base, silver: Math.max(0, base.silver - 5), gem };
-  }
   return { ...base, silver: Math.max(0, base.silver - gem), gem };
 }
 
