@@ -206,16 +206,6 @@ export default function CheckoutModal({
             </div>
           ) : (
             <>
-              {/* Payment is detected automatically while this modal is open. */}
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-200">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                </span>
-                Waiting for your payment — you&apos;ll be credited automatically the moment it arrives.
-              </div>
-
-              <div className="h-px bg-white/10" />
               <div>
                 <label className="text-xs font-medium text-slate-400">
                   Not detected automatically? Paste your transaction hash to confirm

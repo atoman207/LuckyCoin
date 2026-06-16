@@ -464,13 +464,9 @@ export default function GamePage() {
             </div>
           )}
 
-          {/* Board fills the remaining height; rows share it equally so the whole
-              board (and the buttons below) always fit on one screen. */}
-          <div className="min-h-0 flex-1">
-            <div
-              key={roundId ?? "board"}
-              className="grid h-full w-full auto-rows-fr grid-cols-5 gap-1.5 sm:grid-cols-8 sm:gap-2 md:grid-cols-10"
-            >
+          {/* Board fills the remaining height; tiles are equal squares sized to fit. */}
+          <div className="coin-board-shell min-h-0 flex-1">
+            <div key={roundId ?? "board"} className="coin-board-grid">
               {Array.from({ length: BOARD_SIZE }).map((_, i) => {
                 const revealed = phase === "revealed" && board;
                 const type = revealed ? board![i] : null;
@@ -486,7 +482,7 @@ export default function GamePage() {
                       animationDuration: `${DEAL_ANIM_MS}ms`,
                     }}
                     className={[
-                      "tile-deal relative grid h-full w-full min-h-0 place-items-center border transition duration-300",
+                      "coin-board-tile tile-deal relative grid place-items-center border transition duration-300",
                       revealed
                         ? isPick && border
                           ? border.tilePick

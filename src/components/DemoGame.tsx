@@ -69,8 +69,14 @@ export default function DemoGame() {
   const left = Math.max(0, FREE_PLAYS - plays);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div
+      className={
+        board
+          ? "flex h-[calc(100dvh-var(--header-h)-4rem)] flex-col gap-3 overflow-hidden"
+          : "space-y-6"
+      }
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold">Try it free</h1>
           <p className="text-slate-400">
@@ -99,7 +105,8 @@ export default function DemoGame() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 sm:gap-3 md:grid-cols-10">
+          <div className="coin-board-shell min-h-0 flex-1">
+            <div className="coin-board-grid">
             {board.map((slot, i) => {
               const revealed = picked !== null;
               const isPick = picked === i;
@@ -111,26 +118,29 @@ export default function DemoGame() {
                   onClick={() => pick(i)}
                   disabled={revealed}
                   className={[
-                    "relative grid aspect-square place-items-center rounded-xl border transition",
+                    "coin-board-tile relative grid place-items-center border transition",
                     revealed
                       ? isPick
-                        ? "border-amber-300/70 bg-white/10 ring-2 ring-amber-300/70 scale-105"
+                        ? "z-10 border-amber-300/70 bg-white/10 ring-2 ring-amber-300/70 scale-[1.35]"
                         : "border-white/10 bg-black/20 opacity-50"
                       : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50",
                   ].join(" ")}
                 >
                   {revealed && shown !== "empty" ? (
-                    <CoinIcon type={shown} size={40} />
+                    <span className="flex h-full w-full items-center justify-center p-[8%]">
+                      <CoinIcon type={shown} responsive />
+                    </span>
                   ) : revealed ? (
-                    <span className="text-sm font-bold text-slate-500">No</span>
+                    <span className="text-xs font-bold text-slate-500 sm:text-sm">No</span>
                   ) : null}
                 </button>
               );
             })}
+            </div>
           </div>
 
           {result !== null && !coinModal && (
-            <div className="card flex flex-col items-center gap-3 p-6 text-center">
+            <div className="card flex shrink-0 flex-col items-center gap-3 p-4 text-center sm:p-6">
               <div className="text-xl font-bold capitalize">
                 {result === "empty" ? "No win this time (demo)" : `You found 1 ${result} coin! (demo)`}
               </div>

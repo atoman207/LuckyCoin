@@ -216,6 +216,52 @@ table { border-radius: 4px; }
 }
 .tile-deal { animation: tileDeal 0.4s ease-out backwards; }
 
+/* Coin board — square tiles that fit one screen (5×10 / 8×7 / 10×5). */
+.coin-board-shell {
+  container-type: size;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+.coin-board-grid {
+  --coin-board-gap: 0.375rem;
+  --coin-board-cols: 5;
+  --coin-board-rows: 10;
+  display: grid;
+  grid-template-columns: repeat(var(--coin-board-cols), 1fr);
+  gap: var(--coin-board-gap);
+  width: min(
+    100%,
+    calc(
+      (100cqh - (var(--coin-board-rows) - 1) * var(--coin-board-gap)) * var(--coin-board-cols) /
+        var(--coin-board-rows) + (var(--coin-board-cols) - 1) * var(--coin-board-gap)
+    )
+  );
+}
+@media (min-width: 640px) {
+  .coin-board-grid {
+    --coin-board-cols: 8;
+    --coin-board-rows: 7;
+    --coin-board-gap: 0.5rem;
+  }
+}
+@media (min-width: 768px) {
+  .coin-board-grid {
+    --coin-board-cols: 10;
+    --coin-board-rows: 5;
+  }
+}
+.coin-board-tile {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 4px !important;
+}
+
 /* Pulsing gold border so revealed gold-coin cards stand out. */
 @keyframes goldBorder {
   0%, 100% { box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.9), 0 0 12px 2px rgba(251, 191, 36, 0.45); }

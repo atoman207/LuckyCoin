@@ -203,11 +203,12 @@ export async function scanIncoming(methodId: string): Promise<string[]> {
     switch (cfg.kind) {
       case "tron-token": hashes = await scanTronToken(cfg); break;
       case "tron-native": hashes = await scanTronNative(cfg); break;
-      // When an Etherscan key is set, findPayment() handles EVM via the
-      // dedicated endpoint — skip the public-RPC log scan entirely.
-      case "evm-token": hashes = ETHERSCAN_API_KEY && cfg.chainId ? [] : await scanEvmToken(cfg); break;
+      // findPayment() tries Etherscan first; scanIncoming() is only reached
+      // when findPayment() returned null (no match yet, or API error). Always
+      // run the RPC log scan so auto-detect works even if Etherscan is down.
+      case "evm-token": hashes = await scanEvmToken(cfg); break;
       case "btc": hashes = await scanBtc(cfg); break;
-      case "sol-token":
+      case "sol-token": hashes = await scanSolToken(cfg); break;
       case "sol-native": hashes = await scanSol(cfg); break;
       case "xrp": hashes = await scanXrp(cfg); break;
       case "xlm": hashes = await scanXlm(cfg); break;
@@ -220,20 +221,25 @@ export async function scanIncoming(methodId: string): Promise<string[]> {
 }
 
 async function scanTronToken(cfg: ChainConfig): Promise<string[]> {
+  const headers: Record<string, string> = {};
+  if (TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = TRONGRID_API_KEY;
   const j = await getJson(
-    `${TRON_API}/v1/accounts/${cfg.address}/transactions/trc20?only_to=true&limit=30&contract_address=${cfg.tokenContract}`
+    `${TRON_API}/v1/accounts/${cfg.address}/transactions/trc20?only_to=true&limit=30&contract_address=${cfg.tokenContract}`,
+    { headers }
   );
   return (j?.data ?? []).map((t: any) => t.transaction_id);
 }
 
 async function scanTronNative(cfg: ChainConfig): Promise<string[]> {
-  const j = await getJson(`${TRON_API}/v1/accounts/${cfg.address}/transactions?only_to=true&limit=30`);
+  const headers: Record<string, string> = {};
+  if (TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = TRONGRID_API_KEY;
+  const j = await getJson(`${TRON_API}/v1/accounts/${cfg.address}/transactions?only_to=true&limit=30`, { headers });
   return (j?.data ?? []).map((t: any) => t.txID);
 }
 
 async function scanEvmToken(cfg: ChainConfig): Promise<string[]> {
   const head = await rpc(cfg.rpc!, "eth_blockNumber", []);
-  const fromBlock = "0x" + (BigInt(head) - BigInt(800)).toString(16); // ~last hour, well over the 10-min window
+  const fromBlock = "0x" + (BigInt(head) - BigInt(400)).toString(16); // ~20 min on BSC, well over the 10-min window
   const topicTo = "0x" + cfg.address.toLowerCase().replace(/^0x/, "").padStart(64, "0");
   const logs = await rpc(cfg.rpc!, "eth_getLogs", [
     { fromBlock, toBlock: "latest", address: cfg.tokenContract, topics: [ERC20_TRANSFER, null, topicTo] },
@@ -251,6 +257,21 @@ async function scanBtc(cfg: ChainConfig): Promise<string[]> {
 
 async function scanSol(cfg: ChainConfig): Promise<string[]> {
   const sigs = await rpc(SOL_RPC, "getSignaturesForAddress", [cfg.address, { limit: 30 }]);
+  return (sigs ?? []).map((s: any) => s.signature);
+}
+
+// SPL token transfers credit the recipient's Associated Token Account (ATA),
+// not the wallet address itself.  We must look up the ATA first and then
+// query signatures on that address — querying the wallet would miss them.
+async function scanSolToken(cfg: ChainConfig): Promise<string[]> {
+  const accounts = await rpc(SOL_RPC, "getTokenAccountsByOwner", [
+    cfg.address,
+    { mint: cfg.tokenMint },
+    { encoding: "jsonParsed" },
+  ]);
+  const ata: string | undefined = accounts?.value?.[0]?.pubkey;
+  if (!ata) return []; // ATA not yet created — no payments possible yet
+  const sigs = await rpc(SOL_RPC, "getSignaturesForAddress", [ata, { limit: 30 }]);
   return (sigs ?? []).map((s: any) => s.signature);
 }
 
@@ -379,8 +400,15 @@ async function evmRpc(cfg: ChainConfig, method: string, params: unknown[]): Prom
     else if (method === "eth_getBlockByNumber") url = `${base}&action=eth_getBlockByNumber&tag=${params[0]}&boolean=false`;
     if (url) {
       const j = await getJson(url);
-      if (j && j.error) throw new Error(j.error.message || "Explorer RPC error.");
-      return j ? j.result : null;
+      // A valid Etherscan proxy response always carries a "jsonrpc" field.
+      // When Etherscan returns a rate-limit or API-key error it uses its own
+      // envelope ({status:"0", result:"<error string>"}) without "jsonrpc" —
+      // fall through to the direct RPC endpoint so callers get a real result
+      // instead of treating the error string as a transaction receipt.
+      if (j?.jsonrpc) {
+        if (j.error) throw new Error(j.error.message || "Explorer RPC error.");
+        return j.result ?? null;
+      }
     }
   }
   return rpc(cfg.rpc!, method, params);
@@ -416,6 +444,24 @@ function tronToHex(address: string): string {
   const decoded = base58Decode(address);
   const body = decoded.slice(0, decoded.length - 4); // strip 4-byte checksum
   return body.map((b) => b.toString(16).padStart(2, "0")).join("").toLowerCase();
+}
+
+// Headers for every TronGrid API call. The PRO key raises rate limits;
+// always include it so manual verification never gets throttled.
+function tronJsonHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "content-type": "application/json" };
+  if (TRONGRID_API_KEY) h["TRON-PRO-API-KEY"] = TRONGRID_API_KEY;
+  return h;
+}
+
+// Safe raw-units → decimal conversion that avoids Number() precision loss for
+// large BEP-20 (18-decimal) amounts.  Number(2^53) ≈ 9 × 10^15, so a direct
+// division of e.g. 100 USDT BEP-20 (10^20 raw) would silently corrupt digits.
+// Solution: scale to 8 d.p. inside BigInt first, then divide a small integer.
+function bigIntToAmount(units: bigint, decimals: number): number {
+  const SCALE = 100_000_000n; // 10^8 → 8 decimal places of precision
+  const divisor = BigInt(10) ** BigInt(decimals);
+  return Number(units * SCALE / divisor) / 100_000_000;
 }
 
 // --- Bitcoin (Blockstream) -------------------------------------------
@@ -499,7 +545,7 @@ async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyRes
   const { confirmations, timestamp } = await evmBlockInfo(cfg, receipt.blockNumber);
   return {
     ok: true,
-    paid: Number(units) / 10 ** cfg.decimals,
+    paid: bigIntToAmount(units, cfg.decimals),
     confirmed: confirmations >= cfg.minConfirmations,
     timestamp,
   };
@@ -509,7 +555,8 @@ async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyRes
 
 async function tronConfirmations(infoBlock: number | undefined): Promise<number> {
   if (!infoBlock) return 0;
-  const now = await getJson(`${TRON_API}/wallet/getnowblock`);
+  const h = TRONGRID_API_KEY ? { headers: { "TRON-PRO-API-KEY": TRONGRID_API_KEY } } : undefined;
+  const now = await getJson(`${TRON_API}/wallet/getnowblock`, h);
   const head = now?.block_header?.raw_data?.number ?? 0;
   return head - infoBlock + 1;
 }
@@ -517,7 +564,7 @@ async function tronConfirmations(infoBlock: number | undefined): Promise<number>
 async function verifyTronNative(cfg: ChainConfig, txid: string): Promise<VerifyResult> {
   const tx = await getJson(`${TRON_API}/wallet/gettransactionbyid`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
   if (!tx || !tx.txID) return fail("Transaction not found.");
@@ -532,7 +579,7 @@ async function verifyTronNative(cfg: ChainConfig, txid: string): Promise<VerifyR
   }
   const info = await getJson(`${TRON_API}/wallet/gettransactioninfobyid`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
   const confirmations = await tronConfirmations(info?.blockNumber);
@@ -547,7 +594,7 @@ async function verifyTronNative(cfg: ChainConfig, txid: string): Promise<VerifyR
 async function verifyTronToken(cfg: ChainConfig, txid: string): Promise<VerifyResult> {
   const tx = await getJson(`${TRON_API}/wallet/gettransactionbyid`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
   if (!tx || !tx.txID) return fail("Transaction not found.");
@@ -570,13 +617,13 @@ async function verifyTronToken(cfg: ChainConfig, txid: string): Promise<VerifyRe
   const units = BigInt("0x" + data.slice(72, 136));
   const info = await getJson(`${TRON_API}/wallet/gettransactioninfobyid`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
   const confirmations = await tronConfirmations(info?.blockNumber);
   return {
     ok: true,
-    paid: Number(units) / 10 ** cfg.decimals,
+    paid: bigIntToAmount(units, cfg.decimals),
     confirmed: confirmations >= cfg.minConfirmations,
     timestamp: info?.blockTimeStamp ? Math.floor(info.blockTimeStamp / 1000) : 0,
   };

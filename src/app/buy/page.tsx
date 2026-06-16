@@ -33,7 +33,7 @@ export default function BuyPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Auto-detect payment: while the checkout modal is open, monitor the receiving
-  // wallet's network every 2 seconds. The checks never overlap (the next one is
+  // wallet's network once per second. The checks never overlap (the next one is
   // scheduled only after the previous response). As soon as a valid transaction
   // is detected the loop stops immediately, the coins are credited, a green
   // confirmation shows, and the buyer returns to the game.
@@ -64,10 +64,10 @@ export default function BuyPage() {
       } catch {
         /* transient network error — keep monitoring */
       }
-      if (alive) timer = setTimeout(poll, 2000);
+      if (alive) timer = setTimeout(poll, 1000);
     };
 
-    poll(); // first check right away, then every 2s after each response
+    poll(); // first check right away, then every 1s after each response
     return () => {
       alive = false;
       clearTimeout(timer);
