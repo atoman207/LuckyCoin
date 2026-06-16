@@ -52,7 +52,7 @@ export default function DemoGame() {
     const out = weightedOutcome();
     setPicked(i);
     setResult(out);
-    setCoinModal(out === "empty" ? null : out); // effect modal only for coins
+    setCoinModal(out === "empty" || out === "gem" ? null : out); // effect modal only for coins
     const next = plays + 1;
     setPlays(next);
     localStorage.setItem(KEY, String(next));
@@ -126,7 +126,7 @@ export default function DemoGame() {
                       : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50",
                   ].join(" ")}
                 >
-                  {revealed && shown !== "empty" ? (
+                  {revealed && shown !== "empty" && shown !== "gem" ? (
                     <span className="flex h-full w-full items-center justify-center p-[8%]">
                       <CoinIcon type={shown} responsive />
                     </span>

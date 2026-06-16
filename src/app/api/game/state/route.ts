@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import {
   BOARD_SIZE,
-  compositionFor,
+  compositionWithGems,
   multiplierFor,
   type BoardSlot,
-  type PlayMode,
 } from "@/lib/coins";
 
 function compositionWithEmpty(mode: string | null | undefined, round: number) {
-  const c = compositionFor((mode as PlayMode) ?? "continuous", round);
-  return { ...c, empty: BOARD_SIZE - c.gold - c.silver - c.bronze };
+  const c = compositionWithGems(mode, round);
+  const gem = c.gem ?? 0;
+  return { ...c, gem, empty: BOARD_SIZE - c.gold - c.silver - c.bronze - gem };
 }
 
 // Restore the in-progress game session after refresh or navigation.
@@ -20,7 +20,13 @@ export async function GET() {
 
   const { admin, profile } = ctx;
   const roundNum = profile.game_round ?? 0;
-  const mode = profile.game_mode ?? null;
+  // Legacy saves may have null game_mode; treat as multiplier so jewels show from round 2+.
+  const mode =
+    profile.game_mode === "continuous"
+      ? "continuous"
+      : roundNum > 0
+        ? "multiplier"
+        : null;
   const restarts = profile.game_restarts ?? 0;
 
   if (roundNum <= 0) {

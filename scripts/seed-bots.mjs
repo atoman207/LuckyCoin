@@ -19,7 +19,16 @@ import { dirname, join } from "node:path";
 // DiceBear generates a unique, deterministic avatar per seed (the display name).
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AVATAR_CFG = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8"));
-const avatarUrl = (seed) => `${AVATAR_CFG.baseUrl}?seed=${encodeURIComponent(seed || "anon")}`;
+const avatarUrl = (seed) => {
+  if (Math.random() < (AVATAR_CFG.noAvatarChance ?? 0)) return null;
+  if (Math.random() < (AVATAR_CFG.peopleShare ?? 0)) {
+    const p = AVATAR_CFG.people[Math.floor(Math.random() * AVATAR_CFG.people.length)];
+    const n = (p.from ?? 0) + Math.floor(Math.random() * p.count);
+    return p.url.replace("{n}", String(n));
+  }
+  const tpl = AVATAR_CFG.illustrated[Math.floor(Math.random() * AVATAR_CFG.illustrated.length)];
+  return tpl.replace("{seed}", encodeURIComponent(String(seed || "anon")));
+};
 
 // --- config ----------------------------------------------------------------
 const LAUNCH = Date.UTC(2026, 5, 1); // June 1, 2026 (month is 0-based)

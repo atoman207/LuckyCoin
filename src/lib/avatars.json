@@ -1,6 +1,13 @@
 {
-  "note": "Pool of FREE, no-key, deterministic avatar image URLs spread across many styles and two providers (DiceBear SVG + RoboHash). Each user is assigned ONE template by hashing their unique id, then their id is the seed -> avatars are stable, unique, varied, AND spread across endpoints so no single provider gets hit 50x at once. IMPORTANT: use SVG, not PNG -- DiceBear's PNG endpoint rate-limits hard under burst (a leaderboard loading ~50 PNGs at once gets ~2/3 throttled with HTTP 429). {seed} is replaced with the URL-encoded id. Verified 200 on 2026-06-16.",
-  "templates": [
+  "note": "Human-like avatar mix so the player list looks hand-picked, not bot-generated. (1) ~noAvatarChance of users get NO avatar (null -> initial fallback), like real people who never set one. (2) peopleShare of the rest get a REAL-PERSON PHOTO from a small FINITE set (randomuser.me + pravatar.cc), so photos naturally OVERLAP between users, just like real people reusing common stock images. (3) the remainder get a unique illustrated avatar (DiceBear SVG / RoboHash) seeded by their id. Photo {n} = a random index inside the set's range; illustrated {seed} = the user's unique id. All sources are free, no key, direct image URLs. Verified 200 image/jpeg on 2026-06-16.",
+  "noAvatarChance": 0.15,
+  "peopleShare": 0.6,
+  "people": [
+    { "url": "https://randomuser.me/api/portraits/men/{n}.jpg", "from": 0, "count": 100 },
+    { "url": "https://randomuser.me/api/portraits/women/{n}.jpg", "from": 0, "count": 100 },
+    { "url": "https://i.pravatar.cc/300?img={n}", "from": 1, "count": 70 }
+  ],
+  "illustrated": [
     "https://api.dicebear.com/9.x/adventurer/svg?seed={seed}",
     "https://api.dicebear.com/9.x/adventurer-neutral/svg?seed={seed}",
     "https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",

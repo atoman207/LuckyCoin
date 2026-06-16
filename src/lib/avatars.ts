@@ -1,25 +1,36 @@
 // Resource library: user avatar images.
 //
-// Avatars come from a POOL of free, no-key, deterministic image services
-// (DiceBear SVG across ~18 styles + RoboHash) defined in ./avatars.json. Each
-// user is mapped to one template by hashing their unique id, then their id is
-// used as the seed. The result:
-//   * unique  — a unique id seed yields a unique image (no duplicates);
-//   * varied  — users are spread across many styles/providers;
-//   * robust  — spreading across endpoints avoids the rate-limit that breaks a
-//               leaderboard loading 50 avatars from a single endpoint at once.
-// Real users who upload their own picture keep it; this is the avatar source
-// for bot-generated players.
+// The goal is a HUMAN-LOOKING mix, so the player list reads as hand-picked
+// rather than bot-generated (see ./avatars.json):
+//   * a share of users get NO avatar at all (null → initial fallback), like
+//     real people who never set one;
+//   * most of the rest get a REAL-PERSON PHOTO from a small finite set
+//     (randomuser.me / pravatar.cc) — these naturally OVERLAP between users,
+//     just like people reusing common stock images;
+//   * the remainder get a unique illustrated avatar (DiceBear/RoboHash) seeded
+//     by their id.
+// All sources are free, no key, direct image URLs. Real users who upload their
+// own picture keep it; this library is the avatar source for bot players.
 import data from "@/lib/avatars.json";
 
-export const AVATAR_TEMPLATES: readonly string[] = data.templates;
+type PeopleSet = { url: string; from: number; count: number };
+const PEOPLE = data.people as PeopleSet[];
+const ILLUSTRATED = data.illustrated as string[];
 
-// Avatar URL with a RANDOMLY-chosen style/provider from the pool, seeded by the
-// given unique value (the user's id) so the image itself stays unique. Random
-// selection keeps the styles well mixed across users; the unique seed prevents
-// any two users sharing the same image.
-export function avatarUrl(seed: string): string {
-  const s = seed || "anon";
-  const tpl = AVATAR_TEMPLATES[Math.floor(Math.random() * AVATAR_TEMPLATES.length)];
-  return tpl.replace("{seed}", encodeURIComponent(s));
+// Back-compat export (the illustrated style URLs).
+export const AVATAR_TEMPLATES: readonly string[] = ILLUSTRATED;
+
+// Random, human-like avatar for a user. Returns null when the user should have
+// no image. A real-person photo is drawn from a finite set (so photos repeat
+// across users); an illustrated avatar is seeded by the unique id (so it does
+// not).
+export function avatarUrl(seed: string): string | null {
+  if (Math.random() < (data.noAvatarChance ?? 0)) return null;
+  if (Math.random() < (data.peopleShare ?? 0)) {
+    const p = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
+    const n = (p.from ?? 0) + Math.floor(Math.random() * p.count);
+    return p.url.replace("{n}", String(n));
+  }
+  const tpl = ILLUSTRATED[Math.floor(Math.random() * ILLUSTRATED.length)];
+  return tpl.replace("{seed}", encodeURIComponent(seed || "anon"));
 }

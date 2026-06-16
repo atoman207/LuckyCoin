@@ -7,11 +7,11 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import DemoGame from "@/components/DemoGame";
 import InsufficientCoinsModal from "@/components/InsufficientCoinsModal";
-import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, compositionFor, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode } from "@/lib/coins";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, compositionWithGems, gemRewardLabel, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode, type GemReward } from "@/lib/coins";
 
 type Phase = "idle" | "playing" | "revealed";
-type Composition = { gold: number; silver: number; bronze: number; empty: number };
-type Reward = { type: BoardSlot; gold?: number; silver?: number; bronze?: number; multiplier?: number };
+type Composition = { gold: number; silver: number; bronze: number; gem?: number; empty: number };
+type Reward = { type: BoardSlot; gold?: number; silver?: number; bronze?: number; multiplier?: number; gem?: GemReward | null };
 const nextMultiplier = (round: number) => MULTIPLIER_FACTORS[Math.min(round + 1, 10)] ?? 1;
 
 // Per-slot reveal styling: the glow/ray colours match the coin so the modal
@@ -20,8 +20,13 @@ const COIN_REVEAL: Record<BoardSlot, { glow: string; ray: string; title: string 
   gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)", title: "JACKPOT — the lucky GOLD coin! 🏆" },
   silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)", title: "You won a Silver coin!" },
   bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)", title: "You won a Bronze coin!" },
+  gem: { glow: "rgba(167,139,250,0.95)", ray: "rgba(167,139,250,0.5)", title: "A Jewel! Claim your bonus!" },
   empty: { glow: "rgba(100,116,139,0.45)", ray: "rgba(100,116,139,0.2)", title: "Empty — no coin this time!" },
 };
+
+function JewelIcon({ className = "" }: { className?: string }) {
+  return <img src="/jewel.png" alt="Jewel" className={`object-contain ${className}`} />;
+}
 
 // Revealed-board borders: gold → gold, silver → silver, bronze → none.
 const COIN_BORDER: Record<CoinType, { tile: string; tilePick: string; coin: string; coinPick: string }> = {
@@ -335,8 +340,9 @@ export default function GamePage() {
   // The board the player gets on the NEXT round — shown alongside the multiplier
   // to keep them engaged (a richer board to look forward to).
   const nextRoundComp = (() => {
-    const c = compositionFor("multiplier", Math.min(restarts + 2, MAX_RESTARTS));
-    return { ...c, empty: BOARD_SIZE - c.gold - c.silver - c.bronze };
+    const c = compositionWithGems("multiplier", Math.min(restarts + 2, MAX_RESTARTS));
+    const gem = c.gem ?? 0;
+    return { ...c, gem, empty: BOARD_SIZE - c.gold - c.silver - c.bronze - gem };
   })();
 
   // During play the whole view is height-constrained to a single screen so the
@@ -361,7 +367,14 @@ export default function GamePage() {
               : `One round costs ${profile.is_admin ? "nothing for admins" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze hidden among ${BOARD_SIZE}.`}
           </p>
         </div>
-        <CoinBalance profile={profile} size={26} />
+        <div className="flex items-center gap-3">
+          {(profile.free_rounds ?? 0) > 0 && (
+            <span className="rounded-full bg-violet-500/20 px-3 py-1 text-sm font-bold text-violet-200 ring-1 ring-violet-300/40">
+              💎 {profile.free_rounds} free {profile.free_rounds === 1 ? "round" : "rounds"}
+            </span>
+          )}
+          <CoinBalance profile={profile} size={26} />
+        </div>
       </div>
 
       {toast && (
@@ -416,15 +429,19 @@ export default function GamePage() {
                 <button className="btn-ghost text-sm">❓ How many left?</button>
                 <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-white/10 bg-[#121829] p-3 text-xs shadow-xl group-hover:block">
                   <div className="font-semibold text-amber-200">Current multiplier ×{multiplier}</div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div className="mt-2 grid grid-cols-4 gap-2 text-center">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
                       <div key={t} className="rounded bg-black/30 py-2">
                         <CoinIcon type={t} size={22} className="mx-auto" />
                         <div className="mt-1 font-bold">{composition ? composition[t] : "—"}</div>
                       </div>
                     ))}
+                    <div className="rounded bg-violet-500/15 py-2">
+                      <JewelIcon className="mx-auto h-6 w-6 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
+                      <div className="mt-1 font-bold text-violet-200">{composition?.gem ?? 0}</div>
+                    </div>
                   </div>
-                  <div className="mt-2 text-slate-400">Coins on the board this stage.</div>
+                  <div className="mt-2 text-slate-400">Coins &amp; gems on the board this stage.</div>
                 </div>
               </div>
             </div>
@@ -460,6 +477,11 @@ export default function GamePage() {
               <span className="flex items-center gap-1.5 font-semibold">
                 <CoinIcon type="bronze" size={20} /> {composition.bronze}
               </span>
+              {(composition.gem ?? 0) > 0 && (
+                <span className="flex items-center gap-1.5 font-semibold text-violet-300">
+                  <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" /> {composition.gem}
+                </span>
+              )}
               <span className="font-semibold text-slate-400">{composition.empty} blank</span>
             </div>
           )}
@@ -471,7 +493,8 @@ export default function GamePage() {
                 const revealed = phase === "revealed" && board;
                 const type = revealed ? board![i] : null;
                 const isPick = picked === i;
-                const border = type && type !== "empty" ? COIN_BORDER[type] : null;
+                const isGem = type === "gem";
+                const border = type && type !== "empty" && type !== "gem" ? COIN_BORDER[type] : null;
                 const tileVariant = `coin-board-tile-v${(i % 6) + 1}`;
                 return (
                   <button
@@ -486,15 +509,21 @@ export default function GamePage() {
                       "coin-board-tile tile-deal relative grid place-items-center border transition duration-300",
                       tileVariant,
                       revealed
-                        ? isPick && border
-                          ? border.tilePick
-                          : border
-                            ? border.tile
-                            : "border-white/10 bg-black/20 opacity-50"
+                        ? isGem
+                          ? isPick
+                            ? "z-10 border-violet-300/70 bg-violet-400/20 ring-2 ring-violet-300/70 scale-[1.35]"
+                            : "border-violet-300/40 bg-violet-500/10"
+                          : isPick && border
+                            ? border.tilePick
+                            : border
+                              ? border.tile
+                              : "border-white/10 bg-black/20 opacity-50"
                         : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
                     ].join(" ")}
                   >
-                    {revealed && type && type !== "empty" ? (
+                    {revealed && isGem ? (
+                      <JewelIcon className={`h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)] ${isPick ? "tile-flip" : "animate-pop"}`} />
+                    ) : revealed && type && type !== "empty" && type !== "gem" ? (
                       <span className="flex h-full w-full items-center justify-center p-[8%]">
                         <CoinIcon
                           type={type}
@@ -524,17 +553,23 @@ export default function GamePage() {
               <div className="flex items-center gap-3">
                 {reward.type === "empty" ? (
                   <span className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-sm font-bold text-slate-400">No</span>
+                ) : reward.type === "gem" ? (
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-500/20">
+                    <JewelIcon className="h-9 w-9 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
+                  </span>
                 ) : (
                   <CoinIcon type={reward.type} size={40} className="animate-pop" />
                 )}
                 <div className="text-left">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
-                    {reward.type === "empty" ? "Result" : "You won"}
+                    {reward.type === "empty" ? "Result" : reward.type === "gem" ? "Gem bonus" : "You won"}
                   </div>
                   <div className="text-lg font-bold capitalize">
                     {reward.type === "empty"
                       ? "Empty — no win"
-                      : `${reward.type === "gold" ? reward.gold : reward.type === "silver" ? reward.silver : reward.bronze ?? 1} ${reward.type}`}
+                      : reward.type === "gem"
+                        ? reward.gem ? gemRewardLabel(reward.gem) : "Gem"
+                        : `${reward.type === "gold" ? reward.gold : reward.type === "silver" ? reward.silver : reward.bronze ?? 1} ${reward.type}`}
                   </div>
                 </div>
               </div>
@@ -661,6 +696,10 @@ export default function GamePage() {
                   <span className="grid h-[172px] w-[172px] place-items-center rounded-full border border-white/10 bg-white/5 text-5xl font-extrabold text-slate-400">
                     No
                   </span>
+                ) : revealCoin === "gem" ? (
+                  <span className="grid h-[172px] w-[172px] place-items-center">
+                    <JewelIcon className="h-full w-full drop-shadow-[0_0_28px_rgba(167,139,250,0.95)]" />
+                  </span>
                 ) : (
                   <CoinIcon type={revealCoin} size={172} />
                 )}
@@ -671,7 +710,13 @@ export default function GamePage() {
               <p className="mt-1 text-slate-300">
                 {revealCoin === "empty"
                   ? "No coins this stage."
-                  : `+${reward?.[revealCoin] ?? 1} ${revealCoin} added${(reward?.multiplier ?? 1) > 1 ? ` (×${reward?.multiplier})` : ""}`}
+                  : revealCoin === "gem"
+                    ? reward?.gem
+                      ? reward.gem.kind === "turns"
+                        ? `${gemRewardLabel(reward.gem)} — your next ${reward.gem.turns} round${reward.gem.turns === 1 ? "" : "s"} are free!`
+                        : `${gemRewardLabel(reward.gem)} added!`
+                      : "Bonus added!"
+                    : `+${reward?.[revealCoin] ?? 1} ${revealCoin} added${(reward?.multiplier ?? 1) > 1 ? ` (×${reward?.multiplier})` : ""}`}
               </p>
 
               {/* Next-stage prompt: cost + the NEXT round's board (to entice). */}
@@ -679,8 +724,17 @@ export default function GamePage() {
                 <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
                   <p className="font-semibold text-amber-200">Proceed to the next stage?</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
-                    {nextMultiplier(restarts + 1)}
+                    {(profile.free_rounds ?? 0) > 0 ? (
+                      <>
+                        Next stage is <span className="font-semibold text-violet-200">FREE</span> (gem) ·
+                        multiplier rises to ×{nextMultiplier(restarts + 1)}
+                      </>
+                    ) : (
+                      <>
+                        Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
+                        {nextMultiplier(restarts + 1)}
+                      </>
+                    )}
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-wide text-amber-200/80">Next board</p>
                   <div className="mt-1 flex items-center justify-center gap-4">

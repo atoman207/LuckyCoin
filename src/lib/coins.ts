@@ -119,8 +119,47 @@ export const BOARD_SIZE =
 export type PlayMode = "continuous" | "multiplier";
 export const MAX_RESTARTS = 10;
 
-export type Composition = { gold: number; silver: number; bronze: number };
+export type Composition = { gold: number; silver: number; bronze: number; gem?: number };
 export const BASE_COMPOSITION: Composition = { gold: 2, silver: 38, bronze: 5 };
+
+// ---- Gems (Multiplier Play) -------------------------------------------
+// From the 2nd turn to the 10th, GEM tiles appear — replacing that many silver
+// tiles: turn 2 → 1 gem, turn 3 → 2 gems, … turn 10 → 9 gems (turn 1 has none).
+// Gems only appear in Multiplier Play.
+export function gemsForRound(mode: PlayMode | null | undefined, round: number): number {
+  if (mode !== "multiplier") return 0;
+  return Math.max(0, Math.min(round, MAX_RESTARTS) - 1);
+}
+
+// Maximum silver any player may hold. Game/bot-generated silver is capped here.
+export const SILVER_CAP = 10_000;
+
+// A picked gem grants ONE of these, chosen at random:
+//   • free turns  — your next N rounds cost no silver (+1 / +2 / +3);
+//   • silver      — +2 / +10 / +50 / +100 silver;
+//   • bronze      — +100 / +500 / +1,000 bronze.
+export type GemReward =
+  | { kind: "turns"; turns: number }
+  | { kind: "silver"; amount: number }
+  | { kind: "bronze"; amount: number };
+export const GEM_TURN_OPTIONS = [1, 2, 3] as const;
+export const GEM_SILVER_OPTIONS = [2, 10, 50, 100] as const;
+export const GEM_BRONZE_OPTIONS = [100, 500, 1000] as const;
+export const GEM_REWARDS: GemReward[] = [
+  ...GEM_TURN_OPTIONS.map((t): GemReward => ({ kind: "turns", turns: t })),
+  ...GEM_SILVER_OPTIONS.map((a): GemReward => ({ kind: "silver", amount: a })),
+  ...GEM_BRONZE_OPTIONS.map((a): GemReward => ({ kind: "bronze", amount: a })),
+];
+export function randomGemReward(): GemReward {
+  return GEM_REWARDS[Math.floor(Math.random() * GEM_REWARDS.length)];
+}
+
+// Short human label for a gem reward (used in the UI + result text).
+export function gemRewardLabel(r: GemReward): string {
+  if (r.kind === "turns") return `+${r.turns} free turn${r.turns === 1 ? "" : "s"}`;
+  if (r.kind === "silver") return `+${r.amount} silver`;
+  return `+${r.amount.toLocaleString()} bronze`;
+}
 
 // Per-round board composition (rounds 1–10). The remaining tiles of the 50 are
 // empty ("No"). Round 1 is the entry board; each Continue advances the round.
@@ -175,6 +214,16 @@ export function compositionFor(mode: PlayMode, round: number): Composition {
   return BASE_COMPOSITION;
 }
 
+// Composition WITH gems folded in: on Multiplier round R, gemsForRound(R) silver
+// tiles become gems (so the coin counts shift silver → gem). Used for both the
+// server board and the counts shown to the player.
+export function compositionWithGems(mode: string | null | undefined, round: number): Composition {
+  const base = compositionFor((mode as PlayMode) ?? "continuous", round);
+  const gem = gemsForRound(mode as PlayMode, round);
+  if (gem <= 0) return { ...base, gem: 0 };
+  return { ...base, silver: Math.max(0, base.silver - gem), gem };
+}
+
 // Reward granted when a shell of each type is opened.
 export const SHELL_REWARD = {
   gold: { gold: 1, silver: 0, bronze: 0 },
@@ -225,8 +274,8 @@ export const PRICE_PER_SILVER = 0.25; // USD per silver (base rate)
 export const customCost = (silver: number) => Number((silver * PRICE_PER_SILVER).toFixed(2));
 
 export type CoinType = "gold" | "silver" | "bronze";
-// A board tile is a coin or an empty slot (no win).
-export type BoardSlot = CoinType | "empty";
+// A board tile is a coin, a gem (Multiplier Play), or an empty slot (no win).
+export type BoardSlot = CoinType | "empty" | "gem";
 
 export type Profile = {
   id: string;
@@ -245,6 +294,7 @@ export type Profile = {
   game_round?: number;
   game_mode?: string | null;
   game_restarts?: number;
+  free_rounds?: number; // banked free rounds from "free turn" gems
   last_draw_at?: string | null;
   continue_until?: string | null;
   rewards_claimed?: boolean;
@@ -256,12 +306,14 @@ export type Profile = {
 // Build a freshly shuffled 50-tile board from a coin composition; any tiles
 // not filled by coins become empty ("No" — never a win).
 export function buildBoardFrom(comp: Composition): BoardSlot[] {
-  const coins = comp.gold + comp.silver + comp.bronze;
-  const empty = Math.max(0, BOARD_SIZE - coins);
+  const gem = comp.gem ?? 0;
+  const filled = comp.gold + comp.silver + comp.bronze + gem;
+  const empty = Math.max(0, BOARD_SIZE - filled);
   const counts: Record<BoardSlot, number> = {
     gold: comp.gold,
     silver: comp.silver,
     bronze: comp.bronze,
+    gem,
     empty,
   };
   const board: BoardSlot[] = [];

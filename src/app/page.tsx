@@ -85,19 +85,31 @@ export default function Landing() {
         </Link>
 
         {/* Hero fills the viewport minus the header, so header + hero = 100vh. */}
-        <div className="relative flex min-h-[calc(100dvh-var(--header-h))] flex-col items-center justify-center gap-6 px-6 py-20 text-center">
+        <div className="relative flex min-h-[calc(100dvh-var(--header-h))] flex-col items-center justify-center gap-7 px-6 py-20 text-center">
 
-          <h1 className="text-4xl font-extrabold leading-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.75)] sm:text-6xl">
-            Find the <span className="text-amber-300">Lucky</span> Coin.
+          <p className="hero-eyebrow">A daily ritual for dreamers, skeptics &amp; everyone in between</p>
+
+          <h1 className="hero-title">
+            <span className="hero-title-line">Start your day with</span>
+            <span className="hero-luck-word" aria-label="luck">
+              LUCK
+            </span>
+            <span className="hero-title-line hero-title-accent">before the world wakes up.</span>
           </h1>
-          <p className="max-w-xl text-lg font-medium text-amber-50/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] sm:text-2xl">
-            One choice. One treasure. Endless possibilities.
+
+          <p className="hero-subtitle max-w-2xl">
+            Pick your <strong className="text-amber-200">Lucky Coin</strong>, crack it open, and let a little
+            good fortune tag along — because{" "}
+            <em className="not-italic text-violet-200">everyone</em> deserves to enjoy the word{" "}
+            <span className="hero-inline-luck">luck</span>.
           </p>
-          <button onClick={startGame} className="btn-coin mt-2">
+
+          <button onClick={startGame} className="btn-coin mt-1">
             PLAY
           </button>
-          <p className="text-sm text-amber-100/85 drop-shadow-[0_1px_6px_rgba(0,0,0,0.85)]">
-            Register today and receive a <strong className="text-amber-300">50-coin</strong> welcome bonus.
+
+          <p className="hero-footnote">
+            Register today and receive a <strong>50-coin</strong> welcome bonus.
           </p>
         </div>
       </section>
@@ -106,15 +118,18 @@ export default function Landing() {
       <SubscriberChart />
 
       {/* How it works */}
-      <section>
-        <h2 className="text-center text-3xl font-bold">How it works</h2>
+      <section className="landing-section">
+        <h2 className="landing-section-title">How it works</h2>
+        <p className="landing-section-lead">
+          Three steps. One lucky moment. Zero gatekeeping on good fortune.
+        </p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
             { t: "1 · Register & log in", d: "Sign up with your nickname and email. You start with a silver coin, bronze coins and a welcome bonus." },
-            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 50 tiles: 1 gold, 4 silver, 20 bronze — the rest are empty." },
+            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 50 tiles — gold, silver, bronze, and from round 2 onward, rare jewels." },
             { t: "3 · Pick & crack", d: "Choose one coin. It cracks open and the prize is added to your account instantly." },
           ].map((c) => (
-            <div key={c.t} className="p-6">
+            <div key={c.t} className="landing-card p-6">
               <h3 className="text-lg font-semibold text-amber-200">{c.t}</h3>
               <p className="mt-2 text-slate-300">{c.d}</p>
             </div>
@@ -144,10 +159,12 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="flex flex-col items-center gap-4 p-10 text-center">
-        <h2 className="text-3xl font-bold">Feeling lucky?</h2>
+      <section className="landing-cta flex flex-col items-center gap-4 p-10 text-center">
+        <h2 className="landing-cta-title">
+          Feeling <span className="hero-inline-luck">lucky</span>?
+        </h2>
         <p className="max-w-md text-slate-300">
-          Daily bonuses, a 7-day streak reward and a board full of coins are waiting.
+          Daily bonuses, a 7-day streak reward, and a board full of coins — plus jewels from your second round on.
         </p>
         <button onClick={startGame} className="btn-gold text-lg !px-7 !py-3">
           ▶ Start Game

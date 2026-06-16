@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import {
   buildBoardFrom,
-  compositionFor,
+  compositionWithGems,
   multiplierFor,
   stageCostMultiplier,
   BASE_COMPOSITION,
@@ -30,8 +30,9 @@ export async function POST(req: Request) {
   const unit = currency;
   const isRestart = body.action === "restart";
 
-  // Resolve mode + round + restart count.
-  let mode: PlayMode | null;
+  // Resolve mode + round + restart count. New games default to Multiplier Play
+  // so jewels appear from round 2 onward when the player continues.
+  let mode: PlayMode;
   let round: number;
   let restarts: number;
   if (isRestart) {
@@ -46,20 +47,25 @@ export async function POST(req: Request) {
     round = (profile.game_round ?? 1) + 1;
     restarts = used + 1;
   } else {
-    mode = null; // fresh game
+    mode = "multiplier";
     round = 1;
     restarts = 0;
   }
 
-  // Board composition per the original rules (1 gold, 4 silver, 20 bronze and
-  // the rest "NO"), or the per-stage composition in Multiplier Play.
-  const composition = isRestart && mode ? compositionFor(mode, round) : BASE_COMPOSITION;
+  // Multiplier boards include jewels from round 2+ (round 1 has none).
+  const composition =
+    mode === "multiplier" ? compositionWithGems(mode, round) : BASE_COMPOSITION;
   const increase = multiplierFor(mode, round); // per-round ×N (for display)
+
+  // A banked free round (from a "free turn" gem) waives the entry cost for this
+  // round. Admins always play free.
+  const freeRounds = profile.free_rounds ?? 0;
+  const useFreeRound = !profile.is_admin && freeRounds > 0;
 
   // The stake COMPOUNDS each round: cost = base × cumulative multiplier.
   // (silver: 1,2,4,8,24,72,288,1440,14400,288000; bronze ×10.) Admins free.
   const costMult = mode === "multiplier" ? stageCostMultiplier(round) : 1;
-  const cost = profile.is_admin ? 0 : Math.ceil(ROUND_COST[currency] * costMult);
+  const cost = profile.is_admin || useFreeRound ? 0 : Math.ceil(ROUND_COST[currency] * costMult);
   if (!profile.is_admin && profile[unit] < cost) {
     return NextResponse.json(
       {
@@ -79,6 +85,7 @@ export async function POST(req: Request) {
     game_round: round,
     game_mode: mode,
     game_restarts: restarts,
+    free_rounds: useFreeRound ? freeRounds - 1 : freeRounds,
   };
 
   const { data: charged, error: chargeErr } = await admin
@@ -109,7 +116,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not start round." }, { status: 500 });
   }
 
-  const empty = BOARD_SIZE - (composition.gold + composition.silver + composition.bronze);
+  const gem = composition.gem ?? 0;
+  const empty = BOARD_SIZE - (composition.gold + composition.silver + composition.bronze + gem);
   return NextResponse.json({
     roundId: created.id,
     size: BOARD_SIZE,
@@ -118,7 +126,8 @@ export async function POST(req: Request) {
     mode,
     restarts,
     maxRestarts: MAX_RESTARTS,
-    composition: { ...composition, empty },
+    composition: { ...composition, gem, empty },
     multiplier: increase,
+    freeRound: useFreeRound, // this round's cost was waived by a gem
   });
 }

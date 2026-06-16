@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 const DEFAULTS = {
   bot_enabled: "true",
   bot_mode: "auto", // 'auto' = random in [min,max]; 'manual' = exactly bot_daily_count
+  bot_specific_count: "0", // if > 0, overrides mode/range and becomes the exact daily target
   bot_daily_count: "0",
   bot_daily_min: "100",
   bot_daily_max: "1000",
@@ -26,6 +27,7 @@ export async function GET() {
   const config = {
     enabled: (cfg.bot_enabled ?? DEFAULTS.bot_enabled) !== "false",
     mode: cfg.bot_mode === "manual" ? "manual" : "auto",
+    specificCount: parseInt(cfg.bot_specific_count ?? DEFAULTS.bot_specific_count, 10) || 0,
     count: parseInt(cfg.bot_daily_count ?? DEFAULTS.bot_daily_count, 10) || 0,
     min: parseInt(cfg.bot_daily_min ?? DEFAULTS.bot_daily_min, 10),
     max: parseInt(cfg.bot_daily_max ?? DEFAULTS.bot_daily_max, 10),
@@ -63,6 +65,8 @@ export async function PATCH(req: Request) {
   const b = await req.json().catch(() => ({}));
 
   const mode = b.mode === "manual" ? "manual" : "auto";
+  let specificCount = Math.floor(Number(b.specificCount));
+  if (!Number.isFinite(specificCount) || specificCount < 0) specificCount = 0;
   let count = Math.floor(Number(b.count));
   if (!Number.isFinite(count) || count < 0) count = 0;
 
@@ -78,8 +82,10 @@ export async function PATCH(req: Request) {
 
   const now = new Date().toISOString();
   const rows = [
-    { key: "bot_enabled", value: b.enabled ? "true" : "false" },
+    // The workflow runs continuously; keep bot_enabled true so generation stays active.
+    { key: "bot_enabled", value: "true" },
     { key: "bot_mode", value: mode },
+    { key: "bot_specific_count", value: String(specificCount) },
     { key: "bot_daily_count", value: String(count) },
     { key: "bot_daily_min", value: String(min) },
     { key: "bot_daily_max", value: String(max) },
@@ -91,17 +97,18 @@ export async function PATCH(req: Request) {
   // In manual mode, apply the new count to TODAY immediately so the admin's
   // choice takes effect on this day's drip (not just future days). Auto-mode
   // changes only affect future days — today's random target was already rolled.
-  if (mode === "manual") {
+  if (specificCount > 0 || mode === "manual") {
     const day = todayKey();
     const { data: plan } = await ctx.admin
       .from("bot_plan")
       .select("added")
       .eq("day", day)
       .maybeSingle();
+    const target = specificCount > 0 ? specificCount : count;
     await ctx.admin
       .from("bot_plan")
       .upsert(
-        { day, target: count, added: plan?.added ?? 0, updated_at: now },
+        { day, target, added: plan?.added ?? 0, updated_at: now },
         { onConflict: "day" }
       );
   }

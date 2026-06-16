@@ -9,7 +9,11 @@ import {
   BOARD_SIZE,
   BOARD_COMPOSITION,
   MAX_RESTARTS,
-  MULTIPLIER_ROUNDS,
+  compositionWithGems,
+  SILVER_CAP,
+  GEM_TURN_OPTIONS,
+  GEM_SILVER_OPTIONS,
+  GEM_BRONZE_OPTIONS,
   SIGNUP_WELCOME_BRONZE,
   WHEEL_VALUES,
   WHEEL_BLOCKED,
@@ -90,7 +94,8 @@ export default function HelpPage() {
           ))}
         </div>
         <p className="text-sm text-slate-400">
-          1 gold = {COIN_VALUE.gold / COIN_VALUE.silver} silver = {COIN_VALUE.gold} bronze.
+          1 gold = {COIN_VALUE.gold / COIN_VALUE.silver} silver = {COIN_VALUE.gold} bronze. You can hold
+          at most <strong>{SILVER_CAP.toLocaleString()} silver</strong> at a time.
         </p>
       </Section>
 
@@ -121,23 +126,26 @@ export default function HelpPage() {
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-white/5 text-amber-200">
               <tr>
-                <th className="px-3 py-2">Round</th>
+                <th className="px-3 py-2">Turn</th>
                 <th className="px-3 py-2">Gold</th>
                 <th className="px-3 py-2">Silver</th>
                 <th className="px-3 py-2">Bronze</th>
+                <th className="px-3 py-2">💎 Gems</th>
                 <th className="px-3 py-2">Blank</th>
               </tr>
             </thead>
             <tbody className="text-slate-300">
               {Array.from({ length: MAX_RESTARTS }, (_, i) => i + 1).map((r) => {
-                const c = MULTIPLIER_ROUNDS[r];
-                const blank = BOARD_SIZE - c.gold - c.silver - c.bronze;
+                const c = compositionWithGems("multiplier", r);
+                const gem = c.gem ?? 0;
+                const blank = BOARD_SIZE - c.gold - c.silver - c.bronze - gem;
                 return (
                   <tr key={r} className="border-t border-white/10">
                     <td className="px-3 py-1.5 font-semibold text-amber-100">{r}</td>
                     <td className="px-3 py-1.5">{c.gold}</td>
                     <td className="px-3 py-1.5">{c.silver}</td>
                     <td className="px-3 py-1.5">{c.bronze}</td>
+                    <td className="px-3 py-1.5 text-violet-300">{gem}</td>
                     <td className="px-3 py-1.5">{blank}</td>
                   </tr>
                 );
@@ -145,6 +153,39 @@ export default function HelpPage() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      <Section title="💎 Gems (Multiplier Play)">
+        <p>
+          From the <strong>2nd turn onward</strong>, <strong>gem</strong> tiles appear on the board —
+          each one replacing a silver tile. The count climbs every turn:{" "}
+          <strong>1 gem on turn 2</strong>, 2 on turn 3, 3 on turn 4 … up to{" "}
+          <strong>9 gems on turn 10</strong> (turn 1 has none). See the 💎 column above.
+        </p>
+        <p>Crack open a gem and you randomly receive <strong>one</strong> of the following:</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-violet-300/30 bg-violet-500/10 p-4">
+            <div className="font-bold text-violet-200">Free turns</div>
+            <div className="mt-1 text-sm">
+              +{GEM_TURN_OPTIONS.join(", +")} turns. Your next round(s) start{" "}
+              <strong>free</strong> — no silver or bronze entry cost.
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="font-bold text-slate-200">Silver coins</div>
+            <div className="mt-1 text-sm">+{GEM_SILVER_OPTIONS.join(", +")} silver added to your balance.</div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="font-bold text-orange-200">Bronze coins</div>
+            <div className="mt-1 text-sm">
+              +{GEM_BRONZE_OPTIONS.map((n) => n.toLocaleString()).join(", +")} bronze added to your balance.
+            </div>
+          </div>
+        </div>
+        <p className="text-sm text-slate-400">
+          Example: win a <strong>+2 turns</strong> gem on turn 3 and your next 2 rounds are on the
+          house — you proceed and play them without spending any silver.
+        </p>
       </Section>
 
       <Section title="Daily login reward">

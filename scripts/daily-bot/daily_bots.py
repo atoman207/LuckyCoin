@@ -51,7 +51,7 @@ PASSWORD = "LuckyBot#2026"  # shared password (these are non-real accounts)
 
 # Coin caps (must mirror the spec).
 GOLD_MAX = 10          # inclusive
-SILVER_MAX = 999_999   # strictly fewer than 1,000,000
+SILVER_MAX = 10_000    # players hold at most 10,000 silver
 BRONZE_MAX = 999_999
 
 
@@ -96,12 +96,20 @@ if not SUPABASE_URL or not SERVICE_KEY:
     sys.exit(1)
 
 # Avatar pool: free, no-key, deterministic image URLs across many styles and two
-# providers (DiceBear SVG + RoboHash). A user's unique id is hashed to pick one
-# template, then used as the seed -> avatars are unique, varied, and spread
-# across endpoints so a leaderboard loading ~50 at once doesn't trip one
-# provider's rate limit (DiceBear PNG 429s hard under burst -- use SVG).
+# providers. HUMAN-LIKE MIX so the player list looks hand-picked, not bot-made:
+#   * NO_AVATAR_CHANCE of users get no image at all (None -> initial fallback);
+#   * PEOPLE_SHARE of the rest get a REAL-PERSON PHOTO from a small finite set
+#     (randomuser.me / pravatar.cc) -> photos naturally OVERLAP between users;
+#   * the remainder get a unique illustrated avatar (DiceBear SVG / RoboHash).
 # Embedded here so this folder stays fully self-contained on any device.
-AVATAR_TEMPLATES = [
+NO_AVATAR_CHANCE = 0.15
+PEOPLE_SHARE = 0.6
+PEOPLE = [
+    ("https://randomuser.me/api/portraits/men/{n}.jpg", 0, 100),
+    ("https://randomuser.me/api/portraits/women/{n}.jpg", 0, 100),
+    ("https://i.pravatar.cc/300?img={n}", 1, 70),
+]
+ILLUSTRATED = [
     "https://api.dicebear.com/9.x/adventurer/svg?seed={seed}",
     "https://api.dicebear.com/9.x/adventurer-neutral/svg?seed={seed}",
     "https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",
@@ -127,10 +135,15 @@ AVATAR_TEMPLATES = [
 
 
 def avatar_url(seed):
-    # Randomly pick a style/provider from the pool; seed by the unique id so the
-    # image itself stays unique to the user.
+    # Human-like pick: sometimes None (no avatar), often a real-person photo from
+    # a finite set (so photos repeat), otherwise a unique illustrated avatar.
+    if random.random() < NO_AVATAR_CHANCE:
+        return None
+    if random.random() < PEOPLE_SHARE:
+        url, frm, cnt = random.choice(PEOPLE)
+        return url.replace("{n}", str(frm + random.randrange(cnt)))
     s = seed or "anon"
-    return random.choice(AVATAR_TEMPLATES).replace("{seed}", quote(s, safe=""))
+    return random.choice(ILLUSTRATED).replace("{seed}", quote(s, safe=""))
 
 
 # --------------------------------------------------------------------------
@@ -243,8 +256,14 @@ def read_config():
     except RuntimeError as e:
         raise RuntimeError(f"{e}\n   -> Run supabase/schema.sql first (creates app_config + bot_plan).")
     cfg = {r["key"]: r["value"] for r in rows}
-    enabled = (cfg.get("bot_enabled", "true") != "false")
+    enabled = True  # bot runner is always active
     mode = "manual" if cfg.get("bot_mode") == "manual" else "auto"
+    try:
+        specific = int(cfg.get("bot_specific_count", "0"))
+    except ValueError:
+        specific = 0
+    if specific < 0:
+        specific = 0
     try:
         count = int(cfg.get("bot_daily_count", "0"))
     except ValueError:
@@ -263,13 +282,15 @@ def read_config():
         mn = 100
     if mx < mn:
         mx = max(mn, 1000)
-    return {"enabled": enabled, "mode": mode, "count": count, "min": mn, "max": mx}
+    return {"enabled": enabled, "mode": mode, "specific": specific, "count": count, "min": mn, "max": mx}
 
 
 MIN_DAILY = 50  # floor: always generate at least this many users per day
 
 
 def pick_target(cfg):
+    if cfg.get("specific", 0) > 0:
+        return cfg["specific"]
     # The admin's fixed number in manual mode, else random in [min, max].
     base = cfg["count"] if (cfg["mode"] == "manual" and cfg["count"] > 0) else random.randint(cfg["min"], cfg["max"])
     return max(MIN_DAILY, base)
@@ -307,8 +328,7 @@ def existing_names():
 # --------------------------------------------------------------------------
 # Pacing -- how many to add on THIS run, given today's progress.
 # --------------------------------------------------------------------------
-def to_add_this_run(target, added, now):
-    day_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+def to_add_this_run(target, added, now, day_start):
     elapsed = (now - day_start).total_seconds() / 86_400.0
     elapsed = min(1.0, max(0.0, elapsed))
     remaining = max(0, target - added)
@@ -325,13 +345,14 @@ def to_add_this_run(target, added, now):
 # --------------------------------------------------------------------------
 # Create one bot
 # --------------------------------------------------------------------------
-def create_bot(name, now):
+def create_bot(name, now, day_start):
     nationality = random.choice(COUNTRIES)
     discord_id = discord_handle(name)
     gold = random.randint(0, GOLD_MAX)
     silver = random.randint(0, SILVER_MAX)
     bronze = random.randint(0, BRONZE_MAX)
-    created_at = (now - timedelta(milliseconds=random.randint(0, 55 * 60 * 1000))).isoformat()
+    span_ms = max(0, int((now - day_start).total_seconds() * 1000))
+    created_at = (day_start + timedelta(milliseconds=random.randint(0, span_ms))).isoformat()
 
     for attempt in range(3):
         email = f"bot.{uuid.uuid4().hex[:8]}@luckycoin.bot"
@@ -361,9 +382,9 @@ def create_bot(name, now):
     return False
 
 
-def _safe_create(name, now):
+def _safe_create(name, now, day_start):
     try:
-        return create_bot(name, now)
+        return create_bot(name, now, day_start)
     except Exception as e:
         print(f"  - skip \"{name}\": {e}")
         return False
@@ -374,18 +395,22 @@ def _safe_create(name, now):
 # --------------------------------------------------------------------------
 def main():
     now = datetime.now(timezone.utc)
-    day = now.strftime("%Y-%m-%d")
+    tz_offset = timedelta(hours=9)
+    start_hour = 9
+    local_now = now + tz_offset
+    anchor = local_now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+    if local_now.hour < start_hour:
+        anchor -= timedelta(days=1)
+    day = anchor.strftime("%Y-%m-%d")
+    day_start = anchor - tz_offset
 
     cfg = read_config()
-    if not cfg["enabled"]:
-        print("Bot drip is disabled (app_config.bot_enabled = false). Nothing to do.")
-        return
 
     plan = get_plan(day, cfg)
     if not plan:
         raise RuntimeError("Could not read or create today's bot_plan row.")
 
-    want = to_add_this_run(plan["target"], plan["added"], now)
+    want = to_add_this_run(plan["target"], plan["added"], now, day_start)
     print(f"[{day}] target={plan['target']}  added={plan['added']}/{plan['target']}  -> adding {want} this run")
     if want == 0:
         print("On pace -- nothing to add this run.")
@@ -396,7 +421,7 @@ def main():
 
     added = 0
     with ThreadPoolExecutor(max_workers=5) as pool:
-        for ok in pool.map(lambda n: _safe_create(n, now), names):
+        for ok in pool.map(lambda n: _safe_create(n, now, day_start), names):
             if ok:
                 added += 1
 

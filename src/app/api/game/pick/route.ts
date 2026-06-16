@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { SHELL_REWARD, type BoardSlot } from "@/lib/coins";
+import { SHELL_REWARD, SILVER_CAP, randomGemReward, type BoardSlot, type GemReward } from "@/lib/coins";
 
 const NO_REWARD = { gold: 0, silver: 0, bronze: 0 } as const;
 
@@ -56,7 +56,26 @@ export async function POST(req: Request) {
     revealType = "silver"; // the player receives silver instead of gold
   }
 
-  const reward = revealType === "empty" ? NO_REWARD : SHELL_REWARD[revealType];
+  // Work out what the pick credits. A GEM grants ONE random reward — free turns
+  // (banked as free_rounds), silver, or bronze — instead of a coin.
+  let gem: GemReward | null = null;
+  let creditGold = 0;
+  let creditSilver = 0;
+  let creditBronze = 0;
+  let freeRoundsAdd = 0;
+  if (revealType === "gem") {
+    gem = randomGemReward();
+    if (gem.kind === "turns") freeRoundsAdd = gem.turns;
+    else if (gem.kind === "silver") creditSilver = gem.amount;
+    else creditBronze = gem.amount;
+  } else if (revealType !== "empty") {
+    const r = SHELL_REWARD[revealType];
+    creditGold = r.gold;
+    creditSilver = r.silver;
+    creditBronze = r.bronze;
+  }
+
+  const reward = { type: revealType, gold: creditGold, silver: creditSilver, bronze: creditBronze, gem };
 
   // Close the round (guarded so a double-submit can't pay out twice). Persist
   // the possibly-modified board so the relocated gold stays put.
@@ -65,7 +84,7 @@ export async function POST(req: Request) {
     .update({
       status: "done",
       picked_index: index,
-      reward: { type: revealType, ...reward },
+      reward,
       board: finalBoard,
     })
     .eq("id", roundId)
@@ -77,13 +96,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This round is already finished." }, { status: 400 });
   }
 
-  // Credit the reward.
+  // Credit the reward. Silver is capped at SILVER_CAP (10,000) per player.
   const { data: updated, error: creditErr } = await admin
     .from("profiles")
     .update({
-      gold: profile.gold + reward.gold,
-      silver: profile.silver + reward.silver,
-      bronze: profile.bronze + reward.bronze,
+      gold: profile.gold + creditGold,
+      silver: Math.min(SILVER_CAP, profile.silver + creditSilver),
+      bronze: profile.bronze + creditBronze,
+      free_rounds: (profile.free_rounds ?? 0) + freeRoundsAdd,
     })
     .eq("id", profile.id)
     .select("*")
@@ -95,7 +115,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     pickedIndex: index,
-    reward: { type: revealType, ...reward },
+    reward,
     board: finalBoard, // reveal everything (with the gold relocated)
     profile: updated,
   });

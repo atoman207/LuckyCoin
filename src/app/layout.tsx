@@ -9,8 +9,47 @@ import ContactWidget from "@/components/ContactWidget";
 import BackToTop from "@/components/BackToTop";
 
 export const metadata: Metadata = {
-  title: "Lucky Coin — Good Luck",
-  description: "Pick the lucky coin. Crack it open. Win gold, silver and bronze.",
+  metadataBase: new URL("https://luckybronzecoin.com"),
+  title: {
+    default: "Lucky Coin Game | Get Your Lucky Coin Before Starting the Day",
+    template: "%s | Lucky Coin Game",
+  },
+  description:
+    "Grab a Lucky Coin before starting your day, because even your coffee deserves a backup plan for good fortune and smooth sailing.",
+  keywords: [
+    "Lucky Coin",
+    "lucky coin game",
+    "online coin game",
+    "daily luck game",
+    "good luck game",
+    "morning lucky coin",
+    "pick a lucky coin",
+    "coin rewards game",
+    "gold silver bronze coin game",
+  ],
+  applicationName: "Lucky Coin",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Lucky Coin Game | Get Your Lucky Coin Before Starting the Day",
+    description:
+      "Grab a Lucky Coin before starting your day, because even your coffee deserves a backup plan for good fortune and smooth sailing.",
+    url: "/",
+    siteName: "Lucky Coin",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title: "Lucky Coin Game | Get Your Lucky Coin Before Starting the Day",
+    description:
+      "Grab a Lucky Coin before starting your day, because even your coffee deserves a backup plan for good fortune and smooth sailing.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: "/favicon.png",
     apple: "/favicon.png",

@@ -576,7 +576,14 @@ export default function AdminPage() {
 }
 
 // -------- Bots: daily drip settings + today's progress ------------------
-type BotConfig = { enabled: boolean; mode: "auto" | "manual"; count: number; min: number; max: number };
+type BotConfig = {
+  enabled: boolean;
+  mode: "auto" | "manual";
+  specificCount: number;
+  count: number;
+  min: number;
+  max: number;
+};
 type BotToday = { day: string; target: number; added: number; updated_at: string } | null;
 
 function BotsPanel({ onError }: { onError: (m: string) => void }) {
@@ -601,6 +608,7 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
 
   async function save() {
     if (!config) return;
+    if (config.specificCount < 0) return onError("Specific users/day must be 0 or more.");
     if (config.mode === "auto" && config.max < config.min) return onError("Max must be ≥ min.");
     if (config.mode === "manual" && config.count < 1) return onError("Enter how many users to add per day (1 or more).");
     setSaving(true);
@@ -632,21 +640,33 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
         <div>
           <h2 className="text-lg font-bold">Daily new users</h2>
           <p className="mt-1 text-sm text-slate-400">
-            New players are added in batches throughout each day. Choose a fixed number yourself
-            (Manual), or let the bot add a random number for you (Automatic). Coins are random
-            (gold ≤ 10, silver &amp; bronze &lt; 1,000,000).
+            New players are added in batches throughout each day. Enter a specific number to create
+            exactly that many users, randomly distributed across each 24-hour window (9:00 AM → 9:00 AM).
+            Coins are random (gold ≤ 10, silver &amp; bronze &lt; 1,000,000).
           </p>
         </div>
 
-        <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
-          <span className="text-sm font-semibold">Enabled</span>
+        <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
+          <div className="font-semibold text-emerald-300">Bot status: Always running</div>
+          <div className="mt-1 text-xs text-slate-500">
+            The hourly worker stays active continuously and follows the target settings below.
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Specific users / day (exact target)</label>
           <input
-            type="checkbox"
-            checked={config.enabled}
-            onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-            className="h-5 w-5"
+            className="input"
+            type="number"
+            min={0}
+            value={config.specificCount}
+            onChange={(e) => setConfig({ ...config, specificCount: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
           />
-        </label>
+          <p className="mt-1 text-xs text-slate-500">
+            Set to 0 to use Automatic/Manual mode below. Any value above 0 overrides other modes and
+            creates exactly that many users in the current 9:00 AM → next 9:00 AM cycle.
+          </p>
+        </div>
 
         {/* Mode: Automatic (random) vs Manual (admin sets the number) */}
         <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
@@ -669,13 +689,12 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
             <input
               className="input"
               type="number"
-              min={50}
+              min={1}
               value={config.count}
               onChange={(e) => setConfig({ ...config, count: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
             />
             <p className="mt-1 text-xs text-slate-500">
               Exactly this many new users are added each day (dripped in batches over 24h).
-              Minimum 50/day is always enforced.
             </p>
           </div>
         ) : (
@@ -715,8 +734,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           {savedAt && <span className="text-xs text-emerald-300">Saved {savedAt.toLocaleTimeString()}</span>}
         </div>
         <p className="text-xs text-slate-500">
-          Manual changes apply to <strong>today</strong> right away. Automatic-range changes affect
-          future days — today&apos;s random target was already rolled (shown on the right).
+          Specific-target and manual changes apply to <strong>today</strong> right away. Automatic-range
+          changes affect future days after today&apos;s target has already been rolled.
         </p>
       </div>
 

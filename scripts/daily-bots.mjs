@@ -7,10 +7,10 @@
 // instead of arriving in one burst.
 //
 // How the target is chosen
-//   • The admin sets bot_enabled / bot_daily_min / bot_daily_max in the
-//     `app_config` table (editable from the admin dashboard → Bots tab).
-//   • The first run of each UTC day rolls a random target in
-//     [min, max] (default 100–500) and stores it in `bot_plan(day)`.
+//   • The admin can set bot_specific_count in `app_config` for an exact daily
+//     target, or use mode/range fallback settings.
+//   • The first run of each 24h window (09:00 → 09:00, UTC+9) sets the day's
+//     target in `bot_plan(day)`.
 //   • Every later run that day tops `added` up toward `target`, paced by how
 //     much of the day has elapsed (+ jitter), and finishes any remainder in
 //     the final hour. Re-running an hour only adds the shortfall — it's safe.
@@ -19,7 +19,7 @@
 //   • a unique, human-meaningful Discord-style display name;
 //   • a Discord avatar URL from the resource library (src/lib/avatars.ts);
 //   • random coins: gold 0–10, silver and bronze each 0–999,999;
-//   • kind = 'bot', a backdated created_at within the current hour.
+//   • kind = 'bot', a created_at randomized within the current 24h window.
 
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
@@ -27,15 +27,20 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// Avatar resource library — same pool the app's src/lib/avatars.ts imports.
-// A unique seed (the user's id) is hashed to pick one of many free SVG/RoboHash
-// templates, so avatars are unique, varied, and spread across endpoints.
+// Avatar resource library — same human-like mix the app's src/lib/avatars.ts
+// uses: a share get NO avatar (null), most of the rest get a real-person photo
+// from a finite set (so photos overlap), the remainder an illustrated avatar.
 const HERE = dirname(fileURLToPath(import.meta.url));
-const AVATAR_TEMPLATES = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8")).templates;
+const AVATAR_CFG = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8"));
 const avatarUrl = (seed) => {
-  const s = String(seed || "anon");
-  const tpl = AVATAR_TEMPLATES[Math.floor(Math.random() * AVATAR_TEMPLATES.length)];
-  return tpl.replace("{seed}", encodeURIComponent(s));
+  if (Math.random() < (AVATAR_CFG.noAvatarChance ?? 0)) return null;
+  if (Math.random() < (AVATAR_CFG.peopleShare ?? 0)) {
+    const p = AVATAR_CFG.people[Math.floor(Math.random() * AVATAR_CFG.people.length)];
+    const n = (p.from ?? 0) + Math.floor(Math.random() * p.count);
+    return p.url.replace("{n}", String(n));
+  }
+  const tpl = AVATAR_CFG.illustrated[Math.floor(Math.random() * AVATAR_CFG.illustrated.length)];
+  return tpl.replace("{seed}", encodeURIComponent(String(seed || "anon")));
 };
 
 // --- env --------------------------------------------------------------------
@@ -56,7 +61,7 @@ const PASSWORD = "LuckyBot#2026"; // shared password (these are non-real account
 
 // --- coin caps (must mirror the spec) --------------------------------------
 const GOLD_MAX = 10; // inclusive
-const SILVER_MAX = 999_999; // strictly fewer than 1,000,000
+const SILVER_MAX = 10_000; // players hold at most 10,000 silver
 const BRONZE_MAX = 999_999;
 
 // --- tiny helpers -----------------------------------------------------------
@@ -154,15 +159,17 @@ async function readConfig() {
     );
   }
   const cfg = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-  const enabled = (cfg.bot_enabled ?? "true") !== "false";
+  const enabled = true; // Bot worker is always active.
   const mode = cfg.bot_mode === "manual" ? "manual" : "auto";
+  let specificCount = parseInt(cfg.bot_specific_count ?? "0", 10);
+  if (!Number.isFinite(specificCount) || specificCount < 0) specificCount = 0;
   let count = parseInt(cfg.bot_daily_count ?? "0", 10);
   if (!Number.isFinite(count) || count < 0) count = 0;
   let min = parseInt(cfg.bot_daily_min ?? "100", 10);
   let max = parseInt(cfg.bot_daily_max ?? "1000", 10);
   if (!Number.isFinite(min) || min < 0) min = 100;
   if (!Number.isFinite(max) || max < min) max = Math.max(min, 1000);
-  return { enabled, mode, count, min, max };
+  return { enabled, mode, specificCount, count, min, max };
 }
 
 // The day's target: the admin's fixed number in manual mode, otherwise a random
@@ -172,6 +179,11 @@ const MIN_DAILY = 50;
 function pickTarget({ mode, count, min, max }) {
   const base = mode === "manual" && count > 0 ? count : randInt(min, max);
   return Math.max(MIN_DAILY, base);
+}
+
+function pickDailyTarget({ specificCount, mode, count, min, max }) {
+  if (specificCount > 0) return specificCount;
+  return pickTarget({ mode, count, min, max });
 }
 
 // Get (or create, once) today's plan row. Handles two runners racing to
@@ -184,7 +196,7 @@ async function getPlan(dayKey, cfg) {
     .maybeSingle();
   if (existing) return existing;
 
-  const target = pickTarget(cfg);
+  const target = pickDailyTarget(cfg);
   const { data: inserted, error } = await admin
     .from("bot_plan")
     .insert({ day: dayKey, target, added: 0 })
@@ -215,12 +227,7 @@ async function existingNames() {
 
 // --- pacing -----------------------------------------------------------------
 // How many to add on THIS hourly run, given today's progress.
-function toAddThisRun(target, added, now) {
-  const dayStart = Date.UTC(
-    new Date(now).getUTCFullYear(),
-    new Date(now).getUTCMonth(),
-    new Date(now).getUTCDate()
-  );
+function toAddThisRun(target, added, now, dayStart) {
   const elapsed = clamp((now - dayStart) / 86_400_000, 0, 1); // fraction of day done
   const remaining = Math.max(0, target - added);
   if (remaining === 0) return 0;
@@ -234,15 +241,30 @@ function toAddThisRun(target, added, now) {
   return clamp(Math.round(shortfall * jitter), 0, remaining);
 }
 
+function getWindow(nowMs) {
+  // Business day is 09:00 -> next 09:00 in UTC+9 (KST/JST-style offset).
+  const tzOffsetHours = 9;
+  const startHourLocal = 9;
+  const shifted = new Date(nowMs + tzOffsetHours * 3_600_000);
+  const anchor = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate(), startHourLocal, 0, 0, 0)
+  );
+  if (shifted.getUTCHours() < startHourLocal) anchor.setUTCDate(anchor.getUTCDate() - 1);
+  const dayKey = anchor.toISOString().slice(0, 10);
+  const dayStart = anchor.getTime() - tzOffsetHours * 3_600_000;
+  return { dayKey, dayStart };
+}
+
 // --- create one bot ---------------------------------------------------------
-async function createBot(name, now) {
+async function createBot(name, now, dayStart) {
   const nationality = pick(COUNTRIES);
   const discord_id = discordHandle(name);
   const gold = randInt(0, GOLD_MAX);
   const silver = randInt(0, SILVER_MAX);
   const bronze = randInt(0, BRONZE_MAX);
-  // Backdate within the current hour so sign-ups look spread out, not identical.
-  const created_at = new Date(now - randInt(0, 55 * 60 * 1000)).toISOString();
+  // Randomize signup time within the active 24h window (09:00 -> 09:00 local).
+  const createdAtMs = randInt(dayStart, now);
+  const created_at = new Date(createdAtMs).toISOString();
 
   // Retry a couple of times on the rare email/name collision.
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -303,18 +325,14 @@ async function run(items, limit, fn) {
 // --- main -------------------------------------------------------------------
 async function main() {
   const now = Date.now();
-  const dayKey = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  const { dayKey, dayStart } = getWindow(now);
 
   const cfg = await readConfig();
-  if (!cfg.enabled) {
-    console.log("🔕 Bot drip is disabled (app_config.bot_enabled = false). Nothing to do.");
-    return;
-  }
 
   const plan = await getPlan(dayKey, cfg);
   if (!plan) throw new Error("Could not read or create today's bot_plan row.");
 
-  const want = toAddThisRun(plan.target, plan.added, now);
+  const want = toAddThisRun(plan.target, plan.added, now, dayStart);
   console.log(
     `📅 ${dayKey}  target=${plan.target}  added=${plan.added}/${plan.target}  → adding ${want} this run`
   );
@@ -325,7 +343,7 @@ async function main() {
 
   const taken = await existingNames();
   const names = uniqueNames(want, taken);
-  const added = await run(names, 5, (name) => createBot(name, now));
+  const added = await run(names, 5, (name) => createBot(name, now, dayStart));
 
   const { error: upErr } = await admin
     .from("bot_plan")

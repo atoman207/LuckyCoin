@@ -82,6 +82,9 @@ alter table public.profiles  add column if not exists first_login_done boolean n
 -- Registered payout wallet for selling gold back.
 alter table public.profiles  add column if not exists payout_address text;
 alter table public.profiles  add column if not exists payout_method  text;
+-- Free rounds banked from picking "free turn" gems in Multiplier Play. While > 0,
+-- the next round's silver/bronze entry cost is waived (one per round).
+alter table public.profiles  add column if not exists free_rounds integer not null default 0;
 -- Existing/established accounts have already logged in — don't gate them.
 update public.profiles set first_login_done = true
   where first_login_done = false
@@ -179,6 +182,7 @@ create index if not exists contacts_created_idx on public.contacts (created_at d
 -- runtime (no redeploy). Currently drives the daily bot-subscriber drip:
 --   bot_enabled     'true' | 'false'  — master on/off switch
 --   bot_mode        'auto' | 'manual' — how the day's target is chosen
+--   bot_specific_count exact users/day when > 0 (overrides mode/range)
 --   bot_daily_count admin's exact users-per-day (used when mode = 'manual')
 --   bot_daily_min   lower bound of the random daily target (default 100)
 --   bot_daily_max   upper bound of the random daily target (default 1000)
@@ -195,6 +199,7 @@ create table if not exists public.app_config (
 insert into public.app_config (key, value) values
   ('bot_enabled',    'true'),
   ('bot_mode',       'auto'),
+  ('bot_specific_count','0'),
   ('bot_daily_count','0'),
   ('bot_daily_min',  '100'),
   ('bot_daily_max',  '1000')
