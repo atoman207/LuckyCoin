@@ -125,9 +125,9 @@ export default function Landing() {
         </p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
-            { t: "1 · Register & log in", d: "Sign up with your nickname and email. You start with a silver coin, bronze coins and a welcome bonus." },
-            { t: "2 · Spend a silver to play", d: "Each round costs 1 silver and scatters 50 tiles — gold, silver, bronze, and from round 2 onward, rare jewels." },
-            { t: "3 · Pick & crack", d: "Choose one coin. It cracks open and the prize is added to your account instantly." },
+            { t: "1 · Register & log in", d: "Sign up with a nickname and email. We hand you a silver coin, a heap of bronze and a welcome bonus — generosity, absolutely no catch." },
+            { t: "2 · Spend a silver to play", d: "Each round costs a single silver and scatters 50 tiles — gold, silver, bronze, and from round 2 on, jewels rare enough to make you gasp." },
+            { t: "3 · Pick & crack", d: "Pick one tile, watch it crack open, and the prize lands in your account before the suspense even wears off." },
           ].map((c) => (
             <div key={c.t} className="landing-card p-6">
               <h3 className="text-lg font-semibold text-amber-200">{c.t}</h3>
@@ -142,9 +142,9 @@ export default function Landing() {
         <h2 className="text-center text-2xl font-bold">Coin values</h2>
         <div className="mt-6 grid gap-5 sm:grid-cols-3">
           {[
-            { type: "gold" as const, title: "Gold", v: "= 500 bronze", d: "The lucky jackpot coin." },
-            { type: "silver" as const, title: "Silver", v: "= 10 bronze", d: "Your ticket to play." },
-            { type: "bronze" as const, title: "Bronze", v: "base unit", d: "Earned every day." },
+            { type: "gold" as const, title: "Gold", v: "= 500 bronze", d: "The headline act — hard to find, glorious to hold." },
+            { type: "silver" as const, title: "Silver", v: "= 10 bronze", d: "Your ticket to play. Spend it and the board lights up." },
+            { type: "bronze" as const, title: "Bronze", v: "base unit", d: "The everyday workhorse — shows up daily, never complains." },
           ].map((c) => (
             <div key={c.type} className="flex items-center gap-4 p-5">
               <CoinIcon type={c.type} size={52} />
@@ -164,7 +164,8 @@ export default function Landing() {
           Feeling <span className="hero-inline-luck">lucky</span>?
         </h2>
         <p className="max-w-md text-slate-300">
-          Daily bonuses, a 7-day streak reward, and a board full of coins — plus jewels from your second round on.
+          Daily bonuses, a 7-day streak reward, a board positively groaning with coins — and jewels
+          gatecrashing from your second round on.
         </p>
         <button onClick={startGame} className="btn-gold text-lg !px-7 !py-3">
           ▶ Start Game

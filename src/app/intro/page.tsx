@@ -28,10 +28,11 @@ export default function IntroPage() {
       <div className="card p-6">
         <h2 className="text-xl font-bold text-amber-200">At a glance</h2>
         <ul className="mt-3 space-y-2 text-slate-300">
-          <li>• Try <strong>{FREE_PLAYS} rounds free</strong>, no account needed.</li>
-          <li>• Register for a <strong>{SIGNUP_WELCOME_BRONZE}-bronze welcome bonus</strong> + {dailyReward(1)} bronze day-1 reward.</li>
-          <li>• A free <strong>daily prize-wheel spin</strong> and an escalating daily login reward.</li>
-          <li>• Full rules are on the <Link href="/help" className="text-amber-300 underline">Help page</Link>.</li>
+          <li>• Try <strong>{FREE_PLAYS} rounds free</strong> before luck asks for your email address.</li>
+          <li>• Register for a <strong>{SIGNUP_WELCOME_BRONZE}-bronze welcome bonus</strong> + {dailyReward(1)} bronze on day 1.</li>
+          <li>• Jewels appear from <strong>round 2 onward</strong>, bringing bonus turns or extra coins.</li>
+          <li>• Spin the <strong>daily prize wheel</strong> and keep your login streak warm.</li>
+          <li>• Full rules, odds, and treasure-map fine print live on the <Link href="/help" className="text-amber-300 underline">Help page</Link>.</li>
         </ul>
       </div>
 

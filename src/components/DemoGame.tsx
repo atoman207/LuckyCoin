@@ -81,7 +81,7 @@ export default function DemoGame() {
           <h1 className="text-3xl font-extrabold">Try it free</h1>
           <p className="text-slate-400">
             {left > 0 ? `${left} of ${FREE_PLAYS} free demo rounds left` : "Free rounds used"} · demo
-            wins aren&apos;t saved — log in to keep them.
+            wins evaporate the moment you blink — log in to keep them for real.
           </p>
         </div>
         <button onClick={openAuth} className="btn-gold text-sm">Log in / Register</button>
@@ -92,7 +92,8 @@ export default function DemoGame() {
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">Pick the lucky coin</h2>
           <p className="max-w-sm text-slate-300">
-            {BOARD_SIZE} tiles hide gold, silver and bronze coins. Crack one open and see what you find!
+            {BOARD_SIZE} tiles, three kinds of coin, one shining moment. Crack one open and see what
+            fate coughs up!
           </p>
           <button onClick={start} disabled={plays >= FREE_PLAYS} className="btn-gold text-lg !px-7 !py-3">
             {plays >= FREE_PLAYS ? "Log in to keep playing" : "▶ Start free round"}
@@ -142,7 +143,7 @@ export default function DemoGame() {
           {result !== null && !coinModal && (
             <div className="card flex shrink-0 flex-col items-center gap-3 p-4 text-center sm:p-6">
               <div className="text-xl font-bold capitalize">
-                {result === "empty" ? "No win this time (demo)" : `You found 1 ${result} coin! (demo)`}
+                {result === "empty" ? "Nothing but air this time (demo)" : `You unearthed 1 ${result} coin! (demo)`}
               </div>
               <button onClick={start} className="btn-gold">
                 {left > 0 ? `Play again (${left} left)` : "Log in to keep playing"}

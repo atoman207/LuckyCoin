@@ -65,8 +65,8 @@ export default function ExchangePage() {
         <div>
           <h1 className="text-3xl font-extrabold">Exchange coins</h1>
           <p className="text-slate-400">
-            Downward only: gold → silver, silver → bronze. Bulk silver→bronze bundles earn a bonus
-            (10 → 110, 100 → 1,500). You can&apos;t convert back up.
+            Downhill only: gold → silver, silver → bronze. Bulk silver→bronze bundles earn a cheeky
+            bonus (10 → 110, 100 → 1,500). Going back uphill? Not a chance — coins don&apos;t do cardio.
           </p>
         </div>
         <CoinBalance profile={profile} size={26} />

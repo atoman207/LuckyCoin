@@ -97,7 +97,7 @@ export default function SellPage() {
       <div>
         <h1 className="text-3xl font-extrabold">Sell gold coins</h1>
         <p className="text-slate-400">
-          1 gold = <span className="font-semibold text-amber-300">{SELL_PRICE_USDT.toLocaleString()} USDT</span>.
+          1 gold = <span className="font-semibold text-amber-300">{SELL_PRICE_USDT.toLocaleString()} USDT</span> — turn your good luck into actual lunch money.
         </p>
       </div>
 

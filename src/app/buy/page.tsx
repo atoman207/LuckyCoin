@@ -144,7 +144,7 @@ export default function BuyPage() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold sm:text-3xl">Buy silver coins</h1>
-          <p className="hidden text-sm text-slate-400 sm:block">Pay with cryptocurrency · 1 silver = $0.25 USDT</p>
+          <p className="hidden text-sm text-slate-400 sm:block">Pay with crypto, skip the small talk · 1 silver = $0.25 USDT</p>
         </div>
         <CoinBalance profile={profile} size={26} />
       </div>

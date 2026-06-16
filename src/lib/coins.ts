@@ -123,11 +123,13 @@ export type Composition = { gold: number; silver: number; bronze: number; gem?: 
 export const BASE_COMPOSITION: Composition = { gold: 2, silver: 38, bronze: 5 };
 
 // ---- Gems (Multiplier Play) -------------------------------------------
-// From the 2nd turn to the 10th, GEM tiles appear — replacing that many silver
-// tiles: turn 2 → 1 gem, turn 3 → 2 gems, … turn 10 → 9 gems (turn 1 has none).
 // Gems only appear in Multiplier Play.
+// Round 1 has a special starter board: 7 gems total (2 replacing empty slots,
+// and 5 replacing silver). From round 2 onward, gems scale as:
+//   turn 2 → 1 gem, turn 3 → 2 gems, … turn 10 → 9 gems (replacing silver).
 export function gemsForRound(mode: PlayMode | null | undefined, round: number): number {
   if (mode !== "multiplier") return 0;
+  if (round <= 1) return 7;
   return Math.max(0, Math.min(round, MAX_RESTARTS) - 1);
 }
 
@@ -221,6 +223,11 @@ export function compositionWithGems(mode: string | null | undefined, round: numb
   const base = compositionFor((mode as PlayMode) ?? "continuous", round);
   const gem = gemsForRound(mode as PlayMode, round);
   if (gem <= 0) return { ...base, gem: 0 };
+  // Round 1 special case: 7 gems where 5 replace silver and 2 replace empty.
+  // (Empty is derived from BOARD_SIZE minus filled tiles by callers.)
+  if ((mode as PlayMode) === "multiplier" && round <= 1) {
+    return { ...base, silver: Math.max(0, base.silver - 5), gem };
+  }
   return { ...base, silver: Math.max(0, base.silver - gem), gem };
 }
 

@@ -54,8 +54,9 @@ export default function HelpPage() {
       <div>
         <h1 className="text-3xl font-extrabold">Help &amp; rules</h1>
         <p className="text-slate-400">
-          Everything below reflects the <em>current</em> game settings and updates automatically when
-          the rules change. New here? Read the{" "}
+          Everything below reflects the <em>current</em> game settings and updates itself the instant
+          the rules change — no carrier pigeons required. New here and pleasantly bewildered? Start
+          with the{" "}
           <Link href="/intro" className="text-amber-300 underline">
             introduction
           </Link>
@@ -65,17 +66,20 @@ export default function HelpPage() {
 
       <Section title="How to register">
         <p>
-          Click <strong>Log in</strong> in the top bar and switch to <strong>Register</strong>. Enter a
-          nickname, email and a password (6+ characters); nationality, Discord ID and an avatar are
-          optional. Your account is ready instantly.
+          Click <strong>Log in</strong> in the top bar and flip over to <strong>Register</strong>. Hand
+          us a nickname, an email and a password (6+ characters — your cat&apos;s name plus a number is
+          perfectly acceptable, we won&apos;t tell). Nationality, Discord ID and an avatar are optional
+          bragging rights. Your account is ready before you can say &ldquo;beginner&apos;s luck.&rdquo;
         </p>
         <p>
-          New members receive a <strong>{SIGNUP_WELCOME_BRONZE} bronze</strong> welcome bonus plus the
-          day-1 daily reward of <strong>{dailyReward(1)} bronze</strong>.
+          New members get showered with a <strong>{SIGNUP_WELCOME_BRONZE} bronze</strong> welcome bonus
+          plus a day-1 reward of <strong>{dailyReward(1)} bronze</strong> — free coins, no strings, no
+          awkward small talk.
         </p>
         <p className="text-sm text-slate-400">
-          You can try {FREE_PLAYS} rounds for free without an account — after that, logging in keeps
-          your winnings.
+          Want to kick the tyres first? Play {FREE_PLAYS} rounds free without an account. After that,
+          logging in is the only thing standing between your winnings and a vanishing act worthy of a
+          dryer eating socks.
         </p>
       </Section>
 
@@ -94,32 +98,37 @@ export default function HelpPage() {
           ))}
         </div>
         <p className="text-sm text-slate-400">
-          1 gold = {COIN_VALUE.gold / COIN_VALUE.silver} silver = {COIN_VALUE.gold} bronze. You can hold
-          at most <strong>{SILVER_CAP.toLocaleString()} silver</strong> at a time.
+          1 gold = {COIN_VALUE.gold / COIN_VALUE.silver} silver = {COIN_VALUE.gold} bronze — the exchange
+          rate of dreams. And do keep it classy: you can stash at most{" "}
+          <strong>{SILVER_CAP.toLocaleString()} silver</strong> at once, because even pockets have limits
+          (and feelings).
         </p>
       </Section>
 
       <Section title="How to play">
         <p>
-          Each round scatters <strong>{BOARD_SIZE} tiles</strong>: {BOARD_COMPOSITION.gold} gold,{" "}
+          Each round flings out <strong>{BOARD_SIZE} tiles</strong>: {BOARD_COMPOSITION.gold} gold,{" "}
           {BOARD_COMPOSITION.silver} silver, {BOARD_COMPOSITION.bronze} bronze and{" "}
-          {BOARD_COMPOSITION.empty} empty (a blank shows <strong>&ldquo;No&rdquo;</strong> — no win).
-          Pick one tile; its prize is credited instantly.
+          {BOARD_COMPOSITION.empty} cheeky blanks that flash <strong>&ldquo;No&rdquo;</strong> and
+          precisely nothing else. Pick one, crack it open, and the prize lands in your wallet faster
+          than your hopes can rise.
         </p>
         <p>
           A round costs <strong>{ROUND_COST_SILVER} silver</strong> or{" "}
-          <strong>{ROUND_COST_BRONZE} bronze</strong> (your choice — equal value).
+          <strong>{ROUND_COST_BRONZE} bronze</strong> — your call, same price, no loyalty points for
+          agonising over it.
         </p>
         <p>
-          After a round you can <strong>Restart</strong> (up to {MAX_RESTARTS} times) in two modes:
+          Survived a round? <strong>Restart</strong> it (up to {MAX_RESTARTS} times) in one of two
+          flavours:
         </p>
         <ul className="ml-5 list-disc text-sm">
           <li>
-            <strong>Continuous Play</strong> — the same board every restart.
+            <strong>Continuous Play</strong> — the same trusty board on repeat, like comfort food.
           </li>
           <li>
-            <strong>Multiplier Play</strong> — the board gets richer each round (more gold &amp;
-            silver), up to round {MAX_RESTARTS}. The exact coins per round:
+            <strong>Multiplier Play</strong> — the board gets greedier every round (more gold &amp;
+            silver, fewer naps), all the way to round {MAX_RESTARTS}. The exact loot per round:
           </li>
         </ul>
         <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
@@ -157,39 +166,42 @@ export default function HelpPage() {
 
       <Section title="💎 Gems (Multiplier Play)">
         <p>
-          From the <strong>2nd turn onward</strong>, <strong>gem</strong> tiles appear on the board —
-          each one replacing a silver tile. The count climbs every turn:{" "}
-          <strong>1 gem on turn 2</strong>, 2 on turn 3, 3 on turn 4 … up to{" "}
-          <strong>9 gems on turn 10</strong> (turn 1 has none). See the 💎 column above.
+          In Multiplier Play, turn 1 struts in with a flashy <strong>7 gems</strong> (2 muscling out
+          empty slots, 5 elbowing aside silver). From turn 2 on, the gems breed like rabbits and keep
+          replacing silver: <strong>1 gem on turn 2</strong>, 2 on turn 3, 3 on turn 4 … topping out at{" "}
+          <strong>9 glittering gems on turn 10</strong>. The proof is in the 💎 column above.
         </p>
-        <p>Crack open a gem and you randomly receive <strong>one</strong> of the following:</p>
+        <p>Smash a gem open and the prize gods hand you <strong>one</strong> of these, entirely at random:</p>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-violet-300/30 bg-violet-500/10 p-4">
             <div className="font-bold text-violet-200">Free turns</div>
             <div className="mt-1 text-sm">
-              +{GEM_TURN_OPTIONS.join(", +")} turns. Your next round(s) start{" "}
-              <strong>free</strong> — no silver or bronze entry cost.
+              +{GEM_TURN_OPTIONS.join(", +")} turns. Your next round(s) are{" "}
+              <strong>on the house</strong> — no silver, no bronze, no questions asked.
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
             <div className="font-bold text-slate-200">Silver coins</div>
-            <div className="mt-1 text-sm">+{GEM_SILVER_OPTIONS.join(", +")} silver added to your balance.</div>
+            <div className="mt-1 text-sm">+{GEM_SILVER_OPTIONS.join(", +")} silver, plopped straight into your stash.</div>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 p-4">
             <div className="font-bold text-orange-200">Bronze coins</div>
             <div className="mt-1 text-sm">
-              +{GEM_BRONZE_OPTIONS.map((n) => n.toLocaleString()).join(", +")} bronze added to your balance.
+              +{GEM_BRONZE_OPTIONS.map((n) => n.toLocaleString()).join(", +")} bronze, because more is simply more.
             </div>
           </div>
         </div>
         <p className="text-sm text-slate-400">
-          Example: win a <strong>+2 turns</strong> gem on turn 3 and your next 2 rounds are on the
-          house — you proceed and play them without spending any silver.
+          Example: bag a <strong>+2 turns</strong> gem on turn 3 and your next 2 rounds cost exactly
+          nothing — march onward and play them while your silver stays cozy in your pocket.
         </p>
       </Section>
 
       <Section title="Daily login reward">
-        <p>Claimed automatically once every 24 hours. Miss a day and the streak resets to day 1.</p>
+        <p>
+          Claims itself every 24 hours — turn up and the coins are already waiting, like a suspiciously
+          punctual fairy. Ghost the game for a day, though, and the streak sulks all the way back to day 1.
+        </p>
         <div className="flex flex-wrap gap-2 text-sm">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
             <span key={d} className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1">
@@ -202,8 +214,9 @@ export default function HelpPage() {
       <Section title="Daily prize wheel">
         <p>
           Members get one free <Link href="/draw" className="text-amber-300 underline">spin</Link> every
-          24 hours. The wheel has {WHEEL_VALUES.length} segments; the pointer{" "}
-          <strong>never lands on {WHEEL_BLOCKED.join(" or ")}</strong> (those are teasers).
+          24 hours. The wheel sports {WHEEL_VALUES.length} segments, and the pointer will tease you
+          mercilessly but <strong>never actually land on {WHEEL_BLOCKED.join(" or ")}</strong> — those
+          are pure heartbreak bait.
         </p>
         <div className="flex flex-wrap gap-2 text-sm">
           {wheelRows.map((r) => (
@@ -223,25 +236,27 @@ export default function HelpPage() {
 
       <Section title="Exchange, buy &amp; sell">
         <p>
-          <strong>Exchange</strong> converts coins downward only: gold → silver → bronze (never back
-          up). Silver→bronze bundles earn a bonus: 10 copper → 110 bronze, 100 silver → 1,500
-          bronze (singles stay 1 → 10).
+          <strong>Exchange</strong> only ever flows downhill: gold → silver → bronze, never the scenic
+          route back up (it&apos;s gravity, but for coins). Bundle silver → bronze for a tip: 10 copper →
+          110 bronze, 100 silver → 1,500 bronze (lone coins stay a humble 1 → 10).
         </p>
         <p>
-          <strong>Buy</strong> silver with crypto (verified on-chain). Packs:{" "}
+          <strong>Buy</strong> silver with crypto, every payment double-checked on-chain so nobody pulls
+          a fast one. Packs:{" "}
           {COIN_PACKS.map((p) => `${p.silver}/$${p.usd}`).join(", ")}.
         </p>
         <p>
-          <strong>Sell</strong> gold for <strong>{SELL_PRICE_USDT.toLocaleString()} USDT each</strong> —
-          available {SELL_HOURS_LABEL}, so you can sell immediately.
+          <strong>Sell</strong> gold for <strong>{SELL_PRICE_USDT.toLocaleString()} USDT a pop</strong> —
+          open {SELL_HOURS_LABEL}, so you can cash out on a whim.
         </p>
       </Section>
 
       <Section title="Fair play">
         <p className="text-sm text-slate-400">
-          Coin balances are only ever written by the server. Game boards are generated and stored
-          server-side, so picks can&apos;t be predicted or replayed. Purchases are confirmed on-chain
-          before any coins are credited.
+          Only the server ever touches your coin balance — your browser doesn&apos;t get a vote, and
+          neither do hopeful hackers. Boards are conjured and locked away server-side, so nobody can
+          peek, predict or run it back. Purchases are confirmed on-chain before a single coin appears.
+          The mystery lives in the tile, never in the maths.
         </p>
       </Section>
     </div>

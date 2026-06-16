@@ -363,8 +363,8 @@ export default function GamePage() {
           <h1 className="text-2xl font-extrabold sm:text-3xl">Pick the lucky coin</h1>
           <p className="hidden text-slate-400 sm:block">
             {phase === "playing"
-              ? "Tap one coin to crack it open."
-              : `One round costs ${profile.is_admin ? "nothing for admins" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze hidden among ${BOARD_SIZE}.`}
+              ? "Tap one coin to crack it open — deep breaths, no pressure."
+              : `One round costs ${profile.is_admin ? "nothing (admin perks, obviously)" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze playing hide-and-seek among ${BOARD_SIZE} tiles.`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -393,8 +393,8 @@ export default function GamePage() {
           <h2 className="text-2xl font-bold">Ready for a round?</h2>
           <p className="max-w-sm text-slate-300">
             {profile.is_admin
-              ? `Scatter ${BOARD_SIZE} coins and take your pick.`
-              : `Pay ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze to scatter ${BOARD_SIZE} coins and take your pick.`}
+              ? `Scatter ${BOARD_SIZE} coins and take your pick — the house always smiles on admins.`
+              : `Pay ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze, scatter ${BOARD_SIZE} coins, and trust your gut.`}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
@@ -407,10 +407,10 @@ export default function GamePage() {
             )}
           </div>
           <p className="max-w-md text-xs text-slate-500">
-            <b>Start Over</b> begins a fresh run at ×1.
+            <b>Start Over</b> begins a fresh run at a humble ×1.
             {hasSaved
-              ? " Continue resumes your saved multiplier and keeps increasing it — no time limit."
-              : " Play a round and your multiplier is saved, so you can Continue building it up later."}
+              ? " Continue picks up your saved multiplier and keeps stacking it higher — no clock, no rush."
+              : " Play a round and your multiplier is saved, so you can sneak back and keep building it later."}
           </p>
         </div>
       )}
@@ -600,7 +600,7 @@ export default function GamePage() {
             {choice === null ? (
               <>
                 <h2 className="text-xl font-bold">Choose how to pay</h2>
-                <p className="mt-1 text-sm text-slate-400">Select one option to start a round.</p>
+                <p className="mt-1 text-sm text-slate-400">Pick your poison — both cost the same.</p>
                 <div className="mt-4 grid gap-3">
                   {(["silver", "bronze"] as RoundCurrency[]).map((c) => {
                     const ok = canPay(c);
@@ -646,8 +646,8 @@ export default function GamePage() {
                 <h2 className="text-xl font-bold">Start a round?</h2>
                 <p className="mt-2 text-slate-300">
                   {profile.is_admin
-                    ? "Admins play for free."
-                    : `You'll pay ${ROUND_COST[choice]} ${choice} to scatter ${BOARD_SIZE} coins and take your pick.`}
+                    ? "Admins play for free — rank hath its privileges."
+                    : `You'll part with ${ROUND_COST[choice]} ${choice}, scatter ${BOARD_SIZE} coins, and let fate do the rest.`}
                 </p>
                 <div className="mt-5 flex gap-3">
                   <button onClick={() => startRound(choice, "new")} disabled={busy} className="btn-gold flex-1">
@@ -743,6 +743,12 @@ export default function GamePage() {
                         <CoinIcon type={t} size={20} /> {nextRoundComp[t]}
                       </span>
                     ))}
+                    {(nextRoundComp.gem ?? 0) > 0 && (
+                      <span className="flex items-center gap-1 font-bold text-violet-200">
+                        <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.9)]" />
+                        {nextRoundComp.gem}
+                      </span>
+                    )}
                     {nextRoundComp.empty > 0 && (
                       <span className="text-slate-400">{nextRoundComp.empty} blank</span>
                     )}

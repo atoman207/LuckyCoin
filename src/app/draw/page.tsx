@@ -52,7 +52,7 @@ export default function DrawPage() {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
         <h1 className="text-2xl font-bold">Log in to spin</h1>
-        <p className="mt-2 text-slate-300">The daily prize wheel is free for members, once every 24 hours.</p>
+        <p className="mt-2 text-slate-300">The daily prize wheel is free for members, once every 24 hours — no membership card, no velvet rope.</p>
         <button onClick={openAuth} className="btn-gold mt-6">Log in / Register</button>
       </div>
     );
@@ -101,7 +101,7 @@ export default function DrawPage() {
     <div className="mx-auto max-w-xl space-y-6 text-center">
       <div>
         <h1 className="text-3xl font-extrabold">Daily prize wheel</h1>
-        <p className="text-slate-400">One free spin every 24 hours. Win up to 1000 bronze!</p>
+        <p className="text-slate-400">One free spin every 24 hours. Give it a whirl and win up to 1000 bronze!</p>
       </div>
 
       <PrizeWheel layout={layout} rotation={rotation} spinning={spinning} spinMs={WHEEL_SPIN_MS} />

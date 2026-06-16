@@ -59,7 +59,8 @@ export default function ContactPage() {
       <div>
         <h1 className="text-3xl font-extrabold">Contact us</h1>
         <p className="text-slate-400">
-          Have a question or an issue? Send us a message and we&apos;ll get back to you.
+          Got a question, a bug, or a wild idea? Drop us a message and a real human will get back to
+          you (no robots, mostly).
         </p>
       </div>
 
