@@ -213,7 +213,7 @@ export function dailyReward(streakDay: number): number {
 // Minimum purchase is 10 silver. Base rate is $0.25 / silver.
 export type CoinPack = { silver: number; usd: number; label: string; tag?: string };
 export const COIN_PACKS: CoinPack[] = [
-  { silver: 10, usd: 2, label: "10 Silver", tag: "Save 20%" },
+  { silver: 10, usd: 2, label: "10 Copper", tag: "Save 20%" },
   { silver: 100, usd: 15, label: "100 Silver", tag: "Save 40%" },
   { silver: 1000, usd: 100, label: "1,000 Silver", tag: "Best value" },
 ];

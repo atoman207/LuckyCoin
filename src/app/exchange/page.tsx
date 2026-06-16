@@ -55,7 +55,7 @@ export default function ExchangePage() {
   const presets = [
     { from: "gold" as const, amount: 1, label: "1 gold → 50 silver" },
     { from: "silver" as const, amount: 1, label: "1 silver → 10 bronze" },
-    { from: "silver" as const, amount: 10, label: "10 silver → 110 bronze" },
+    { from: "silver" as const, amount: 10, label: "10 copper → 110 bronze" },
     { from: "silver" as const, amount: 100, label: "100 silver → 1,500 bronze" },
   ];
 

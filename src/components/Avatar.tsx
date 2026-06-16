@@ -1,5 +1,11 @@
-// Round avatar. Shows the uploaded image, or falls back to the first letter
-// of the nickname on a colored disc.
+"use client";
+
+import { useEffect, useState } from "react";
+
+// Round avatar. Shows the image, or falls back to the first letter of the
+// nickname on a colored disc — both when there is no image AND when the image
+// fails to load (e.g. a provider rate-limits), so a broken URL never shows ugly
+// clipped alt text.
 export default function Avatar({
   src,
   name,
@@ -11,18 +17,29 @@ export default function Avatar({
   size?: number;
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
+
+  // Reset the error state if the image source changes.
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
   const initial = name?.trim()?.charAt(0)?.toUpperCase() || "?";
-  if (src) {
-    // Plain <img> (not next/image) so runtime-written files under /public work
-    // without extra config.
+
+  if (src && !failed) {
+    // Plain <img> (not next/image) so external avatar hosts work without config.
+    // alt="" so nothing is shown while loading or on failure (we render the
+    // initial disc on error instead).
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
         src={src}
-        alt={`${name} avatar`}
+        alt=""
         width={size}
         height={size}
-        className={`rounded-full object-cover ring-2 ring-white/15 ${className}`}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className={`rounded-full bg-white/5 object-cover ring-2 ring-white/15 ${className}`}
         style={{ width: size, height: size }}
       />
     );

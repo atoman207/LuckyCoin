@@ -27,11 +27,16 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// Avatar resource library — same config the app's src/lib/avatars.ts imports.
-// DiceBear generates a unique, deterministic avatar per seed (the display name).
+// Avatar resource library — same pool the app's src/lib/avatars.ts imports.
+// A unique seed (the user's id) is hashed to pick one of many free SVG/RoboHash
+// templates, so avatars are unique, varied, and spread across endpoints.
 const HERE = dirname(fileURLToPath(import.meta.url));
-const AVATAR_CFG = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8"));
-const avatarUrl = (seed) => `${AVATAR_CFG.baseUrl}?seed=${encodeURIComponent(seed || "anon")}`;
+const AVATAR_TEMPLATES = JSON.parse(readFileSync(join(HERE, "../src/lib/avatars.json"), "utf8")).templates;
+const avatarUrl = (seed) => {
+  const s = String(seed || "anon");
+  const tpl = AVATAR_TEMPLATES[Math.floor(Math.random() * AVATAR_TEMPLATES.length)];
+  return tpl.replace("{seed}", encodeURIComponent(s));
+};
 
 // --- env --------------------------------------------------------------------
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

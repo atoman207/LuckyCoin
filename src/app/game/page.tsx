@@ -347,7 +347,7 @@ export default function GamePage() {
     <div
       className={`${
         playing
-          ? "flex h-[calc(100dvh-var(--header-h)-4rem)] flex-col gap-3 overflow-hidden"
+          ? "flex h-[calc(100dvh-var(--header-h)-1.5rem)] flex-col gap-2 overflow-hidden sm:h-[calc(100dvh-var(--header-h)-4rem)] sm:gap-3"
           : "space-y-6"
       } ${shake ? "screen-shake" : ""}`}
     >
@@ -472,6 +472,7 @@ export default function GamePage() {
                 const type = revealed ? board![i] : null;
                 const isPick = picked === i;
                 const border = type && type !== "empty" ? COIN_BORDER[type] : null;
+                const tileVariant = `coin-board-tile-v${(i % 6) + 1}`;
                 return (
                   <button
                     key={i}
@@ -483,6 +484,7 @@ export default function GamePage() {
                     }}
                     className={[
                       "coin-board-tile tile-deal relative grid place-items-center border transition duration-300",
+                      tileVariant,
                       revealed
                         ? isPick && border
                           ? border.tilePick

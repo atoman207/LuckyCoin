@@ -37,6 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib import error, request
+from urllib.parse import quote
 
 # Make stdout UTF-8 tolerant so the Windows console never crashes on output.
 try:
@@ -85,7 +86,6 @@ load_env()
 
 SUPABASE_URL = (os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or "").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
-AVATAR_BASE = os.environ.get("AVATAR_BASE_URL") or "https://api.dicebear.com/9.x/adventurer/png"
 
 if not SUPABASE_URL or not SERVICE_KEY:
     print(
@@ -95,9 +95,42 @@ if not SUPABASE_URL or not SERVICE_KEY:
     )
     sys.exit(1)
 
+# Avatar pool: free, no-key, deterministic image URLs across many styles and two
+# providers (DiceBear SVG + RoboHash). A user's unique id is hashed to pick one
+# template, then used as the seed -> avatars are unique, varied, and spread
+# across endpoints so a leaderboard loading ~50 at once doesn't trip one
+# provider's rate limit (DiceBear PNG 429s hard under burst -- use SVG).
+# Embedded here so this folder stays fully self-contained on any device.
+AVATAR_TEMPLATES = [
+    "https://api.dicebear.com/9.x/adventurer/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/adventurer-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/big-ears/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/big-smile/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/bottts/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/croodles/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/fun-emoji/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/lorelei/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/micah/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/miniavs/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/notionists/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/notionists-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/open-peeps/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/personas/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/pixel-art/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/thumbs/svg?seed={seed}",
+    "https://robohash.org/{seed}.png?set=set1",
+    "https://robohash.org/{seed}.png?set=set3",
+    "https://robohash.org/{seed}.png?set=set4",
+]
+
 
 def avatar_url(seed):
-    return f"{AVATAR_BASE}?seed={request.quote(seed or 'anon', safe='')}"
+    # Randomly pick a style/provider from the pool; seed by the unique id so the
+    # image itself stays unique to the user.
+    s = seed or "anon"
+    return random.choice(AVATAR_TEMPLATES).replace("{seed}", quote(s, safe=""))
 
 
 # --------------------------------------------------------------------------

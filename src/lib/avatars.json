@@ -1,8 +1,26 @@
 {
-  "provider": "DiceBear",
-  "version": "9.x",
-  "style": "adventurer",
-  "format": "png",
-  "baseUrl": "https://api.dicebear.com/9.x/adventurer/png",
-  "note": "Avatars are generated per-user by DiceBear from a stable seed (the user's display name): `${baseUrl}?seed=<seed>`. Unlimited unique images, free, no API key, no storage. Verified 200 image/png on 2026-06-16."
+  "note": "Pool of FREE, no-key, deterministic avatar image URLs spread across many styles and two providers (DiceBear SVG + RoboHash). Each user is assigned ONE template by hashing their unique id, then their id is the seed -> avatars are stable, unique, varied, AND spread across endpoints so no single provider gets hit 50x at once. IMPORTANT: use SVG, not PNG -- DiceBear's PNG endpoint rate-limits hard under burst (a leaderboard loading ~50 PNGs at once gets ~2/3 throttled with HTTP 429). {seed} is replaced with the URL-encoded id. Verified 200 on 2026-06-16.",
+  "templates": [
+    "https://api.dicebear.com/9.x/adventurer/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/adventurer-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/big-ears/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/big-smile/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/bottts/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/croodles/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/fun-emoji/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/lorelei/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/micah/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/miniavs/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/notionists/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/notionists-neutral/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/open-peeps/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/personas/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/pixel-art/svg?seed={seed}",
+    "https://api.dicebear.com/9.x/thumbs/svg?seed={seed}",
+    "https://robohash.org/{seed}.png?set=set1",
+    "https://robohash.org/{seed}.png?set=set3",
+    "https://robohash.org/{seed}.png?set=set4"
+  ]
 }
