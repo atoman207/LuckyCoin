@@ -211,26 +211,42 @@ def read_config():
         raise RuntimeError(f"{e}\n   -> Run supabase/schema.sql first (creates app_config + bot_plan).")
     cfg = {r["key"]: r["value"] for r in rows}
     enabled = (cfg.get("bot_enabled", "true") != "false")
+    mode = "manual" if cfg.get("bot_mode") == "manual" else "auto"
+    try:
+        count = int(cfg.get("bot_daily_count", "0"))
+    except ValueError:
+        count = 0
+    if count < 0:
+        count = 0
     try:
         mn = int(cfg.get("bot_daily_min", "100"))
     except ValueError:
         mn = 100
     try:
-        mx = int(cfg.get("bot_daily_max", "500"))
+        mx = int(cfg.get("bot_daily_max", "1000"))
     except ValueError:
-        mx = 500
+        mx = 1000
     if mn < 0:
         mn = 100
     if mx < mn:
-        mx = max(mn, 500)
-    return enabled, mn, mx
+        mx = max(mn, 1000)
+    return {"enabled": enabled, "mode": mode, "count": count, "min": mn, "max": mx}
 
 
-def get_plan(day, mn, mx):
+MIN_DAILY = 50  # floor: always generate at least this many users per day
+
+
+def pick_target(cfg):
+    # The admin's fixed number in manual mode, else random in [min, max].
+    base = cfg["count"] if (cfg["mode"] == "manual" and cfg["count"] > 0) else random.randint(cfg["min"], cfg["max"])
+    return max(MIN_DAILY, base)
+
+
+def get_plan(day, cfg):
     existing = rest_get("bot_plan", f"day=eq.{day}&select=*")
     if existing:
         return existing[0]
-    target = random.randint(mn, mx)
+    target = pick_target(cfg)
     status, data = _req("POST", "/rest/v1/bot_plan",
                         body={"day": day, "target": target, "added": 0},
                         headers={"Prefer": "return=representation"})
@@ -279,7 +295,6 @@ def to_add_this_run(target, added, now):
 def create_bot(name, now):
     nationality = random.choice(COUNTRIES)
     discord_id = discord_handle(name)
-    av = avatar_url(name)
     gold = random.randint(0, GOLD_MAX)
     silver = random.randint(0, SILVER_MAX)
     bronze = random.randint(0, BRONZE_MAX)
@@ -295,6 +310,8 @@ def create_bot(name, now):
             if attempt == 2:
                 raise RuntimeError(f"create auth user: {data}")
             continue
+        # Seed the avatar with the user's own UUID -> guaranteed-unique image URL.
+        av = avatar_url(uid)
         p_status, p_data = _req("POST", "/rest/v1/profiles",
                                body={"id": uid, "nickname": name, "email": email,
                                      "nationality": nationality, "discord_id": discord_id,
@@ -326,12 +343,12 @@ def main():
     now = datetime.now(timezone.utc)
     day = now.strftime("%Y-%m-%d")
 
-    enabled, mn, mx = read_config()
-    if not enabled:
+    cfg = read_config()
+    if not cfg["enabled"]:
         print("Bot drip is disabled (app_config.bot_enabled = false). Nothing to do.")
         return
 
-    plan = get_plan(day, mn, mx)
+    plan = get_plan(day, cfg)
     if not plan:
         raise RuntimeError("Could not read or create today's bot_plan row.")
 

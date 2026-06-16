@@ -177,9 +177,14 @@ create index if not exists contacts_created_idx on public.contacts (created_at d
 -- ---------- app_config --------------------------------------------------
 -- Simple key/value store for server-side settings the admin can tune at
 -- runtime (no redeploy). Currently drives the daily bot-subscriber drip:
---   bot_enabled    'true' | 'false'  — master on/off switch
---   bot_daily_min  lower bound of the random daily target (default 100)
---   bot_daily_max  upper bound of the random daily target (default 500)
+--   bot_enabled     'true' | 'false'  — master on/off switch
+--   bot_mode        'auto' | 'manual' — how the day's target is chosen
+--   bot_daily_count admin's exact users-per-day (used when mode = 'manual')
+--   bot_daily_min   lower bound of the random daily target (default 100)
+--   bot_daily_max   upper bound of the random daily target (default 1000)
+-- The day's target = (mode='manual' and count>0) ? count : random(min,max).
+-- So if the admin doesn't set a manual count, the bot auto-adds a random
+-- number of users between 100 and 1000, dripped across 24h.
 -- Written/read only via the service role (see RLS below).
 create table if not exists public.app_config (
   key        text primary key,
@@ -188,10 +193,15 @@ create table if not exists public.app_config (
 );
 -- Seed the bot defaults once (do nothing if an admin already changed them).
 insert into public.app_config (key, value) values
-  ('bot_enabled',   'true'),
-  ('bot_daily_min', '100'),
-  ('bot_daily_max', '500')
+  ('bot_enabled',    'true'),
+  ('bot_mode',       'auto'),
+  ('bot_daily_count','0'),
+  ('bot_daily_min',  '100'),
+  ('bot_daily_max',  '1000')
 on conflict (key) do nothing;
+-- Bump the old default range (100–500) up to the new 100–1000, but only if an
+-- admin hasn't customised it (i.e. it's still the previous default of 500).
+update public.app_config set value = '1000' where key = 'bot_daily_max' and value = '500';
 
 -- ---------- bot_plan ----------------------------------------------------
 -- One row per UTC day. The daily target is chosen ONCE (random in

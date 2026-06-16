@@ -4,12 +4,13 @@ import { requireAdmin } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const KEYS = ["bot_enabled", "bot_daily_min", "bot_daily_max"] as const;
-const DEFAULTS: Record<(typeof KEYS)[number], string> = {
+const DEFAULTS = {
   bot_enabled: "true",
+  bot_mode: "auto", // 'auto' = random in [min,max]; 'manual' = exactly bot_daily_count
+  bot_daily_count: "0",
   bot_daily_min: "100",
-  bot_daily_max: "500",
-};
+  bot_daily_max: "1000",
+} as const;
 
 const todayKey = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 
@@ -24,6 +25,8 @@ export async function GET() {
   const cfg = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
   const config = {
     enabled: (cfg.bot_enabled ?? DEFAULTS.bot_enabled) !== "false",
+    mode: cfg.bot_mode === "manual" ? "manual" : "auto",
+    count: parseInt(cfg.bot_daily_count ?? DEFAULTS.bot_daily_count, 10) || 0,
     min: parseInt(cfg.bot_daily_min ?? DEFAULTS.bot_daily_min, 10),
     max: parseInt(cfg.bot_daily_max ?? DEFAULTS.bot_daily_max, 10),
   };
@@ -59,22 +62,49 @@ export async function PATCH(req: Request) {
 
   const b = await req.json().catch(() => ({}));
 
+  const mode = b.mode === "manual" ? "manual" : "auto";
+  let count = Math.floor(Number(b.count));
+  if (!Number.isFinite(count) || count < 0) count = 0;
+
   let min = Math.floor(Number(b.min));
   let max = Math.floor(Number(b.max));
   if (!Number.isFinite(min) || min < 0) min = 0;
   if (!Number.isFinite(max) || max < min) {
     return NextResponse.json({ error: "Max must be a number ≥ min." }, { status: 400 });
   }
+  if (mode === "manual" && count <= 0) {
+    return NextResponse.json({ error: "Enter how many users to add per day (1 or more)." }, { status: 400 });
+  }
 
+  const now = new Date().toISOString();
   const rows = [
     { key: "bot_enabled", value: b.enabled ? "true" : "false" },
+    { key: "bot_mode", value: mode },
+    { key: "bot_daily_count", value: String(count) },
     { key: "bot_daily_min", value: String(min) },
     { key: "bot_daily_max", value: String(max) },
-    // updated_at refreshes via the column default on conflict.
-  ].map((r) => ({ ...r, updated_at: new Date().toISOString() }));
+  ].map((r) => ({ ...r, updated_at: now }));
 
   const { error } = await ctx.admin.from("app_config").upsert(rows, { onConflict: "key" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // In manual mode, apply the new count to TODAY immediately so the admin's
+  // choice takes effect on this day's drip (not just future days). Auto-mode
+  // changes only affect future days — today's random target was already rolled.
+  if (mode === "manual") {
+    const day = todayKey();
+    const { data: plan } = await ctx.admin
+      .from("bot_plan")
+      .select("added")
+      .eq("day", day)
+      .maybeSingle();
+    await ctx.admin
+      .from("bot_plan")
+      .upsert(
+        { day, target: count, added: plan?.added ?? 0, updated_at: now },
+        { onConflict: "day" }
+      );
+  }
 
   return NextResponse.json({ ok: true });
 }

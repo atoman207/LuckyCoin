@@ -576,7 +576,7 @@ export default function AdminPage() {
 }
 
 // -------- Bots: daily drip settings + today's progress ------------------
-type BotConfig = { enabled: boolean; min: number; max: number };
+type BotConfig = { enabled: boolean; mode: "auto" | "manual"; count: number; min: number; max: number };
 type BotToday = { day: string; target: number; added: number; updated_at: string } | null;
 
 function BotsPanel({ onError }: { onError: (m: string) => void }) {
@@ -601,7 +601,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
 
   async function save() {
     if (!config) return;
-    if (config.max < config.min) return onError("Max must be ≥ min.");
+    if (config.mode === "auto" && config.max < config.min) return onError("Max must be ≥ min.");
+    if (config.mode === "manual" && config.count < 1) return onError("Enter how many users to add per day (1 or more).");
     setSaving(true);
     try {
       const res = await fetch("/api/admin/bot-config", {
@@ -629,11 +630,11 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
       {/* Settings */}
       <div className="card space-y-5 p-6">
         <div>
-          <h2 className="text-lg font-bold">Daily bot drip</h2>
+          <h2 className="text-lg font-bold">Daily new users</h2>
           <p className="mt-1 text-sm text-slate-400">
-            New players are added throughout each day (hourly, via the GitHub Action). The day&apos;s
-            count is a random number in the range below; coins are random (gold ≤ 10, silver &amp;
-            bronze &lt; 1,000,000).
+            New players are added in batches throughout each day. Choose a fixed number yourself
+            (Manual), or let the bot add a random number for you (Automatic). Coins are random
+            (gold ≤ 10, silver &amp; bronze &lt; 1,000,000).
           </p>
         </div>
 
@@ -647,28 +648,65 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Min users / day</label>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={config.min}
-              onChange={(e) => setConfig({ ...config, min: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-            />
-          </div>
-          <div>
-            <label className="label">Max users / day</label>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={config.max}
-              onChange={(e) => setConfig({ ...config, max: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-            />
-          </div>
+        {/* Mode: Automatic (random) vs Manual (admin sets the number) */}
+        <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+          {(["auto", "manual"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setConfig({ ...config, mode: m })}
+              className={`flex-1 rounded-lg px-3 py-2 font-semibold capitalize transition ${
+                config.mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+              }`}
+            >
+              {m === "auto" ? "Automatic" : "Manual"}
+            </button>
+          ))}
         </div>
+
+        {config.mode === "manual" ? (
+          <div>
+            <label className="label">Users to add per day</label>
+            <input
+              className="input"
+              type="number"
+              min={50}
+              value={config.count}
+              onChange={(e) => setConfig({ ...config, count: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Exactly this many new users are added each day (dripped in batches over 24h).
+              Minimum 50/day is always enforced.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Min users / day</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={config.min}
+                  onChange={(e) => setConfig({ ...config, min: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                />
+              </div>
+              <div>
+                <label className="label">Max users / day</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={config.max}
+                  onChange={(e) => setConfig({ ...config, max: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              The bot picks a random number in this range each day (default 100–1000, never below 50).
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           <button onClick={save} className="btn-gold" disabled={saving}>
@@ -677,8 +715,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           {savedAt && <span className="text-xs text-emerald-300">Saved {savedAt.toLocaleTimeString()}</span>}
         </div>
         <p className="text-xs text-slate-500">
-          Note: changing the range affects future days. Today&apos;s target was already rolled and is
-          shown on the right.
+          Manual changes apply to <strong>today</strong> right away. Automatic-range changes affect
+          future days — today&apos;s random target was already rolled (shown on the right).
         </p>
       </div>
 

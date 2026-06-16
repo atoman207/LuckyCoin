@@ -150,16 +150,28 @@ async function readConfig() {
   }
   const cfg = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
   const enabled = (cfg.bot_enabled ?? "true") !== "false";
+  const mode = cfg.bot_mode === "manual" ? "manual" : "auto";
+  let count = parseInt(cfg.bot_daily_count ?? "0", 10);
+  if (!Number.isFinite(count) || count < 0) count = 0;
   let min = parseInt(cfg.bot_daily_min ?? "100", 10);
-  let max = parseInt(cfg.bot_daily_max ?? "500", 10);
+  let max = parseInt(cfg.bot_daily_max ?? "1000", 10);
   if (!Number.isFinite(min) || min < 0) min = 100;
-  if (!Number.isFinite(max) || max < min) max = Math.max(min, 500);
-  return { enabled, min, max };
+  if (!Number.isFinite(max) || max < min) max = Math.max(min, 1000);
+  return { enabled, mode, count, min, max };
+}
+
+// The day's target: the admin's fixed number in manual mode, otherwise a random
+// number in [min, max] (default 100–1000). Floored so we always generate at
+// least MIN_DAILY users per day.
+const MIN_DAILY = 50;
+function pickTarget({ mode, count, min, max }) {
+  const base = mode === "manual" && count > 0 ? count : randInt(min, max);
+  return Math.max(MIN_DAILY, base);
 }
 
 // Get (or create, once) today's plan row. Handles two runners racing to
 // create the same day by re-selecting on a conflict.
-async function getPlan(dayKey, min, max) {
+async function getPlan(dayKey, cfg) {
   const { data: existing } = await admin
     .from("bot_plan")
     .select("*")
@@ -167,7 +179,7 @@ async function getPlan(dayKey, min, max) {
     .maybeSingle();
   if (existing) return existing;
 
-  const target = randInt(min, max);
+  const target = pickTarget(cfg);
   const { data: inserted, error } = await admin
     .from("bot_plan")
     .insert({ day: dayKey, target, added: 0 })
@@ -221,7 +233,6 @@ function toAddThisRun(target, added, now) {
 async function createBot(name, now) {
   const nationality = pick(COUNTRIES);
   const discord_id = discordHandle(name);
-  const avatar_url = avatarUrl(name);
   const gold = randInt(0, GOLD_MAX);
   const silver = randInt(0, SILVER_MAX);
   const bronze = randInt(0, BRONZE_MAX);
@@ -247,7 +258,8 @@ async function createBot(name, now) {
       email,
       nationality,
       discord_id,
-      avatar_url,
+      // Seed the avatar with the user's own UUID → guaranteed-unique image URL.
+      avatar_url: avatarUrl(data.user.id),
       gold,
       silver,
       bronze,
@@ -288,13 +300,13 @@ async function main() {
   const now = Date.now();
   const dayKey = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 
-  const { enabled, min, max } = await readConfig();
-  if (!enabled) {
+  const cfg = await readConfig();
+  if (!cfg.enabled) {
     console.log("🔕 Bot drip is disabled (app_config.bot_enabled = false). Nothing to do.");
     return;
   }
 
-  const plan = await getPlan(dayKey, min, max);
+  const plan = await getPlan(dayKey, cfg);
   if (!plan) throw new Error("Could not read or create today's bot_plan row.");
 
   const want = toAddThisRun(plan.target, plan.added, now);
