@@ -20,8 +20,19 @@ inside this folder, and it uses only the Python standard library (nothing to
 
 ## Run it on this machine
 
-Double-click **`run-bot.bat`**. Each run adds that run's slice of today's
-target. Run it again later (hourly is ideal) to keep the drip going.
+Double-click **`run-bot.bat`** **once**. The bot then runs **continuously** in
+that window — it rolls a fresh daily target at **09:00** and trickles new users
+in across the 24-hour window, topping up every ~10 minutes on its own. Leave the
+window open; press **Ctrl+C** to stop. (Override the cadence with the
+`RUN_INTERVAL_SECONDS` env var; pass `--once` for a single slice under an
+external scheduler.)
+
+### How many users per day?
+
+* If the admin sets a **specific number** that day (dashboard → Bots tab), the
+  bot creates exactly that many.
+* If **no number is entered**, or the number is **unchanged** from a previous
+  day, the bot generates a random **100–200** users that day.
 
 ## Run it on a DIFFERENT device
 
@@ -48,11 +59,11 @@ The daily count and on/off switch are **not** here — they live in the
 `app_config` table and are editable from the app's admin dashboard → Bots tab
 (`bot_enabled`, `bot_daily_min`, `bot_daily_max`).
 
-## Automate it (optional)
+## Keep it running across reboots (optional)
 
-Point **Windows Task Scheduler** at `run-bot.bat` on an hourly trigger to drip
-users automatically without clicking. (This is the local equivalent of the
-GitHub Actions schedule.)
+The bot already runs continuously once started, so you don't need a scheduler.
+To survive a reboot, drop a shortcut to `run-bot.bat` into the Startup folder
+(`Win+R` → `shell:startup`) so Windows relaunches it automatically at login.
 
 ## Security
 

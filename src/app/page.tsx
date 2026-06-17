@@ -8,17 +8,20 @@ import CoinIcon from "@/components/CoinIcon";
 import SubscriberChart from "@/components/SubscriberChart";
 
 export default function Landing() {
-  const { openWelcome } = useUser();
+  const { openWelcome, openAuth } = useUser();
   const router = useRouter();
 
-  // After the email magic-link login lands here, show the welcome message.
+  // After login lands back here: show the welcome message on success, or
+  // re-open the auth modal (which reads the reason from the URL) on failure.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("welcome") === "1") {
       openWelcome();
       window.history.replaceState({}, "", "/");
+    } else if (params.get("login_error")) {
+      openAuth();
     }
-  }, [openWelcome]);
+  }, [openWelcome, openAuth]);
 
   function startGame() {
     // Logged-out visitors get the free demo on /game (3 rounds, then login).

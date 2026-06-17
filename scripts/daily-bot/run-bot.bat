@@ -18,12 +18,14 @@ if errorlevel 1 goto :nopython
 
 if not exist "%~dp0.env" goto :noenv
 
-echo Running the Lucky Coin daily-bot drip...
+echo Starting the Lucky Coin bot...
+echo It runs continuously - leave this window open. Press Ctrl+C to stop.
+echo (You only need to start it ONCE; it keeps adding users automatically.)
 echo.
 %PYEXE% "%~dp0daily_bots.py"
 echo.
 echo ------------------------------------------------------------
-echo Done. Press any key to close this window.
+echo Bot stopped. Press any key to close this window.
 pause >nul
 exit /b 0
 

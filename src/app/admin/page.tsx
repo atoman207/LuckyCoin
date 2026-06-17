@@ -649,7 +649,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
         <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
           <div className="font-semibold text-emerald-300">Bot status: Always running</div>
           <div className="mt-1 text-xs text-slate-500">
-            The hourly worker stays active continuously and follows the target settings below.
+            Started once, the worker keeps running on its own — it rolls a new target at 9:00 AM each
+            day and adds users across the 24h window, following the settings below.
           </div>
         </div>
 
@@ -722,7 +723,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
               </div>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              The bot picks a random number in this range each day (default 100–1000, never below 50).
+              The bot picks a random number in this range each day (default 100–200, never below 50).
+              Used whenever you haven&apos;t set a specific number for the day.
             </p>
           </div>
         )}
@@ -761,7 +763,7 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           </>
         ) : (
           <p className="text-sm text-slate-400">
-            No run yet today. The first hourly run will roll today&apos;s target and begin adding players.
+            No run yet today. The bot will roll today&apos;s target on its next cycle and begin adding players.
           </p>
         )}
 

@@ -10,7 +10,7 @@ const DEFAULTS = {
   bot_specific_count: "0", // if > 0, overrides mode/range and becomes the exact daily target
   bot_daily_count: "0",
   bot_daily_min: "100",
-  bot_daily_max: "1000",
+  bot_daily_max: "200",
 } as const;
 
 const todayKey = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)

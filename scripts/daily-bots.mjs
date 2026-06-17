@@ -151,44 +151,63 @@ function discordHandle(name) {
 }
 
 // --- config + plan ----------------------------------------------------------
+// Default random daily range when the admin hasn't set (or hasn't changed) a
+// fixed number: between DEFAULT_MIN and DEFAULT_MAX users per day.
+const DEFAULT_MIN = 100;
+const DEFAULT_MAX = 200;
+
 async function readConfig() {
-  const { data, error } = await admin.from("app_config").select("key, value");
+  const { data, error } = await admin.from("app_config").select("key, value, updated_at");
   if (error) {
     throw new Error(
       `${error.message}\n   → Run supabase/schema.sql first (it creates the app_config + bot_plan tables).`
     );
   }
   const cfg = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+  const updated = Object.fromEntries(
+    (data ?? []).map((r) => [r.key, r.updated_at ? Date.parse(r.updated_at) : NaN])
+  );
   const enabled = true; // Bot worker is always active.
   const mode = cfg.bot_mode === "manual" ? "manual" : "auto";
   let specificCount = parseInt(cfg.bot_specific_count ?? "0", 10);
   if (!Number.isFinite(specificCount) || specificCount < 0) specificCount = 0;
   let count = parseInt(cfg.bot_daily_count ?? "0", 10);
   if (!Number.isFinite(count) || count < 0) count = 0;
-  let min = parseInt(cfg.bot_daily_min ?? "100", 10);
-  let max = parseInt(cfg.bot_daily_max ?? "1000", 10);
-  if (!Number.isFinite(min) || min < 0) min = 100;
-  if (!Number.isFinite(max) || max < min) max = Math.max(min, 1000);
-  return { enabled, mode, specificCount, count, min, max };
+  let min = parseInt(cfg.bot_daily_min ?? String(DEFAULT_MIN), 10);
+  let max = parseInt(cfg.bot_daily_max ?? String(DEFAULT_MAX), 10);
+  if (!Number.isFinite(min) || min < 0) min = DEFAULT_MIN;
+  if (!Number.isFinite(max) || max < min) max = Math.max(min, DEFAULT_MAX);
+  return {
+    enabled, mode, specificCount, count, min, max,
+    specificUpdated: updated.bot_specific_count,
+    countUpdated: updated.bot_daily_count,
+  };
 }
 
-// The day's target: the admin's fixed number in manual mode, otherwise a random
-// number in [min, max] (default 100–1000). Floored so we always generate at
-// least MIN_DAILY users per day.
+// The day's target. Honour the admin's fixed number ONLY if they set or changed
+// it during the current 09:00 business day; otherwise (no number, or unchanged
+// from a previous day) use a random count in [min, max] (default 100–200).
+// Floored so we always generate at least MIN_DAILY users per day.
 const MIN_DAILY = 50;
-function pickTarget({ mode, count, min, max }) {
-  const base = mode === "manual" && count > 0 ? count : randInt(min, max);
-  return Math.max(MIN_DAILY, base);
-}
-
-function pickDailyTarget({ specificCount, mode, count, min, max }) {
-  if (specificCount > 0) return specificCount;
-  return pickTarget({ mode, count, min, max });
+function pickDailyTarget(cfg, dayStart) {
+  let adminNum = 0;
+  let adminUpdated = NaN;
+  if (cfg.specificCount > 0) {
+    adminNum = cfg.specificCount;
+    adminUpdated = cfg.specificUpdated;
+  } else if (cfg.mode === "manual" && cfg.count > 0) {
+    adminNum = cfg.count;
+    adminUpdated = cfg.countUpdated;
+  }
+  if (adminNum > 0 && Number.isFinite(adminUpdated) && adminUpdated >= dayStart) {
+    return Math.max(MIN_DAILY, adminNum);
+  }
+  return Math.max(MIN_DAILY, randInt(cfg.min, cfg.max));
 }
 
 // Get (or create, once) today's plan row. Handles two runners racing to
 // create the same day by re-selecting on a conflict.
-async function getPlan(dayKey, cfg) {
+async function getPlan(dayKey, cfg, dayStart) {
   const { data: existing } = await admin
     .from("bot_plan")
     .select("*")
@@ -196,7 +215,7 @@ async function getPlan(dayKey, cfg) {
     .maybeSingle();
   if (existing) return existing;
 
-  const target = pickDailyTarget(cfg);
+  const target = pickDailyTarget(cfg, dayStart);
   const { data: inserted, error } = await admin
     .from("bot_plan")
     .insert({ day: dayKey, target, added: 0 })
@@ -329,7 +348,7 @@ async function main() {
 
   const cfg = await readConfig();
 
-  const plan = await getPlan(dayKey, cfg);
+  const plan = await getPlan(dayKey, cfg, dayStart);
   if (!plan) throw new Error("Could not read or create today's bot_plan row.");
 
   const want = toAddThisRun(plan.target, plan.added, now, dayStart);

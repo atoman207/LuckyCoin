@@ -185,10 +185,10 @@ create index if not exists contacts_created_idx on public.contacts (created_at d
 --   bot_specific_count exact users/day when > 0 (overrides mode/range)
 --   bot_daily_count admin's exact users-per-day (used when mode = 'manual')
 --   bot_daily_min   lower bound of the random daily target (default 100)
---   bot_daily_max   upper bound of the random daily target (default 1000)
--- The day's target = (mode='manual' and count>0) ? count : random(min,max).
--- So if the admin doesn't set a manual count, the bot auto-adds a random
--- number of users between 100 and 1000, dripped across 24h.
+--   bot_daily_max   upper bound of the random daily target (default 200)
+-- The day's target = (admin's number, if set/changed this day) else random(min,max).
+-- So if the admin doesn't set a number (or leaves it unchanged), the bot
+-- auto-adds a random number of users between 100 and 200, dripped across 24h.
 -- Written/read only via the service role (see RLS below).
 create table if not exists public.app_config (
   key        text primary key,
@@ -202,11 +202,11 @@ insert into public.app_config (key, value) values
   ('bot_specific_count','0'),
   ('bot_daily_count','0'),
   ('bot_daily_min',  '100'),
-  ('bot_daily_max',  '1000')
+  ('bot_daily_max',  '200')
 on conflict (key) do nothing;
--- Bump the old default range (100–500) up to the new 100–1000, but only if an
--- admin hasn't customised it (i.e. it's still the previous default of 500).
-update public.app_config set value = '1000' where key = 'bot_daily_max' and value = '500';
+-- Reset the daily max to the new 100–200 default, but only if an admin hasn't
+-- customised it (i.e. it's still one of the old defaults 500 or 1000).
+update public.app_config set value = '200' where key = 'bot_daily_max' and value in ('500', '1000');
 
 -- ---------- bot_plan ----------------------------------------------------
 -- One row per UTC day. The daily target is chosen ONCE (random in

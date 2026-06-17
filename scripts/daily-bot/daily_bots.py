@@ -9,14 +9,17 @@
 # No third-party packages -- standard library only, so there is nothing to
 # `pip install`.
 #
-# Run it repeatedly (hourly, or each click). Every run adds only a SLICE of the
-# day's target so new "users" trickle into the database across 24h:
-#   * The admin sets bot_enabled / bot_daily_min / bot_daily_max in app_config
-#     (editable from the admin dashboard -> Bots tab).
-#   * The first run of each UTC day rolls a random target in [min, max]
-#     (default 100-500) and stores it in bot_plan(day).
-#   * Later runs top `added` up toward `target`, paced by how much of the day
+# Start it ONCE (double-click run-bot.bat). It then runs CONTINUOUSLY, topping
+# the day's count up toward the target every ~10 minutes so new "users" trickle
+# into the database across 24h:
+#   * The admin sets the daily number / range in app_config (editable from the
+#     admin dashboard -> Bots tab).
+#   * At 09:00 (UTC+9) each day a fresh target is rolled and stored in
+#     bot_plan(day): the admin's number if they set/changed it that day, else a
+#     random count in [min, max] (default 100-200).
+#   * Each cycle tops `added` up toward `target`, paced by how much of the day
 #     has elapsed (+ jitter), finishing any remainder in the final hour.
+#   * Pass --once for a single slice (e.g. under an external scheduler/cron).
 #
 # Each generated user gets: a unique Discord-style display name, a DiceBear
 # avatar seeded by that name, random coins (gold 0-10, silver/bronze 0-999,999),
@@ -250,12 +253,33 @@ def discord_handle(name):
 # --------------------------------------------------------------------------
 # Config + plan
 # --------------------------------------------------------------------------
+# Default random daily range when the admin hasn't set (or hasn't changed) a
+# fixed number: between DEFAULT_MIN and DEFAULT_MAX users per day.
+DEFAULT_MIN = 100
+DEFAULT_MAX = 200
+
+
+def _parse_ts(value):
+    """Parse a Supabase timestamptz string into an aware UTC datetime, or None."""
+    if not value:
+        return None
+    try:
+        s = str(value).strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
 def read_config():
     try:
-        rows = rest_get("app_config", "select=key,value")
+        rows = rest_get("app_config", "select=key,value,updated_at")
     except RuntimeError as e:
         raise RuntimeError(f"{e}\n   -> Run supabase/schema.sql first (creates app_config + bot_plan).")
     cfg = {r["key"]: r["value"] for r in rows}
+    updated = {r["key"]: _parse_ts(r.get("updated_at")) for r in rows}
     enabled = True  # bot runner is always active
     mode = "manual" if cfg.get("bot_mode") == "manual" else "auto"
     try:
@@ -271,36 +295,53 @@ def read_config():
     if count < 0:
         count = 0
     try:
-        mn = int(cfg.get("bot_daily_min", "100"))
+        mn = int(cfg.get("bot_daily_min", str(DEFAULT_MIN)))
     except ValueError:
-        mn = 100
+        mn = DEFAULT_MIN
     try:
-        mx = int(cfg.get("bot_daily_max", "1000"))
+        mx = int(cfg.get("bot_daily_max", str(DEFAULT_MAX)))
     except ValueError:
-        mx = 1000
+        mx = DEFAULT_MAX
     if mn < 0:
-        mn = 100
+        mn = DEFAULT_MIN
     if mx < mn:
-        mx = max(mn, 1000)
-    return {"enabled": enabled, "mode": mode, "specific": specific, "count": count, "min": mn, "max": mx}
+        mx = max(mn, DEFAULT_MAX)
+    return {
+        "enabled": enabled, "mode": mode, "specific": specific, "count": count,
+        "min": mn, "max": mx,
+        "specific_updated": updated.get("bot_specific_count"),
+        "count_updated": updated.get("bot_daily_count"),
+    }
 
 
-MIN_DAILY = 50  # floor: always generate at least this many users per day
+MIN_DAILY = 50  # absolute floor: never generate fewer than this in a day
 
 
-def pick_target(cfg):
+def pick_target(cfg, day_start):
+    """Choose today's target. Honour the admin's fixed number ONLY if they set or
+    changed it during the current 09:00 business day; otherwise (no number, or it
+    is unchanged from a previous day) fall back to a random count in [min, max]
+    (default 100-200)."""
+    # The admin's "specified number" is the explicit specific-count, or the
+    # manual-mode per-day count.
+    admin_num, admin_updated = 0, None
     if cfg.get("specific", 0) > 0:
-        return cfg["specific"]
-    # The admin's fixed number in manual mode, else random in [min, max].
-    base = cfg["count"] if (cfg["mode"] == "manual" and cfg["count"] > 0) else random.randint(cfg["min"], cfg["max"])
-    return max(MIN_DAILY, base)
+        admin_num, admin_updated = cfg["specific"], cfg.get("specific_updated")
+    elif cfg["mode"] == "manual" and cfg["count"] > 0:
+        admin_num, admin_updated = cfg["count"], cfg.get("count_updated")
+
+    if admin_num > 0 and admin_updated is not None and admin_updated >= day_start:
+        return max(MIN_DAILY, admin_num)
+
+    # No number entered, or the previous number is unchanged -> random 100-200.
+    return max(MIN_DAILY, random.randint(cfg["min"], cfg["max"]))
 
 
-def get_plan(day, cfg):
+def get_plan(day, cfg, day_start):
     existing = rest_get("bot_plan", f"day=eq.{day}&select=*")
     if existing:
         return existing[0]
-    target = pick_target(cfg)
+    target = pick_target(cfg, day_start)
     status, data = _req("POST", "/rest/v1/bot_plan",
                         body={"day": day, "target": target, "added": 0},
                         headers={"Prefer": "return=representation"})
@@ -393,7 +434,8 @@ def _safe_create(name, now, day_start):
 # --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
-def main():
+def run_once():
+    """One drip slice: top today's count up toward the target, paced across 24h."""
     now = datetime.now(timezone.utc)
     tz_offset = timedelta(hours=9)
     start_hour = 9
@@ -402,11 +444,11 @@ def main():
     if local_now.hour < start_hour:
         anchor -= timedelta(days=1)
     day = anchor.strftime("%Y-%m-%d")
-    day_start = anchor - tz_offset
+    day_start = anchor - tz_offset  # start of the 24h window, as an aware UTC dt
 
     cfg = read_config()
 
-    plan = get_plan(day, cfg)
+    plan = get_plan(day, cfg, day_start)
     if not plan:
         raise RuntimeError("Could not read or create today's bot_plan row.")
 
@@ -435,9 +477,52 @@ def main():
           f"Today: {total}/{plan['target']} ({pct}%).")
 
 
+# How often (seconds) the always-on loop tops up the day's drip. Each cycle only
+# adds the slice that's due, so frequent wake-ups are cheap. Override with the
+# RUN_INTERVAL_SECONDS env var. Default: every 10 minutes.
+try:
+    RUN_INTERVAL_SECONDS = max(60, int(os.environ.get("RUN_INTERVAL_SECONDS", "600")))
+except ValueError:
+    RUN_INTERVAL_SECONDS = 600
+
+
+def main():
+    """Run forever. Start it ONCE (double-click run-bot.bat) and it keeps adding
+    users automatically: a new 24h target is rolled at 09:00 each day and the
+    target is dripped in across the day. Pass --once for a single slice (e.g.
+    when driven by an external scheduler / GitHub Actions cron)."""
+    import time
+
+    once = "--once" in sys.argv
+    if once:
+        run_once()
+        return
+
+    print(f"Lucky Coin bot is now running continuously "
+          f"(top-up every {RUN_INTERVAL_SECONDS // 60} min). Leave this window open; "
+          f"press Ctrl+C to stop.")
+    while True:
+        try:
+            run_once()
+        except KeyboardInterrupt:
+            print("\nStopped.")
+            return
+        except Exception as e:
+            # Never let a transient error (network blip, rate limit) kill the
+            # always-on loop -- log it and try again next cycle.
+            print(f"[warn] cycle failed, will retry: {e}")
+        try:
+            time.sleep(RUN_INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            print("\nStopped.")
+            return
+
+
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        print("\nStopped.")
     except Exception as e:
         print(f"\n[error] daily_bots failed: {e}")
         sys.exit(1)
