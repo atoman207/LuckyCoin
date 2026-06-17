@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureOAuthProfile } from "@/lib/oauth-profile";
 
 export const runtime = "nodejs";
 
@@ -28,44 +29,7 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const admin = createAdminClient();
-
-        // First-time social sign-ins have no profile yet — create one so the
-        // app recognises them as a real, fully logged-in player.
-        const { data: existing } = await admin
-          .from("profiles")
-          .select("id")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (!existing) {
-          const meta = user.user_metadata ?? {};
-          const nickname =
-            (meta.full_name || meta.name || meta.user_name || user.email?.split("@")[0] || "Player").toString();
-          // Keep a stable placeholder if a provider ever withholds the email, so
-          // the NOT NULL profile column is always satisfied.
-          const email = (user.email || `${user.id}@social.luckycoin`).toLowerCase();
-          const avatar_url = (meta.avatar_url || meta.picture || null) as string | null;
-
-          await admin.from("profiles").insert({
-            id: user.id,
-            nickname,
-            email,
-            avatar_url,
-            gold: 0,
-            silver: 0,
-            bronze: 0,
-            streak: 0,
-            rewards_claimed: false,
-            // The provider already verified the email — no magic-link gate needed.
-            first_login_done: true,
-            kind: "real",
-          });
-        } else {
-          // Returning user: flag the first login as done so future logins skip
-          // the email magic-link step.
-          await admin.from("profiles").update({ first_login_done: true }).eq("id", user.id);
-        }
+        await ensureOAuthProfile(createAdminClient(), user);
       }
       return NextResponse.redirect(`${origin}/?welcome=1`);
     }

@@ -84,27 +84,13 @@ export default function AuthModal() {
     if (m !== "register") clearAvatar();
   }
 
-  // Sign in with Google. Supabase redirects to Google and back to
-  // /auth/callback, which creates the profile and logs the user in.
-  async function handleOAuth() {
+  // Sign in with Google via our server route. The browser talks to Google and
+  // luckybronzecoin.com only — not supabase.co — so login works when
+  // supabase.co is blocked on the user's network.
+  function handleOAuth() {
     setError(null);
     setNotice(null);
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: "email profile",
-        },
-      });
-      if (oauthErr) throw new Error(oauthErr.message);
-      // On success the browser is redirected to Google; nothing else runs.
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign in with Google.");
-      setLoading(false);
-    }
+    window.location.href = "/api/auth/google";
   }
 
   async function handleSubmit(e: React.FormEvent) {

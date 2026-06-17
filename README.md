@@ -72,6 +72,38 @@ update public.profiles set is_admin = true where email = 'someone@example.com';
 
 ## Going to production
 
+### Vercel environment variables
+
+Set these in **Vercel → Project → Settings → Environment Variables** (then redeploy):
+
+| Variable | Required |
+|----------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes |
+| `NEXT_PUBLIC_SITE_URL` | Recommended (`https://luckybronzecoin.com`) |
+| `GOOGLE_CLIENT_ID` | Yes (for Google login) |
+| `GOOGLE_CLIENT_SECRET` | Yes (for Google login) |
+| `SMTP_*`, `CONTACT_EMAIL` | If using email login / contact form |
+
+### Google login (production)
+
+1. **Supabase** → Authentication → URL Configuration:
+   - Site URL: `https://luckybronzecoin.com`
+   - Redirect URLs: `https://luckybronzecoin.com/auth/callback`
+
+2. **Google Cloud Console** → APIs & Services → Credentials → your OAuth client:
+   - Authorized JavaScript origins: `https://luckybronzecoin.com`
+   - Authorized redirect URIs (add **both**):
+     - `https://YOUR-PROJECT.supabase.co/auth/v1/callback` (Supabase fallback)
+     - `https://luckybronzecoin.com/api/auth/google/callback` (server-side flow)
+
+3. Copy the same **Client ID** and **Client secret** into Vercel as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+The app uses a **server-side Google OAuth** route (`/api/auth/google`) so the user's browser never opens `supabase.co` during sign-in. This fixes `ERR_TUNNEL_CONNECTION_FAILED` when `supabase.co` is blocked on the network.
+
+### Other production notes
+
 - Replace the simulated checkout in [`src/app/api/purchase/route.ts`](src/app/api/purchase/route.ts)
   with a real crypto provider (Coinbase Commerce / NOWPayments). Credit coins only
   from a verified webhook, not from the client request.
