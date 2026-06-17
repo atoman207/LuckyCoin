@@ -13,12 +13,11 @@ export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      {
-        error:
-          "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Vercel.",
-      },
-      { status: 503 }
+    const origin = getSiteOrigin(request);
+    return NextResponse.redirect(
+      `${origin}/?login_error=${encodeURIComponent(
+        "Google login is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Vercel, then redeploy."
+      )}`
     );
   }
 
