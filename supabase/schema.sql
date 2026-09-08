@@ -47,7 +47,11 @@ create table if not exists public.game_rounds (
 create index if not exists game_rounds_user_idx on public.game_rounds (user_id, created_at desc);
 
 -- ---------- purchases ---------------------------------------------------
--- Log of crypto purchases of silver coins, verified directly on-chain.
+-- Log of silver-coin purchases. Two payment methods share this table:
+--   method = 'crypto-direct'  verified directly on-chain (tx_hash)
+--   method = 'stripe'         card payment via Stripe Checkout
+--                             (stripe_session_id / stripe_payment_intent)
+-- `credited` is the single source of truth for "coins already granted".
 create table if not exists public.purchases (
   id          uuid primary key default gen_random_uuid(),
   user_id        uuid not null references public.profiles (id) on delete cascade,
@@ -118,10 +122,16 @@ alter table public.purchases add column if not exists pay_amount     numeric;
 alter table public.purchases add column if not exists pay_currency   text;
 alter table public.purchases add column if not exists tx_hash        text;
 alter table public.purchases add column if not exists credited       boolean not null default false;
+-- Stripe card checkout: the Checkout Session and the PaymentIntent behind it.
+alter table public.purchases add column if not exists stripe_session_id    text;
+alter table public.purchases add column if not exists stripe_payment_intent text;
 
 -- Indexes (after the columns above are guaranteed to exist).
 -- One payment can only ever credit one order.
 create unique index if not exists purchases_tx_hash_key on public.purchases (tx_hash) where tx_hash is not null;
+-- Likewise for Stripe: one Checkout Session belongs to exactly one order.
+create unique index if not exists purchases_stripe_session_key
+  on public.purchases (stripe_session_id) where stripe_session_id is not null;
 create index if not exists purchases_user_idx on public.purchases (user_id, created_at desc);
 
 -- ---------- sells -------------------------------------------------------

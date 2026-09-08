@@ -6,9 +6,13 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import SubscriberChart from "@/components/SubscriberChart";
+import RichText from "@/components/RichText";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 export default function Landing() {
   const { openWelcome, openAuth } = useUser();
+  const { t } = useI18n();
   const router = useRouter();
 
   // After login lands back here: show the welcome message on success, or
@@ -27,6 +31,18 @@ export default function Landing() {
     // Logged-out visitors get the free demo on /game (3 rounds, then login).
     router.push("/game");
   }
+
+  const steps: { t: MessageKey; d: MessageKey }[] = [
+    { t: "home.how1Title", d: "home.how1Body" },
+    { t: "home.how2Title", d: "home.how2Body" },
+    { t: "home.how3Title", d: "home.how3Body" },
+  ];
+
+  const values: { type: "gold" | "silver" | "bronze"; title: MessageKey; v: MessageKey; d: MessageKey }[] = [
+    { type: "gold", title: "coin.gold", v: "home.goldValue", d: "home.goldDesc" },
+    { type: "silver", title: "coin.silver", v: "home.silverValue", d: "home.silverDesc" },
+    { type: "bronze", title: "coin.bronze", v: "home.bronzeValue", d: "home.bronzeDesc" },
+  ];
 
   return (
     <>
@@ -69,51 +85,50 @@ export default function Landing() {
         {/* Daily Draw (top-left) and Help (top-right) icons, ~5vw inside the hero. */}
         <Link
           href="/draw"
-          aria-label="Daily Draw"
-          title="Daily Draw"
+          aria-label={t("home.dailyDraw")}
+          title={t("home.dailyDraw")}
           className="anim-bob absolute left-[5vw] top-[5vw] z-20"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/wheel.webp" alt="Daily Draw" className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
+          <img src="/wheel.webp" alt={t("home.dailyDraw")} className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
         </Link>
         <Link
           href="/help"
-          aria-label="Help"
-          title="Help & rules"
+          aria-label={t("home.help")}
+          title={t("home.helpTitle")}
           className="anim-bob absolute right-[5vw] top-[5vw] z-20"
           style={{ animationDelay: "0.5s" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/help.webp" alt="Help" className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
+          <img src="/help.webp" alt={t("home.help")} className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
         </Link>
 
         {/* Hero fills the viewport minus the header, so header + hero = 100vh. */}
         <div className="relative flex min-h-[calc(100dvh-var(--header-h))] flex-col items-center justify-center gap-7 px-6 py-20 text-center">
 
-          <p className="hero-eyebrow">A daily ritual for dreamers, skeptics &amp; everyone in between</p>
+          <p className="hero-eyebrow">{t("home.eyebrow")}</p>
 
           <h1 className="hero-title">
-            <span className="hero-title-line">Start your day with</span>
-            <span className="hero-luck-word" aria-label="luck">
-              LUCK
+            <span className="hero-title-line">{t("home.titleLine1")}</span>
+            <span className="hero-luck-word" aria-label={t("home.luckWord")}>
+              {t("home.luckWord")}
             </span>
-            <span className="hero-title-line hero-title-accent">before the world wakes up.</span>
+            <span className="hero-title-line hero-title-accent">{t("home.titleLine2")}</span>
           </h1>
 
-          <p className="hero-subtitle max-w-2xl">
-            Pick your <strong className="text-amber-200">Lucky Coin</strong>, crack it open, and let a little
-            good fortune tag along — because{" "}
-            <em className="not-italic text-violet-200">everyone</em> deserves to enjoy the word{" "}
-            <span className="hero-inline-luck">luck</span>.
+          <p className="hero-subtitle">
+            {t("home.subtitlePre")}
+            <strong className="text-amber-200">{t("home.subtitleStrong")}</strong>
+            {t("home.subtitleMid")}
+            <em className="not-italic text-violet-200">{t("home.subtitleEm")}</em>
+            {t("home.subtitlePost")}
           </p>
 
           <button onClick={startGame} className="btn-coin mt-1">
-            PLAY
+            {t("home.play")}
           </button>
 
-          <p className="hero-footnote">
-            Register today and receive a <strong>50-coin</strong> welcome bonus.
-          </p>
+          <RichText k="home.footnote" as="p" className="hero-footnote" />
         </div>
       </section>
 
@@ -122,19 +137,13 @@ export default function Landing() {
 
       {/* How it works */}
       <section className="landing-section">
-        <h2 className="landing-section-title">How it works</h2>
-        <p className="landing-section-lead">
-          Three steps. One lucky moment. Zero gatekeeping on good fortune.
-        </p>
+        <h2 className="landing-section-title">{t("home.howTitle")}</h2>
+        <p className="landing-section-lead">{t("home.howLead")}</p>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
-          {[
-            { t: "1 · Register & log in", d: "Sign up with a nickname and email. We hand you a silver coin, a heap of bronze and a welcome bonus — generosity, absolutely no catch." },
-            { t: "2 · Spend a silver to play", d: "Each round costs a single silver and scatters 50 tiles — gold, silver, bronze, and from round 2 on, jewels rare enough to make you gasp." },
-            { t: "3 · Pick & crack", d: "Pick one tile, watch it crack open, and the prize lands in your account before the suspense even wears off." },
-          ].map((c) => (
+          {steps.map((c) => (
             <div key={c.t} className="landing-card p-6">
-              <h3 className="text-lg font-semibold text-amber-200">{c.t}</h3>
-              <p className="mt-2 text-slate-300">{c.d}</p>
+              <h3 className="text-lg font-semibold text-amber-200">{t(c.t)}</h3>
+              <p className="mt-2 text-slate-300">{t(c.d)}</p>
             </div>
           ))}
         </div>
@@ -142,19 +151,15 @@ export default function Landing() {
 
       {/* Coin values */}
       <section className="p-8">
-        <h2 className="text-center text-2xl font-bold">Coin values</h2>
+        <h2 className="text-center text-2xl font-bold">{t("home.valuesTitle")}</h2>
         <div className="mt-6 grid gap-5 sm:grid-cols-3">
-          {[
-            { type: "gold" as const, title: "Gold", v: "= 500 bronze", d: "The headline act — hard to find, glorious to hold." },
-            { type: "silver" as const, title: "Silver", v: "= 10 bronze", d: "Your ticket to play. Spend it and the board lights up." },
-            { type: "bronze" as const, title: "Bronze", v: "base unit", d: "The everyday workhorse — shows up daily, never complains." },
-          ].map((c) => (
+          {values.map((c) => (
             <div key={c.type} className="flex items-center gap-4 p-5">
               <CoinIcon type={c.type} size={52} />
               <div>
-                <div className="font-bold">{c.title}</div>
-                <div className="text-amber-300">{c.v}</div>
-                <div className="text-sm text-slate-400">{c.d}</div>
+                <div className="font-bold">{t(c.title)}</div>
+                <div className="text-amber-300">{t(c.v)}</div>
+                <div className="text-sm text-slate-400">{t(c.d)}</div>
               </div>
             </div>
           ))}
@@ -164,14 +169,13 @@ export default function Landing() {
       {/* CTA */}
       <section className="landing-cta flex flex-col items-center gap-4 p-10 text-center">
         <h2 className="landing-cta-title">
-          Feeling <span className="hero-inline-luck">lucky</span>?
+          {t("home.ctaTitlePre")}
+          <span className="hero-inline-luck">{t("home.ctaLuck")}</span>
+          {t("home.ctaTitlePost")}
         </h2>
-        <p className="max-w-md text-slate-300">
-          Daily bonuses, a 7-day streak reward, a board positively groaning with coins — and jewels
-          gatecrashing from your second round on.
-        </p>
+        <p className="max-w-md text-slate-300">{t("home.ctaBody")}</p>
         <button onClick={startGame} className="btn-gold text-lg !px-7 !py-3">
-          ▶ Start Game
+          {t("home.startGame")}
         </button>
       </section>
       </div>

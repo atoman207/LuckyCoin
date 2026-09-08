@@ -1,6 +1,8 @@
 "use client";
 
 import CoinIcon from "@/components/CoinIcon";
+import { useI18n } from "@/lib/i18n/provider";
+import { coinName } from "@/lib/coins";
 import type { Profile } from "@/lib/coins";
 
 // Balance display: gold / silver / bronze.
@@ -16,6 +18,7 @@ export default function CoinBalance({
   size?: number;
   compact?: boolean;
 }) {
+  const { t } = useI18n();
   const items = [
     { type: "gold" as const, value: profile.gold },
     { type: "silver" as const, value: profile.silver },
@@ -30,9 +33,9 @@ export default function CoinBalance({
             <CoinIcon type={it.type} size={size} />
             <span
               role="tooltip"
-              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#121829] px-2 py-1 text-xs font-semibold capitalize tabular-nums opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
+              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#121829] px-2 py-1 text-xs font-semibold tabular-nums opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
             >
-              {it.value.toLocaleString()} {it.type}
+              {it.value.toLocaleString()} {coinName(t, it.type)}
             </span>
           </span>
         ))}
@@ -46,7 +49,7 @@ export default function CoinBalance({
         <span
           key={it.type}
           className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-sm font-semibold tabular-nums"
-          title={`${it.value} ${it.type}`}
+          title={`${it.value} ${coinName(t, it.type)}`}
         >
           <CoinIcon type={it.type} size={size} />
           {it.value.toLocaleString()}

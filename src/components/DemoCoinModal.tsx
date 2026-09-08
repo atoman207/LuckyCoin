@@ -2,15 +2,17 @@
 
 import type { CSSProperties } from "react";
 import CoinIcon from "@/components/CoinIcon";
-import type { CoinType } from "@/lib/coins";
+import RichText from "@/components/RichText";
+import { coinName, type CoinType } from "@/lib/coins";
+import { useI18n } from "@/lib/i18n/provider";
 
 // Glowing coin "effect" shown on every demo win — styled like the in-game
 // reveal but with a log-in call to action. Intentionally a DIFFERENT modal
 // from the post-trial login gate.
-const GLOW: Record<CoinType, { glow: string; ray: string; name: string }> = {
-  gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)", name: "Gold" },
-  silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)", name: "Silver" },
-  bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)", name: "Bronze" },
+const GLOW: Record<CoinType, { glow: string; ray: string }> = {
+  gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)" },
+  silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)" },
+  bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)" },
 };
 
 export default function DemoCoinModal({
@@ -22,6 +24,7 @@ export default function DemoCoinModal({
   onLogin: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const cfg = GLOW[coin];
   return (
     <div
@@ -38,17 +41,16 @@ export default function DemoCoinModal({
           </div>
         </div>
         <div className="relative -mt-2 max-w-xs text-center">
-          <p className="text-2xl font-extrabold text-white drop-shadow">You found a {cfg.name} coin! 🎉</p>
-          <p className="mt-2 text-slate-300">
-            In the free trial it isn&apos;t saved. <strong className="text-amber-200">Log in</strong> to
-            keep your coins and enjoy the full game — daily rewards, the prize wheel and more.
+          <p className="text-2xl font-extrabold text-white drop-shadow">
+            {t("demo.foundCoin", { name: coinName(t, coin) })}
           </p>
+          <RichText as="p" k="demo.notSaved" className="mt-2 text-slate-300" />
           <div className="mt-5 flex flex-col gap-2">
             <button onClick={onLogin} className="btn-gold w-full">
-              Log in / Register
+              {t("common.loginRegister")}
             </button>
             <button onClick={onClose} className="btn-ghost w-full text-sm">
-              Keep trying
+              {t("demo.keepTrying")}
             </button>
           </div>
         </div>

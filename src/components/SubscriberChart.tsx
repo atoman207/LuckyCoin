@@ -15,6 +15,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 type Stats = {
   total: number;
@@ -26,7 +28,18 @@ type Stats = {
 type ChartType = "bar" | "line" | "pie";
 type Granularity = "day" | "month" | "year";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Axis labels are formatted with Intl so they read naturally in both
+// languages ("Jun 1" / "6月1日").
+const CHART_TYPE_LABEL: Record<ChartType, MessageKey> = {
+  bar: "chart.bar",
+  line: "chart.line",
+  pie: "chart.pie",
+};
+const GRANULARITY_LABEL: Record<Granularity, MessageKey> = {
+  day: "chart.day",
+  month: "chart.month",
+  year: "chart.year",
+};
 const PIE_COLORS = ["#f5b73d", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb923c", "#22d3ee", "#facc15", "#4ade80", "#f87171", "#c084fc", "#2dd4bf"];
 
 // Renders a single bar as a stack of golden coins instead of a flat column.
@@ -67,12 +80,19 @@ function CoinStack(props: { x?: number; y?: number; width?: number; height?: num
 }
 
 // Roll the daily series up to the chosen granularity.
-function aggregate(series: { date: string; count: number }[], gran: Granularity) {
+function aggregate(
+  series: { date: string; count: number }[],
+  gran: Granularity,
+  locale: string
+) {
+  const dayFmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" });
+  const monthFmt = new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", timeZone: "UTC" });
+
   if (gran === "day") {
-    return series.map((s) => {
-      const d = new Date(s.date + "T00:00:00Z");
-      return { label: `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`, value: s.count };
-    });
+    return series.map((s) => ({
+      label: dayFmt.format(new Date(s.date + "T00:00:00Z")),
+      value: s.count,
+    }));
   }
   const buckets = new Map<string, number>();
   for (const s of series) {
@@ -80,12 +100,14 @@ function aggregate(series: { date: string; count: number }[], gran: Granularity)
     buckets.set(key, (buckets.get(key) ?? 0) + s.count);
   }
   return [...buckets.entries()].map(([key, value]) => ({
-    label: gran === "month" ? `${MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}` : key,
+    label:
+      gran === "month" ? monthFmt.format(new Date(key + "-01T00:00:00Z")) : key,
     value,
   }));
 }
 
 export default function SubscriberChart() {
+  const { t, intlLocale } = useI18n();
   const [stats, setStats] = useState<Stats | null>(null);
   const [type, setType] = useState<ChartType>("bar");
   const [gran, setGran] = useState<Granularity>("day");
@@ -109,7 +131,10 @@ export default function SubscriberChart() {
     };
   }, []);
 
-  const data = useMemo(() => (stats ? aggregate(stats.series, gran) : []), [stats, gran]);
+  const data = useMemo(
+    () => (stats ? aggregate(stats.series, gran, intlLocale) : []),
+    [stats, gran, intlLocale]
+  );
 
   const axis = { fill: "#94a3b8", fontSize: 12 };
   const tooltipStyle = {
@@ -123,20 +148,29 @@ export default function SubscriberChart() {
     <section className="p-6 sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">New subscribers</h2>
+          <h2 className="text-2xl font-bold">{t("chart.title")}</h2>
           <p className="text-slate-400">
-            Sign-ups since launch on {stats ? new Date(stats.launch + "T00:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "Jun 1, 2026"}.
+            {t("chart.lead", {
+              date: stats
+                ? new Date(stats.launch + "T00:00:00Z").toLocaleDateString(intlLocale, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    timeZone: "UTC",
+                  })
+                : "—",
+            })}
           </p>
         </div>
         <div className="flex gap-6">
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Total</div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">{t("chart.total")}</div>
             <div className="text-3xl font-extrabold tabular-nums text-amber-300">
               {stats ? stats.total.toLocaleString() : "—"}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-slate-400">Today</div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">{t("chart.today")}</div>
             <div className="text-3xl font-extrabold tabular-nums text-emerald-300">
               {stats ? `+${stats.today.toLocaleString()}` : "—"}
             </div>
@@ -147,15 +181,15 @@ export default function SubscriberChart() {
       {/* Controls */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
-          {(["bar", "line", "pie"] as ChartType[]).map((t) => (
+          {(["bar", "line", "pie"] as ChartType[]).map((c) => (
             <button
-              key={t}
-              onClick={() => setType(t)}
-              className={`rounded-lg px-3 py-1.5 font-semibold capitalize transition ${
-                type === t ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+              key={c}
+              onClick={() => setType(c)}
+              className={`rounded-lg px-3 py-1.5 font-semibold transition ${
+                type === c ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
               }`}
             >
-              {t}
+              {t(CHART_TYPE_LABEL[c])}
             </button>
           ))}
         </div>
@@ -164,11 +198,11 @@ export default function SubscriberChart() {
             <button
               key={g}
               onClick={() => setGran(g)}
-              className={`rounded-lg px-3 py-1.5 font-semibold capitalize transition ${
+              className={`rounded-lg px-3 py-1.5 font-semibold transition ${
                 gran === g ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
               }`}
             >
-              {g}
+              {t(GRANULARITY_LABEL[g])}
             </button>
           ))}
         </div>
@@ -177,7 +211,7 @@ export default function SubscriberChart() {
       {/* Chart */}
       <div className="mt-6 h-72 w-full">
         {data.length === 0 ? (
-          <div className="grid h-full place-items-center text-sm text-slate-500">Loading chart…</div>
+          <div className="grid h-full place-items-center text-sm text-slate-500">{t("common.loadingChart")}</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {type === "bar" ? (
@@ -197,7 +231,7 @@ export default function SubscriberChart() {
                 <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={tooltipStyle} />
-                <Bar dataKey="value" name="Sign-ups" fill="#f5b73d" maxBarSize={46} shape={<CoinStack />} activeBar={<CoinStack />} />
+                <Bar dataKey="value" name={t("chart.signups")} fill="#f5b73d" maxBarSize={46} shape={<CoinStack />} activeBar={<CoinStack />} />
               </BarChart>
             ) : type === "line" ? (
               <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: -16 }}>
@@ -205,7 +239,7 @@ export default function SubscriberChart() {
                 <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="value" name="Sign-ups" stroke="#f5b73d" strokeWidth={3} dot={{ r: 3, fill: "#f5b73d" }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="value" name={t("chart.signups")} stroke="#f5b73d" strokeWidth={3} dot={{ r: 3, fill: "#f5b73d" }} activeDot={{ r: 5 }} />
               </LineChart>
             ) : (
               <PieChart>

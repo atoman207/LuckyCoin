@@ -4,13 +4,16 @@ import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
-import { EXCHANGE_NEXT, exchangeOutput, type CoinType } from "@/lib/coins";
+import { EXCHANGE_NEXT, exchangeOutput, coinName, type CoinType } from "@/lib/coins";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 // Only downward conversions are allowed: gold → silver, silver → bronze.
 const FROM_TYPES: CoinType[] = ["gold", "silver"];
 
 export default function ExchangePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
+  const { t } = useI18n();
   const [from, setFrom] = useState<CoinType>("gold");
   const [amount, setAmount] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -20,12 +23,12 @@ export default function ExchangePage() {
   if (!loading && !profile) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Log in to exchange coins</h1>
-        <button onClick={openAuth} className="btn-gold mt-6">Log in / Register</button>
+        <h1 className="text-2xl font-bold">{t("exchange.loginTitle")}</h1>
+        <button onClick={openAuth} className="btn-gold mt-6">{t("common.loginRegister")}</button>
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
 
   const to = EXCHANGE_NEXT[from] as CoinType; // gold→silver, silver→bronze
   const received = amount > 0 ? exchangeOutput(from, to, amount) : 0;
@@ -46,28 +49,25 @@ export default function ExchangePage() {
       setProfile(data.profile);
       setMsg(data.message);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Exchange failed.");
+      setError(e instanceof Error ? e.message : t("exchange.failed"));
     } finally {
       setBusy(false);
     }
   }
 
-  const presets = [
-    { from: "gold" as const, amount: 1, label: "1 gold → 50 silver" },
-    { from: "silver" as const, amount: 1, label: "1 silver → 10 bronze" },
-    { from: "silver" as const, amount: 10, label: "10 copper → 110 bronze" },
-    { from: "silver" as const, amount: 100, label: "100 silver → 1,500 bronze" },
+  const presets: { from: CoinType; amount: number; label: MessageKey }[] = [
+    { from: "gold", amount: 1, label: "exchange.preset1" },
+    { from: "silver", amount: 1, label: "exchange.preset2" },
+    { from: "silver", amount: 10, label: "exchange.preset3" },
+    { from: "silver", amount: 100, label: "exchange.preset4" },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold">Exchange coins</h1>
-          <p className="text-slate-400">
-            Downhill only: gold → silver, silver → bronze. Bulk silver→bronze bundles earn a cheeky
-            bonus (10 → 110, 100 → 1,500). Going back uphill? Not a chance — coins don&apos;t do cardio.
-          </p>
+          <h1 className="text-3xl font-extrabold">{t("exchange.title")}</h1>
+          <p className="text-slate-400">{t("exchange.subtitle")}</p>
         </div>
         <CoinBalance profile={profile} size={26} />
       </div>
@@ -84,26 +84,26 @@ export default function ExchangePage() {
         <div className="card p-6">
           <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
             <div>
-              <label className="label">From</label>
+              <label className="label">{t("exchange.from")}</label>
               <select className="input" value={from} onChange={(e) => setFrom(e.target.value as CoinType)}>
-                {FROM_TYPES.map((t) => (
-                  <option key={t} value={t} className="bg-slate-900">
-                    {t} (you have {profile[t]})
+                {FROM_TYPES.map((type) => (
+                  <option key={type} value={type} className="bg-slate-900">
+                    {t("exchange.fromOption", { name: coinName(t, type), count: profile[type] })}
                   </option>
                 ))}
               </select>
             </div>
             <div className="pb-2.5 text-2xl text-amber-300">→</div>
             <div>
-              <label className="label">To</label>
-              <div className="input flex items-center gap-2 capitalize">
-                <CoinIcon type={to} size={20} /> {to}
+              <label className="label">{t("exchange.to")}</label>
+              <div className="input flex items-center gap-2">
+                <CoinIcon type={to} size={20} /> {coinName(t, to)}
               </div>
             </div>
           </div>
 
           <div className="mt-4">
-            <label className="label">Amount to convert</label>
+            <label className="label">{t("exchange.amount")}</label>
             <input
               type="number"
               min={1}
@@ -125,16 +125,20 @@ export default function ExchangePage() {
             </div>
           </div>
 
-          {!enough && <p className="mt-3 text-center text-sm text-red-300">You don&apos;t have enough {from}.</p>}
+          {!enough && (
+            <p className="mt-3 text-center text-sm text-red-300">
+              {t("exchange.notEnough", { name: coinName(t, from) })}
+            </p>
+          )}
 
           <button onClick={submit} disabled={busy || !enough} className="btn-gold mt-4 w-full text-lg">
-            {busy ? "Exchanging…" : "Exchange"}
+            {busy ? t("exchange.exchanging") : t("exchange.action")}
           </button>
         </div>
 
         {/* Quick presets */}
         <div className="card p-6">
-          <h2 className="text-lg font-bold">Quick exchanges</h2>
+          <h2 className="text-lg font-bold">{t("exchange.quickTitle")}</h2>
           <div className="mt-4 space-y-2">
             {presets.map((p) => (
               <button
@@ -145,14 +149,12 @@ export default function ExchangePage() {
                 }}
                 className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm transition hover:border-amber-300/40 hover:bg-white/5"
               >
-                <span>{p.label}</span>
+                <span>{t(p.label)}</span>
                 <span className="text-amber-300">›</span>
               </button>
             ))}
           </div>
-          <p className="mt-4 text-xs text-slate-500">
-            Upgrading (bronze → silver → gold) is disabled.
-          </p>
+          <p className="mt-4 text-xs text-slate-500">{t("exchange.upgradeDisabled")}</p>
         </div>
       </div>
     </div>

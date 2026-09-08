@@ -1,16 +1,20 @@
 "use client";
 
+"use client";
+
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/provider";
 
 // Floating message-icon button pinned to the bottom-left corner. Clicking it
 // takes the user to the "Contact Us" page, where the form is delivered to the
 // site owner's inbox via SMTP (see /api/contact).
 export default function ContactWidget() {
+  const { t } = useI18n();
   return (
     <Link
       href="/contact"
-      aria-label="Contact us"
-      title="Contact us"
+      aria-label={t("contact.widgetLabel")}
+      title={t("contact.widgetLabel")}
       className="fixed bottom-4 left-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-amber-400 text-slate-900 shadow-lg transition hover:scale-105 hover:bg-amber-300"
     >
       {/* message / chat bubble icon */}

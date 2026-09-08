@@ -8,6 +8,8 @@
 //  its own.
 // =====================================================================
 
+import type { MessageKey } from "@/lib/i18n";
+
 // One address per chain. EVM (ETH + BNB) intentionally share an address.
 export const RECEIVING_WALLETS = {
   evm: "0xb593a3dA1b311D08b9a4b46F5331A931c6aA5f1f", // Ethereum + BNB Smart Chain
@@ -20,11 +22,11 @@ export const RECEIVING_WALLETS = {
 
 export type PaymentMethod = {
   id: string; // stable key recorded with the transaction
-  label: string; // shown on the checkout button
+  label: string; // shown on the checkout button (asset/network names stay as-is)
   asset: string; // token the buyer sends
   network: string; // chain it travels on
   address: string; // the admin address the buyer must send funds TO
-  memo?: string; // note for chains that need a destination tag / memo
+  memo?: MessageKey; // translated note for chains that need a destination tag / memo
 };
 
 // Order matters — USDT options lead because every pack is priced in USDT, and
@@ -47,7 +49,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
     asset: "XRP",
     network: "XRP Ledger",
     address: RECEIVING_WALLETS.xrp,
-    memo: "Some wallets/exchanges require a destination tag — leave it blank or use 0 unless told otherwise.",
+    memo: "checkout.memoXrp",
   },
   {
     id: "xlm",
@@ -55,7 +57,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
     asset: "XLM",
     network: "Stellar",
     address: RECEIVING_WALLETS.xlm,
-    memo: "If your wallet/exchange asks for a memo, leave it blank unless told otherwise.",
+    memo: "checkout.memoXlm",
   },
 ];
 

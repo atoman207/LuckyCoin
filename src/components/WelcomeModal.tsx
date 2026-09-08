@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
+import { useI18n } from "@/lib/i18n/provider";
 
 const AUTO_CLOSE_MS = 10_000;
 
@@ -10,11 +11,12 @@ const AUTO_CLOSE_MS = 10_000;
 // can close it with the × button.
 export default function WelcomeModal() {
   const { welcomeOpen, closeWelcome } = useUser();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!welcomeOpen) return;
-    const t = setTimeout(closeWelcome, AUTO_CLOSE_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(closeWelcome, AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
   }, [welcomeOpen, closeWelcome]);
 
   if (!welcomeOpen) return null;
@@ -27,15 +29,15 @@ export default function WelcomeModal() {
       >
         <button
           onClick={closeWelcome}
-          aria-label="Close"
+          aria-label={t("common.close")}
           className="absolute right-4 top-4 text-slate-400 hover:text-white"
         >
           ✕
         </button>
         <CoinIcon type="gold" size={72} className="mx-auto animate-pop" />
-        <h2 className="mt-4 text-2xl font-extrabold">Welcome aboard! 🎉</h2>
-        <p className="mt-2 text-lg text-slate-200">We hope you get today&apos;s lucky coin.</p>
-        <p className="mt-4 text-xs text-slate-500">This message closes automatically.</p>
+        <h2 className="mt-4 text-2xl font-extrabold">{t("welcome.title")}</h2>
+        <p className="mt-2 text-lg text-slate-200">{t("welcome.body")}</p>
+        <p className="mt-4 text-xs text-slate-500">{t("welcome.autoClose")}</p>
       </div>
     </div>
   );

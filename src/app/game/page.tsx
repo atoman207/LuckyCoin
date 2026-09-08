@@ -7,7 +7,10 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import DemoGame from "@/components/DemoGame";
 import InsufficientCoinsModal from "@/components/InsufficientCoinsModal";
-import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, compositionWithGems, gemRewardLabel, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode, type GemReward } from "@/lib/coins";
+import RichText from "@/components/RichText";
+import { BOARD_SIZE, BOARD_COMPOSITION, ROUND_COST, MAX_RESTARTS, MULTIPLIER_FACTORS, stageCostMultiplier, compositionWithGems, gemRewardLabel, coinName, type BoardSlot, type CoinType, type RoundCurrency, type PlayMode, type GemReward } from "@/lib/coins";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 type Phase = "idle" | "playing" | "revealed";
 type Composition = { gold: number; silver: number; bronze: number; gem?: number; empty: number };
@@ -16,16 +19,17 @@ const nextMultiplier = (round: number) => MULTIPLIER_FACTORS[Math.min(round + 1,
 
 // Per-slot reveal styling: the glow/ray colours match the coin so the modal
 // looks like it emits light of that colour. Empty is a neutral "no win".
-const COIN_REVEAL: Record<BoardSlot, { glow: string; ray: string; title: string }> = {
-  gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)", title: "JACKPOT — the lucky GOLD coin! 🏆" },
-  silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)", title: "You won a Silver coin!" },
-  bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)", title: "You won a Bronze coin!" },
-  gem: { glow: "rgba(167,139,250,0.95)", ray: "rgba(167,139,250,0.5)", title: "A Jewel! Claim your bonus!" },
-  empty: { glow: "rgba(100,116,139,0.45)", ray: "rgba(100,116,139,0.2)", title: "Empty — no coin this time!" },
+const COIN_REVEAL: Record<BoardSlot, { glow: string; ray: string; title: MessageKey }> = {
+  gold: { glow: "rgba(251,191,36,0.95)", ray: "rgba(251,191,36,0.5)", title: "game.revealGold" },
+  silver: { glow: "rgba(226,232,240,0.9)", ray: "rgba(226,232,240,0.45)", title: "game.revealSilver" },
+  bronze: { glow: "rgba(205,127,50,0.95)", ray: "rgba(205,127,50,0.5)", title: "game.revealBronze" },
+  gem: { glow: "rgba(167,139,250,0.95)", ray: "rgba(167,139,250,0.5)", title: "game.revealGem" },
+  empty: { glow: "rgba(100,116,139,0.45)", ray: "rgba(100,116,139,0.2)", title: "game.revealEmpty" },
 };
 
 function JewelIcon({ className = "" }: { className?: string }) {
-  return <img src="/jewel.png" alt="Jewel" className={`object-contain ${className}`} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/jewel.png" alt="" aria-hidden className={`object-contain ${className}`} />;
 }
 
 // Revealed-board borders: gold → gold, silver → silver, bronze → none.
@@ -75,6 +79,7 @@ const SPIRAL_ORDER = buildSpiralOrder(SPIRAL_ROWS, SPIRAL_COLS, BOARD_SIZE);
 
 export default function GamePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
+  const { t } = useI18n();
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [roundId, setRoundId] = useState<string | null>(null);
@@ -249,7 +254,7 @@ export default function GamePage() {
       if (data.composition) triggerBoardIntro(data.composition);
       return data;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start.");
+      setError(e instanceof Error ? e.message : t("game.couldNotStart"));
     } finally {
       setBusy(false);
     }
@@ -281,7 +286,7 @@ export default function GamePage() {
       const mult = stageCostMultiplier(restarts + 2);
       const needSilver = Math.ceil(ROUND_COST.silver * mult);
       const needBronze = Math.ceil(ROUND_COST.bronze * mult);
-      setLowCoins(`You need ${needSilver} silver or ${needBronze} bronze to continue.`);
+      setLowCoins(t("game.needToContinue", { silver: needSilver, bronze: needBronze }));
       return;
     }
     setRevealCoin(null);
@@ -336,7 +341,7 @@ export default function GamePage() {
       // the gold cards) is seen first.
       setTimeout(() => setRevealCoin(data.reward.type), 3000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reveal.");
+      setError(e instanceof Error ? e.message : t("game.couldNotReveal"));
     } finally {
       setBusy(false);
     }
@@ -359,7 +364,7 @@ export default function GamePage() {
   }
 
   if (loading || !profile || !sessionReady) {
-    return <div className="py-20 text-center text-slate-400">Loading…</div>;
+    return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
   }
 
   // A round can be paid with EITHER 1 silver OR 10 bronze. Admins play free.
@@ -394,17 +399,25 @@ export default function GamePage() {
       {/* Header */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold sm:text-3xl">Pick the lucky coin</h1>
+          <h1 className="text-2xl font-extrabold sm:text-3xl">{t("game.title")}</h1>
           <p className="hidden text-slate-400 sm:block">
             {phase === "playing"
-              ? "Tap one coin to crack it open — deep breaths, no pressure."
-              : `One round costs ${profile.is_admin ? "nothing (admin perks, obviously)" : `${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze`} · ${BOARD_COMPOSITION.gold} gold, ${BOARD_COMPOSITION.silver} silver & ${BOARD_COMPOSITION.bronze} bronze playing hide-and-seek among ${BOARD_SIZE} tiles.`}
+              ? t("game.subtitlePlaying")
+              : t("game.subtitleIdle", {
+                  cost: profile.is_admin
+                    ? t("game.costAdmin")
+                    : t("game.costNormal", { silver: ROUND_COST.silver, bronze: ROUND_COST.bronze }),
+                  gold: BOARD_COMPOSITION.gold,
+                  silver: BOARD_COMPOSITION.silver,
+                  bronze: BOARD_COMPOSITION.bronze,
+                  size: BOARD_SIZE,
+                })}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {(profile.free_rounds ?? 0) > 0 && (
             <span className="rounded-full bg-violet-500/20 px-3 py-1 text-sm font-bold text-violet-200 ring-1 ring-violet-300/40">
-              💎 {profile.free_rounds} free {profile.free_rounds === 1 ? "round" : "rounds"}
+              {t("game.freeRounds", { count: profile.free_rounds ?? 0 })}
             </span>
           )}
           <CoinBalance profile={profile} size={26} />
@@ -424,27 +437,30 @@ export default function GamePage() {
       {phase === "idle" && (
         <div className="card flex flex-col items-center gap-4 p-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
-          <h2 className="text-2xl font-bold">Ready for a round?</h2>
+          <h2 className="text-2xl font-bold">{t("game.readyTitle")}</h2>
           <p className="max-w-sm text-slate-300">
             {profile.is_admin
-              ? `Scatter ${BOARD_SIZE} coins and take your pick — the house always smiles on admins.`
-              : `Pay ${ROUND_COST.silver} silver or ${ROUND_COST.bronze} bronze, scatter ${BOARD_SIZE} coins, and trust your gut.`}
+              ? t("game.readyBodyAdmin", { size: BOARD_SIZE })
+              : t("game.readyBody", {
+                  silver: ROUND_COST.silver,
+                  bronze: ROUND_COST.bronze,
+                  size: BOARD_SIZE,
+                })}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button onClick={openChooser} disabled={busy} className="btn-gold text-lg !px-7 !py-3">
-              {busy ? "Dealing…" : "↺ Start Over"}
+              {busy ? t("game.dealing") : t("game.startOver")}
             </button>
             {hasSaved && (
               <button onClick={nextStage} disabled={busy} className="btn-ghost text-lg">
-                ▶ Continue <span className="text-xs text-amber-200">(×{nextMultiplier(restarts + 1)})</span>
+                {t("game.continue")}{" "}
+                <span className="text-xs text-amber-200">(×{nextMultiplier(restarts + 1)})</span>
               </button>
             )}
           </div>
           <p className="max-w-md text-xs text-slate-500">
-            <b>Start Over</b> begins a fresh run at a humble ×1.
-            {hasSaved
-              ? " Continue picks up your saved multiplier and keeps stacking it higher — no clock, no rush."
-              : " Play a round and your multiplier is saved, so you can sneak back and keep building it later."}
+            <RichText k="game.startOverHint" />{" "}
+            {hasSaved ? t("game.savedHint") : t("game.noSavedHint")}
           </p>
         </div>
       )}
@@ -456,13 +472,13 @@ export default function GamePage() {
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="rounded bg-amber-300/15 px-2.5 py-1 text-sm font-bold text-amber-200">
-                ×{multiplier} · stage {restarts + 1}/{MAX_RESTARTS}
+                {t("game.stageBadge", { mult: multiplier, stage: restarts + 1, max: MAX_RESTARTS })}
               </span>
               {/* How many left? — hover for the current multiplier + coin counts */}
               <div className="group relative">
-                <button className="btn-ghost text-sm">❓ How many left?</button>
+                <button className="btn-ghost text-sm">{t("game.howManyLeft")}</button>
                 <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-white/10 bg-[#121829] p-3 text-xs shadow-xl group-hover:block">
-                  <div className="font-semibold text-amber-200">Current multiplier ×{multiplier}</div>
+                  <div className="font-semibold text-amber-200">{t("game.currentMultiplier", { mult: multiplier })}</div>
                   <div className="mt-2 grid grid-cols-4 gap-2 text-center">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
                       <div key={t} className="rounded bg-black/30 py-2">
@@ -475,7 +491,7 @@ export default function GamePage() {
                       <div className="mt-1 font-bold text-violet-200">{composition?.gem ?? 0}</div>
                     </div>
                   </div>
-                  <div className="mt-2 text-slate-400">Coins &amp; gems on the board this stage.</div>
+                  <div className="mt-2 text-slate-400">{t("game.boardContents")}</div>
                 </div>
               </div>
             </div>
@@ -487,12 +503,13 @@ export default function GamePage() {
                 disabled={busy || phase !== "revealed" || restartsLeft <= 0}
                 className="btn-gold text-sm"
               >
-                ▶ Continue
-                {restartsLeft <= 0 ? " (max)" : ` (×${nextMultiplier(restarts + 1)})`}
+                {restartsLeft <= 0
+                  ? t("game.continueMax")
+                  : t("game.continueWith", { mult: nextMultiplier(restarts + 1) })}
               </button>
               {/* Start Over: reset the multiplier and return to the start screen. */}
               <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
-                ↺ Start Over
+                {t("game.startOver")}
               </button>
             </div>
           </div>
@@ -501,7 +518,7 @@ export default function GamePage() {
               same info is in the "How many left?" tooltip). */}
           {composition && (
             <div className="hidden shrink-0 flex-wrap items-center justify-center gap-4 rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm sm:flex">
-              <span className="text-slate-400">This round:</span>
+              <span className="text-slate-400">{t("game.thisRound")}</span>
               <span className="flex items-center gap-1.5 font-semibold">
                 <CoinIcon type="gold" size={20} /> {composition.gold}
               </span>
@@ -516,7 +533,7 @@ export default function GamePage() {
                   <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" /> {composition.gem}
                 </span>
               )}
-              <span className="font-semibold text-slate-400">{composition.empty} blank</span>
+              <span className="font-semibold text-slate-400">{t("game.blankCount", { count: composition.empty })}</span>
             </div>
           )}
 
@@ -573,7 +590,7 @@ export default function GamePage() {
                     {introType === "gem" ? (
                       <JewelIcon className="h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
                     ) : introType === "empty" ? (
-                      <span className="text-xs font-bold text-slate-400/70 sm:text-sm">No</span>
+                      <span className="text-xs font-bold text-slate-400/70 sm:text-sm">{t("coin.no")}</span>
                     ) : introType ? (
                       <span className="flex h-full w-full items-center justify-center p-[8%]">
                         <CoinIcon type={introType as CoinType} responsive className="rounded-full" />
@@ -592,7 +609,7 @@ export default function GamePage() {
                         />
                       </span>
                     ) : revealed && type === "empty" ? (
-                      <span className={`text-xs font-bold text-slate-500 sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>No</span>
+                      <span className={`text-xs font-bold text-slate-500 sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>{t("coin.no")}</span>
                     ) : null}
                     {revealed && isPick && (
                       <span className="absolute -top-1.5 left-1/2 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-[10px] font-black text-slate-900 shadow sm:h-5 sm:w-5 sm:text-xs">
@@ -609,7 +626,7 @@ export default function GamePage() {
             <div className="card flex shrink-0 flex-wrap items-center justify-between gap-3 p-3">
               <div className="flex items-center gap-3">
                 {reward.type === "empty" ? (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-sm font-bold text-slate-400">No</span>
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-sm font-bold text-slate-400">{t("coin.no")}</span>
                 ) : reward.type === "gem" ? (
                   <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-500/20">
                     <JewelIcon className="h-9 w-9 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
@@ -619,14 +636,28 @@ export default function GamePage() {
                 )}
                 <div className="text-left">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
-                    {reward.type === "empty" ? "Result" : reward.type === "gem" ? "Gem bonus" : "You won"}
-                  </div>
-                  <div className="text-lg font-bold capitalize">
                     {reward.type === "empty"
-                      ? "Empty — no win"
+                      ? t("game.resultLabel")
                       : reward.type === "gem"
-                        ? reward.gem ? gemRewardLabel(reward.gem) : "Gem"
-                        : `${reward.type === "gold" ? reward.gold : reward.type === "silver" ? reward.silver : reward.bronze ?? 1} ${reward.type}`}
+                        ? t("game.gemBonusLabel")
+                        : t("game.youWonLabel")}
+                  </div>
+                  <div className="text-lg font-bold">
+                    {reward.type === "empty"
+                      ? t("game.emptyResult")
+                      : reward.type === "gem"
+                        ? reward.gem
+                          ? gemRewardLabel(t, reward.gem)
+                          : t("game.gemLabel")
+                        : t("game.rewardCoin", {
+                            count:
+                              (reward.type === "gold"
+                                ? reward.gold
+                                : reward.type === "silver"
+                                  ? reward.silver
+                                  : reward.bronze) ?? 1,
+                            name: coinName(t, reward.type),
+                          })}
                   </div>
                 </div>
               </div>
@@ -636,10 +667,12 @@ export default function GamePage() {
                   disabled={busy || restartsLeft <= 0}
                   className="btn-gold text-sm"
                 >
-                  ▶ Continue {restartsLeft <= 0 ? "(max)" : `(×${nextMultiplier(restarts + 1)})`}
+                  {restartsLeft <= 0
+                    ? t("game.continueMax")
+                    : t("game.continueWith", { mult: nextMultiplier(restarts + 1) })}
                 </button>
                 <button onClick={newGame} disabled={busy} className="btn-ghost text-sm">
-                  ↺ Start Over
+                  {t("game.startOver")}
                 </button>
               </div>
             </div>
@@ -656,8 +689,8 @@ export default function GamePage() {
           <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             {choice === null ? (
               <>
-                <h2 className="text-xl font-bold">Choose how to pay</h2>
-                <p className="mt-1 text-sm text-slate-400">Pick your poison — both cost the same.</p>
+                <h2 className="text-xl font-bold">{t("game.chooseHowToPay")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("game.chooseHowToPayHint")}</p>
                 <div className="mt-4 grid gap-3">
                   {(["silver", "bronze"] as RoundCurrency[]).map((c) => {
                     const ok = canPay(c);
@@ -668,7 +701,11 @@ export default function GamePage() {
                           if (!ok) {
                             closeChooser();
                             setLowCoins(
-                              `You need ${ROUND_COST[c]} ${c} to start a round, but only have ${profile[c]}.`
+                              t("game.needToStart", {
+                                name: coinName(t, c),
+                                need: ROUND_COST[c],
+                                have: profile[c],
+                              })
                             );
                           } else {
                             setChoice(c);
@@ -680,54 +717,59 @@ export default function GamePage() {
                           <CoinIcon type={c} size={32} />
                           <span>
                             <span className="block font-bold">
-                              {ROUND_COST[c]} {c === "silver" ? "Silver" : "Bronze"}
+                              {t("game.rewardCoin", { count: ROUND_COST[c], name: coinName(t, c) })}
                             </span>
                             <span className="block text-xs text-slate-400">
-                              You have {profile[c]} {c}
+                              {t("game.youHave", { amount: profile[c], name: coinName(t, c) })}
                             </span>
                           </span>
                         </span>
                         <span className={`text-xs font-semibold ${ok ? "text-emerald-300" : "text-red-300"}`}>
-                          {profile.is_admin ? "Free" : ok ? "Available" : "Not enough"}
+                          {profile.is_admin ? t("common.free") : ok ? t("common.available") : t("common.notEnough")}
                         </span>
                       </button>
                     );
                   })}
                 </div>
                 <button onClick={closeChooser} className="btn-ghost mt-4 w-full">
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </>
             ) : canPay(choice) ? (
               <>
-                <h2 className="text-xl font-bold">Start a round?</h2>
+                <h2 className="text-xl font-bold">{t("game.startRoundTitle")}</h2>
                 <p className="mt-2 text-slate-300">
                   {profile.is_admin
-                    ? "Admins play for free — rank hath its privileges."
-                    : `You'll part with ${ROUND_COST[choice]} ${choice}, scatter ${BOARD_SIZE} coins, and let fate do the rest.`}
+                    ? t("game.startRoundAdmin")
+                    : t("game.startRoundBody", {
+                        cost: ROUND_COST[choice],
+                        name: coinName(t, choice),
+                        size: BOARD_SIZE,
+                      })}
                 </p>
                 <div className="mt-5 flex gap-3">
                   <button onClick={() => startRound(choice, "new")} disabled={busy} className="btn-gold flex-1">
-                    ▶ Start
+                    {t("game.start")}
                   </button>
                   <button onClick={() => setChoice(null)} className="btn-ghost">
-                    Back
+                    {t("common.back")}
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <h2 className="text-xl font-bold text-red-200">Not enough {choice}</h2>
+                <h2 className="text-xl font-bold text-red-200">
+                  {t("game.notEnoughTitle", { name: coinName(t, choice) })}
+                </h2>
                 <p className="mt-2 text-slate-300">
-                  You don&apos;t have enough {choice} to start a round. Purchase more silver to keep
-                  playing — pay with crypto and it&apos;s credited as soon as the payment confirms.
+                  {t("game.notEnoughBody", { name: coinName(t, choice) })}
                 </p>
                 <div className="mt-5 flex flex-col gap-3">
                   <Link href="/buy" onClick={closeChooser} className="btn-gold text-center">
-                    Go to the purchase page →
+                    {t("game.goToPurchase")}
                   </Link>
                   <button onClick={() => setChoice(null)} className="btn-ghost">
-                    Back
+                    {t("common.back")}
                   </button>
                 </div>
               </>
@@ -751,7 +793,7 @@ export default function GamePage() {
               <div className="reveal-coin relative drop-shadow-2xl">
                 {revealCoin === "empty" ? (
                   <span className="grid h-[172px] w-[172px] place-items-center rounded-full border border-white/10 bg-white/5 text-5xl font-extrabold text-slate-400">
-                    No
+                    {t("coin.no")}
                   </span>
                 ) : revealCoin === "gem" ? (
                   <span className="grid h-[172px] w-[172px] place-items-center">
@@ -763,37 +805,51 @@ export default function GamePage() {
               </div>
             </div>
             <div className="relative -mt-2 max-w-sm text-center">
-              <p className="text-2xl font-extrabold text-white drop-shadow">{COIN_REVEAL[revealCoin].title}</p>
+              <p className="text-2xl font-extrabold text-white drop-shadow">{t(COIN_REVEAL[revealCoin].title)}</p>
               <p className="mt-1 text-slate-300">
                 {revealCoin === "empty"
-                  ? "No coins this stage."
+                  ? t("game.revealEmptyBody")
                   : revealCoin === "gem"
                     ? reward?.gem
                       ? reward.gem.kind === "turns"
-                        ? `${gemRewardLabel(reward.gem)} — your next ${reward.gem.turns} round${reward.gem.turns === 1 ? "" : "s"} are free!`
-                        : `${gemRewardLabel(reward.gem)} added!`
-                      : "Bonus added!"
-                    : `+${reward?.[revealCoin] ?? 1} ${revealCoin} added${(reward?.multiplier ?? 1) > 1 ? ` (×${reward?.multiplier})` : ""}`}
+                        ? t("game.revealGemTurns", {
+                            label: gemRewardLabel(t, reward.gem),
+                            turns: reward.gem.turns,
+                          })
+                        : t("game.revealGemAdded", { label: gemRewardLabel(t, reward.gem) })
+                      : t("game.revealGemBonus")
+                    : t("game.revealCoinAdded", {
+                        amount: reward?.[revealCoin] ?? 1,
+                        name: coinName(t, revealCoin),
+                        mult:
+                          (reward?.multiplier ?? 1) > 1
+                            ? t("game.revealMultSuffix", { mult: reward?.multiplier ?? 1 })
+                            : "",
+                      })}
               </p>
 
               {/* Next-stage prompt: cost + the NEXT round's board (to entice). */}
               {restartsLeft > 0 && (
                 <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
-                  <p className="font-semibold text-amber-200">Proceed to the next stage?</p>
+                  <p className="font-semibold text-amber-200">{t("game.nextStageTitle")}</p>
                   <p className="mt-1 text-xs text-slate-400">
                     {(profile.free_rounds ?? 0) > 0 ? (
-                      <>
-                        Next stage is <span className="font-semibold text-violet-200">FREE</span> (gem) ·
-                        multiplier rises to ×{nextMultiplier(restarts + 1)}
-                      </>
+                      <RichText
+                        k="game.nextStageFree"
+                        vars={{ mult: nextMultiplier(restarts + 1) }}
+                      />
                     ) : (
-                      <>
-                        Next stage consumes {nextStageCost} {stageCurrency} · multiplier rises to ×
-                        {nextMultiplier(restarts + 1)}
-                      </>
+                      <RichText
+                        k="game.nextStageCost"
+                        vars={{
+                          cost: nextStageCost,
+                          name: coinName(t, stageCurrency),
+                          mult: nextMultiplier(restarts + 1),
+                        }}
+                      />
                     )}
                   </p>
-                  <p className="mt-2 text-xs uppercase tracking-wide text-amber-200/80">Next board</p>
+                  <p className="mt-2 text-xs uppercase tracking-wide text-amber-200/80">{t("game.nextBoard")}</p>
                   <div className="mt-1 flex items-center justify-center gap-4">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
                       <span key={t} className="flex items-center gap-1 font-bold">
@@ -807,7 +863,7 @@ export default function GamePage() {
                       </span>
                     )}
                     {nextRoundComp.empty > 0 && (
-                      <span className="text-slate-400">{nextRoundComp.empty} blank</span>
+                      <span className="text-slate-400">{t("game.blankCount", { count: nextRoundComp.empty })}</span>
                     )}
                   </div>
                 </div>
@@ -816,17 +872,17 @@ export default function GamePage() {
               <div className="mt-5 flex flex-col gap-2">
                 {restartsLeft > 0 ? (
                   <button onClick={nextStage} className="btn-gold w-full">
-                    ▶ Continue (×{nextMultiplier(restarts + 1)})
+                    {t("game.continueWith", { mult: nextMultiplier(restarts + 1) })}
                   </button>
                 ) : (
                   <button onClick={() => { setRevealCoin(null); newGame(); }} className="btn-gold w-full">
-                    🏆 Max stage reached — Start Over
+                    {t("game.maxStageReached")}
                   </button>
                 )}
                 {/* Stop here keeps the saved multiplier and returns to the hub,
                     where the player can Continue later or Start Over. */}
                 <button onClick={() => { setRevealCoin(null); reset(); }} className="btn-ghost w-full text-sm">
-                  Stop &amp; save
+                  {t("game.stopAndSave")}
                 </button>
               </div>
             </div>
@@ -841,9 +897,14 @@ export default function GamePage() {
           onClick={() => setRestartChooserOpen(false)}
         >
           <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold">Restart — choose a mode</h2>
+            <h2 className="text-xl font-bold">{t("game.restartTitle")}</h2>
             <p className="mt-1 text-sm text-slate-400">
-              {restartsLeft} of {MAX_RESTARTS} restarts left · pays {ROUND_COST[lastCurrency]} {lastCurrency}.
+              {t("game.restartLead", {
+                left: restartsLeft,
+                max: MAX_RESTARTS,
+                cost: ROUND_COST[lastCurrency],
+                name: coinName(t, lastCurrency),
+              })}
             </p>
             <div className="mt-4 grid gap-3">
               <button
@@ -851,24 +912,20 @@ export default function GamePage() {
                 disabled={busy}
                 className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
               >
-                <div className="font-bold">Continuous Play</div>
-                <div className="text-xs text-slate-400">
-                  Same board every restart — 1 gold, 4 silver, 20 bronze, the rest empty.
-                </div>
+                <div className="font-bold">{t("game.modeContinuous")}</div>
+                <div className="text-xs text-slate-400">{t("game.modeContinuousDesc")}</div>
               </button>
               <button
                 onClick={() => startRound(lastCurrency, "restart", "multiplier")}
                 disabled={busy}
                 className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
               >
-                <div className="font-bold">Multiplier Play</div>
-                <div className="text-xs text-slate-400">
-                  Rewards escalate each round — more coins and fewer blanks, up to round {MAX_RESTARTS}.
-                </div>
+                <div className="font-bold">{t("game.modeMultiplier")}</div>
+                <div className="text-xs text-slate-400">{t("game.modeMultiplierDesc", { max: MAX_RESTARTS })}</div>
               </button>
             </div>
             <button onClick={() => setRestartChooserOpen(false)} className="btn-ghost mt-4 w-full">
-              Cancel
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -878,12 +935,12 @@ export default function GamePage() {
       {multModal !== null && (
         <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
           <div className="card animate-pop border-amber-300/40 bg-amber-300/10 px-10 py-8 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-amber-200">Multiplier increased</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-200">{t("game.multIncreased")}</p>
             <p className="mt-1 text-6xl font-black text-amber-300 drop-shadow">×{multModal}</p>
-            <p className="mt-2 text-slate-300">Winnings this stage are multiplied by {multModal}!</p>
+            <p className="mt-2 text-slate-300">{t("game.multBody", { mult: multModal })}</p>
             {composition && (
               <>
-                <p className="mt-4 text-xs uppercase tracking-wide text-amber-200/80">Coins on this board</p>
+                <p className="mt-4 text-xs uppercase tracking-wide text-amber-200/80">{t("game.boardCoins")}</p>
                 <div className="mt-1 flex items-center justify-center gap-4">
                   {(["gold", "silver", "bronze"] as const).map((t) => (
                     <span key={t} className="flex items-center gap-1 font-bold">
@@ -891,7 +948,7 @@ export default function GamePage() {
                     </span>
                   ))}
                   {composition.empty > 0 && (
-                    <span className="text-sm text-slate-400">{composition.empty} blank</span>
+                    <span className="text-sm text-slate-400">{t("game.blankCount", { count: composition.empty })}</span>
                   )}
                 </div>
               </>

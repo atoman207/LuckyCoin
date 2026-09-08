@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { saveAvatarFile } from "@/lib/avatar";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const t = await getT();
   try {
     // Sent as multipart form-data so the avatar can be uploaded at sign-up.
     const form = await req.formData();
@@ -17,13 +19,13 @@ export async function POST(req: Request) {
 
     if (!nickname || !email || !password) {
       return NextResponse.json(
-        { error: "Nickname, email and password are required." },
+        { error: t("api.admin.userFields") },
         { status: 400 }
       );
     }
     if (password.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters." },
+        { error: t("api.register.passwordShort") },
         { status: 400 }
       );
     }
@@ -40,10 +42,11 @@ export async function POST(req: Request) {
     });
 
     if (createErr || !created.user) {
-      const msg = createErr?.message ?? "Could not create account.";
+      const msg = createErr?.message ?? "";
       const already = /registered|already/i.test(msg);
+      if (!already) console.error("[register] createUser failed:", createErr);
       return NextResponse.json(
-        { error: already ? "That email is already registered." : msg },
+        { error: already ? t("api.register.emailTaken") : t("api.register.createFailed") },
         { status: 400 }
       );
     }
@@ -80,16 +83,14 @@ export async function POST(req: Request) {
       // Roll back the auth user so the email can be reused.
       await admin.auth.admin.deleteUser(created.user.id);
       return NextResponse.json(
-        { error: "Could not create profile: " + profileErr.message },
+        { error: t("api.register.profileFailed", { detail: profileErr.message }) },
         { status: 400 }
       );
     }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Unexpected error." },
-      { status: 500 }
-    );
+    console.error("[register] unexpected error:", e);
+    return NextResponse.json({ error: t("api.unexpected") }, { status: 500 });
   }
 }

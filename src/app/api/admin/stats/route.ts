@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +12,9 @@ const todayKey = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC
 //   visitors = anonymous people who opened the app to try it free
 //   members  = registered users (counted as registered or logged-in today)
 export async function GET() {
+  const t = await getT();
   const ctx = await requireAdmin();
-  if (!ctx) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: t("api.admin.only") }, { status: 403 });
 
   const admin = createAdminClient();
   const today = todayKey();

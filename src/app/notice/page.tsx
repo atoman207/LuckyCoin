@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import Avatar from "@/components/Avatar";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 type Ranked = {
   rank: number;
@@ -22,10 +24,10 @@ const POLL_MS = 5_000; // refresh cadence — "real time" within a few seconds
 const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null);
 
 // Gold / silver / bronze styling for the top three places.
-const PODIUM: Record<number, { ring: string; row: string; tag: string; label: string }> = {
-  1: { ring: "ring-amber-400/60", row: "border-l-4 border-amber-400 bg-amber-400/10", tag: "bg-amber-400 text-slate-900", label: "Gold" },
-  2: { ring: "ring-slate-300/60", row: "border-l-4 border-slate-300 bg-slate-300/10", tag: "bg-slate-300 text-slate-900", label: "Silver" },
-  3: { ring: "ring-orange-400/60", row: "border-l-4 border-orange-400 bg-orange-400/10", tag: "bg-orange-400 text-slate-900", label: "Bronze" },
+const PODIUM: Record<number, { ring: string; row: string; tag: string; label: MessageKey; place: MessageKey }> = {
+  1: { ring: "ring-amber-400/60", row: "border-l-4 border-amber-400 bg-amber-400/10", tag: "bg-amber-400 text-slate-900", label: "coin.gold", place: "notice.first" },
+  2: { ring: "ring-slate-300/60", row: "border-l-4 border-slate-300 bg-slate-300/10", tag: "bg-slate-300 text-slate-900", label: "coin.silver", place: "notice.second" },
+  3: { ring: "ring-orange-400/60", row: "border-l-4 border-orange-400 bg-orange-400/10", tag: "bg-orange-400 text-slate-900", label: "coin.bronze", place: "notice.third" },
 };
 
 // Coin counts shown inline next to a player's avatar + name.
@@ -47,6 +49,7 @@ function Coins({ gold, silver, bronze }: { gold: number; silver: number; bronze:
 
 export default function NoticePage() {
   const { profile, openAuth } = useUser();
+  const { t, intlLocale } = useI18n();
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -56,14 +59,14 @@ export default function NoticePage() {
     try {
       const res = await fetch("/api/leaderboard", { cache: "no-store" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load rankings.");
+      if (!res.ok) throw new Error(data.error ?? t("notice.loadFailed"));
       setBoard(data);
       setUpdatedAt(new Date());
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load rankings.");
+      setError(e instanceof Error ? e.message : t("notice.loadFailed"));
     }
-  }, []);
+  }, [t]);
 
   // Poll on an interval so rankings stay live without a page refresh.
   useEffect(() => {
@@ -90,10 +93,8 @@ export default function NoticePage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="text-center">
-        <h1 className="text-3xl font-extrabold sm:text-4xl">📣 Notice — Live Rankings</h1>
-        <p className="mt-2 text-slate-400">
-          Ranked by gold, then silver, then bronze. Updates automatically every few seconds.
-        </p>
+        <h1 className="text-3xl font-extrabold sm:text-4xl">{t("notice.title")}</h1>
+        <p className="mt-2 text-slate-400">{t("notice.lead")}</p>
       </header>
 
       {error && (
@@ -103,34 +104,34 @@ export default function NoticePage() {
       {/* Headline stats + "My ranking" button */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="card p-6 text-center">
-          <div className="text-sm text-slate-400">Total participants</div>
+          <div className="text-sm text-slate-400">{t("notice.totalParticipants")}</div>
           <div className="mt-1 text-4xl font-extrabold tabular-nums text-emerald-300">
             {board ? total.toLocaleString() : "…"}
           </div>
         </div>
         <div className="card flex flex-col items-center justify-center gap-3 p-6 text-center">
           <div>
-            <div className="text-sm text-slate-400">Your current rank</div>
+            <div className="text-sm text-slate-400">{t("notice.yourRank")}</div>
             <div className="mt-1 text-4xl font-extrabold tabular-nums text-amber-300">
               {!profile ? (
-                <span className="text-lg font-semibold text-slate-400">Not logged in</span>
+                <span className="text-lg font-semibold text-slate-400">{t("notice.notLoggedIn")}</span>
               ) : you ? (
                 <>
                   #{you.rank.toLocaleString()}
                   <span className="ml-2 text-base font-medium text-slate-400">
-                    of {total.toLocaleString()}
+                    {t("notice.ofTotal", { total: total.toLocaleString() })}
                   </span>
                 </>
               ) : (
-                <span className="text-lg font-semibold text-slate-400">Unranked</span>
+                <span className="text-lg font-semibold text-slate-400">{t("notice.unranked")}</span>
               )}
             </div>
             {profile && you && percentile && (
-              <div className="mt-1 text-xs text-slate-500">Top {percentile}% of all players</div>
+              <div className="mt-1 text-xs text-slate-500">{t("notice.percentile", { percent: percentile })}</div>
             )}
           </div>
           <button onClick={showMyRanking} className="btn-gold text-sm">
-            📊 {profile ? "My ranking" : "Log in to see your rank"}
+            {profile ? t("notice.myRanking") : t("notice.loginToSeeRank")}
           </button>
         </div>
       </div>
@@ -147,7 +148,7 @@ export default function NoticePage() {
                 className={`card flex flex-col items-center gap-2 p-5 text-center ${p.row}`}
               >
                 <span className={`rounded-full px-3 py-0.5 text-xs font-bold ${p.tag}`}>
-                  {r.rank === 1 ? "1st" : r.rank === 2 ? "2nd" : "3rd"} · {p.label}
+                  {t(p.place)} · {t(p.label)}
                 </span>
                 <div className="text-3xl">{medal(r.rank)}</div>
                 <Avatar src={r.avatar_url} name={r.nickname} size={64} className={`ring-2 ${p.ring}`} />
@@ -155,7 +156,7 @@ export default function NoticePage() {
                   {r.nickname}
                   {mine && (
                     <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">
-                      you
+                      {t("common.you")}
                     </span>
                   )}
                 </div>
@@ -169,16 +170,18 @@ export default function NoticePage() {
       {/* Top 50 list — avatar + name with coin counts alongside */}
       <section className="card p-0">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h2 className="text-lg font-bold">Top 50 players</h2>
+          <h2 className="text-lg font-bold">{t("notice.top50")}</h2>
           <span className="text-xs text-slate-500">
-            {updatedAt ? `updated ${updatedAt.toLocaleTimeString()}` : "loading…"}
+            {updatedAt
+              ? t("notice.updatedAt", { time: updatedAt.toLocaleTimeString(intlLocale) })
+              : t("common.loading")}
           </span>
         </div>
 
         {board === null ? (
-          <div className="px-5 py-10 text-center text-slate-500">Loading rankings…</div>
+          <div className="px-5 py-10 text-center text-slate-500">{t("notice.loadingRankings")}</div>
         ) : board.top.length === 0 ? (
-          <div className="px-5 py-10 text-center text-slate-500">No players yet.</div>
+          <div className="px-5 py-10 text-center text-slate-500">{t("notice.noPlayers")}</div>
         ) : (
           <ul className="divide-y divide-white/5">
             {board.top.map((r) => {
@@ -203,7 +206,7 @@ export default function NoticePage() {
                       <span className="truncate">{r.nickname}</span>
                       {mine && (
                         <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">
-                          you
+                          {t("common.you")}
                         </span>
                       )}
                     </div>
@@ -220,7 +223,7 @@ export default function NoticePage() {
       {profile && you && you.rank > 50 && (
         <section id="my-rank" className={`card p-0 ${flash ? "ring-2 ring-amber-400" : ""}`}>
           <div className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-slate-300">
-            Your standing — #{you.rank.toLocaleString()} of {total.toLocaleString()}
+            {t("notice.yourStanding", { rank: you.rank.toLocaleString(), total: total.toLocaleString() })}
           </div>
           <div className="flex items-center gap-3 bg-amber-400/10 px-4 py-3">
             <div className="w-10 shrink-0 text-center text-lg font-bold tabular-nums">{you.rank}</div>
@@ -228,7 +231,7 @@ export default function NoticePage() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 font-semibold">
                 <span className="truncate">{you.nickname}</span>
-                <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">you</span>
+                <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">{t("common.you")}</span>
               </div>
               <Coins gold={you.gold} silver={you.silver} bronze={you.bronze} />
             </div>

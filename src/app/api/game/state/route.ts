@@ -6,6 +6,7 @@ import {
   multiplierFor,
   type BoardSlot,
 } from "@/lib/coins";
+import { getT } from "@/lib/i18n/server";
 
 function compositionWithEmpty(mode: string | null | undefined, round: number) {
   const c = compositionWithGems(mode, round);
@@ -15,8 +16,9 @@ function compositionWithEmpty(mode: string | null | undefined, round: number) {
 
 // Restore the in-progress game session after refresh or navigation.
 export async function GET() {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
   const roundNum = profile.game_round ?? 0;

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/provider";
 
 // "Back to top" button, bottom-right. Hidden while the hero (first screen) is in
 // view; it appears once the user scrolls into the section after the hero.
 export default function BackToTop() {
+  const { t } = useI18n();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -23,8 +25,8 @@ export default function BackToTop() {
   return (
     <button
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      aria-label="Back to top"
-      title="Back to top"
+      aria-label={t("backToTop.label")}
+      title={t("backToTop.label")}
       className="anim-bob fixed bottom-4 right-4 z-50 grid h-12 w-12 place-items-center rounded-full bg-amber-400 text-2xl font-black text-slate-900 shadow-lg transition hover:scale-105 hover:bg-amber-300"
     >
       ↑

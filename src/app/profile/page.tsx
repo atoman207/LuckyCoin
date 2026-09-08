@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 import CoinBalance from "@/components/CoinBalance";
+import { useI18n } from "@/lib/i18n/provider";
 
 export default function ProfilePage() {
   const { profile, loading, openAuth, setProfile } = useUser();
+  const { t, intlLocale } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({ nickname: "", nationality: "", discord_id: "" });
@@ -29,12 +31,12 @@ export default function ProfilePage() {
   if (!loading && !profile) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Log in to view your profile</h1>
-        <button onClick={openAuth} className="btn-gold mt-6">Log in / Register</button>
+        <h1 className="text-2xl font-bold">{t("profile.loginTitle")}</h1>
+        <button onClick={openAuth} className="btn-gold mt-6">{t("common.loginRegister")}</button>
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -58,9 +60,9 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setProfile(data.profile);
-      flash("Profile saved.");
+      flash(t("profile.saved"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save.");
+      setError(e instanceof Error ? e.message : t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -78,25 +80,25 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setProfile(data.profile);
-      flash("Avatar updated.");
+      flash(t("profile.avatarUpdated"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
+      setError(e instanceof Error ? e.message : t("common.uploadFailed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   }
 
-  const joined = new Date(profile.created_at).toLocaleDateString();
+  const joined = new Date(profile.created_at).toLocaleDateString(intlLocale);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-extrabold">
-          {profile.is_admin ? "Administrator profile" : "My profile"}
+          {profile.is_admin ? t("profile.titleAdmin") : t("profile.title")}
         </h1>
         {profile.is_admin && (
-          <Link href="/admin" className="btn-ghost text-sm">Admin dashboard →</Link>
+          <Link href="/admin" className="btn-ghost text-sm">{t("profile.adminDashboard")}</Link>
         )}
       </div>
 
@@ -123,48 +125,53 @@ export default function ProfilePage() {
             disabled={uploading}
             className="btn-ghost text-sm"
           >
-            {uploading ? "Uploading…" : "Upload avatar"}
+            {uploading ? t("profile.uploading") : t("profile.uploadAvatar")}
           </button>
-          <p className="text-xs text-slate-500">PNG/JPG/WEBP/GIF, up to 2 MB.</p>
+          <p className="text-xs text-slate-500">{t("profile.avatarNote")}</p>
 
           <div className="mt-2 w-full space-y-2 border-t border-white/10 pt-4 text-left text-sm">
-            <div className="flex justify-between"><span className="text-slate-400">Email</span><span>{profile.email}</span></div>
-            <div className="flex justify-between"><span className="text-slate-400">Member since</span><span>{joined}</span></div>
-            <div className="flex justify-between"><span className="text-slate-400">Login streak</span><span>{profile.streak} day(s)</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">{t("profile.email")}</span><span>{profile.email}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">{t("profile.memberSince")}</span><span>{joined}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">{t("profile.loginStreak")}</span><span>{t("profile.days", { count: profile.streak })}</span></div>
             {profile.is_admin && (
-              <div className="flex justify-between"><span className="text-slate-400">Role</span><span className="text-amber-300">Administrator</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">{t("profile.role")}</span><span className="text-amber-300">{t("profile.administrator")}</span></div>
             )}
           </div>
           <div className="w-full border-t border-white/10 pt-4">
-            <div className="mb-2 text-left text-sm text-slate-400">Coins held</div>
+            <div className="mb-2 text-left text-sm text-slate-400">{t("profile.coinsHeld")}</div>
             <CoinBalance profile={profile} size={24} />
           </div>
         </div>
 
         {/* Editable info */}
         <form onSubmit={save} className="card space-y-4 p-6">
-          <h2 className="text-lg font-bold">Personal information</h2>
+          <h2 className="text-lg font-bold">{t("profile.personalInfo")}</h2>
           <div>
-            <label className="label">Nickname</label>
+            <label className="label">{t("profile.nickname")}</label>
             <input className="input" value={form.nickname} onChange={set("nickname")} required />
           </div>
           <div>
-            <label className="label">Email</label>
+            <label className="label">{t("profile.email")}</label>
             <input className="input opacity-60" value={profile.email} disabled />
-            <p className="mt-1 text-xs text-slate-500">Contact an administrator to change your email.</p>
+            <p className="mt-1 text-xs text-slate-500">{t("profile.emailNote")}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">Nationality</label>
-              <input className="input" value={form.nationality} onChange={set("nationality")} placeholder="e.g. USA" />
+              <label className="label">{t("profile.nationality")}</label>
+              <input
+                className="input"
+                value={form.nationality}
+                onChange={set("nationality")}
+                placeholder={t("profile.nationalityPlaceholder")}
+              />
             </div>
             <div>
-              <label className="label">Discord ID</label>
+              <label className="label">{t("profile.discordId")}</label>
               <input className="input" value={form.discord_id} onChange={set("discord_id")} placeholder="name#0000" />
             </div>
           </div>
           <button type="submit" className="btn-gold w-full" disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("common.saving") : t("profile.saveChanges")}
           </button>
         </form>
       </div>

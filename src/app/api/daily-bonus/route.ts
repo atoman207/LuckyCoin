@@ -5,11 +5,16 @@ import {
   DAILY_CLAIM_INTERVAL_MS,
   DAILY_RESET_AFTER_MS,
 } from "@/lib/coins";
+import { getT } from "@/lib/i18n/server";
+import type { TFunction } from "@/lib/i18n";
 
-function formatLeft(ms: number): string {
+// "2h 15m" / "45m", worded in the visitor's language.
+function formatLeft(t: TFunction, ms: number): string {
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return h > 0
+    ? t("api.daily.hoursMinutes", { hours: h, minutes: m })
+    : t("api.daily.minutes", { minutes: m });
 }
 
 // Claim the daily login reward. Claimable once every 24h. The streak advances
@@ -17,14 +22,15 @@ function formatLeft(ms: number): string {
 // last claim means a day was missed, so the streak resets to day 1 (20 bronze).
 // Schedule: 20, 25, 30, 30, 30, 30, then a fixed 50 from day 7 onward.
 export async function POST() {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
 
   // New members must claim their sign-up + day-1 reward first (/api/claim).
   if (!profile.rewards_claimed) {
-    return NextResponse.json({ claimed: false, message: "Claim your sign-up rewards first.", profile });
+    return NextResponse.json({ claimed: false, message: t("api.daily.claimFirst"), profile });
   }
 
   const now = Date.now();
@@ -38,7 +44,7 @@ export async function POST() {
       return NextResponse.json({
         claimed: false,
         nextClaimInMs: msLeft,
-        message: `Daily reward already claimed. Come back in ${formatLeft(msLeft)}.`,
+        message: t("api.daily.alreadyClaimedIn", { time: formatLeft(t, msLeft) }),
         profile,
       });
     }
@@ -64,12 +70,12 @@ export async function POST() {
 
   const { data: updated, error } = await q.select("*").maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
   if (!updated) {
     // Lost the race — someone already claimed for this period.
     return NextResponse.json({
       claimed: false,
-      message: "Daily reward already claimed.",
+      message: t("api.daily.alreadyClaimed"),
       profile,
     });
   }
@@ -81,8 +87,8 @@ export async function POST() {
     reset: missed && last !== null,
     message:
       missed && last !== null
-        ? `Streak reset — +${gained} bronze (day 1).`
-        : `+${gained} bronze · day ${streak} streak 🎉`,
+        ? t("api.daily.streakReset", { amount: gained })
+        : t("api.daily.claimed", { amount: gained, streak }),
     profile: updated,
   });
 }

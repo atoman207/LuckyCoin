@@ -9,12 +9,13 @@ bronze straight to your account.
 - **Auth** — register (nickname, email, password, nationality, Discord ID) & login via a modal.
 - **The game** — spend 1 silver to scatter 50 tiles (1 gold, 4 silver, 20 bronze, 25 empty). Pick one, it cracks open, the prize is credited. The board then reveals where everything was.
 - **Rewards** — 50-coin welcome bonus, +5 bronze daily, +20 bronze for a 7-day login streak (a missed day resets the streak).
-- **Buy** — purchase silver coins with a crypto checkout (verified on-chain). Minimum 10 silver. Packs: 10/$2, 100/$15, 1,000/$100.
+- **Buy** — purchase silver coins by **credit card (Stripe Checkout)** or with a crypto checkout (verified on-chain). Minimum 10 silver. Packs: 10/$2, 100/$15, 1,000/$100.
 - **Exchange** — value-preserving conversion between gold/silver/bronze.
 - **Profile** — `/profile`: every user (and the admin) can edit their own info and upload an avatar.
 - **Admin** — `/admin`: full CRUD over all users (create/edit/delete, coins by type, role, login dates) plus a **Transactions** tab showing wallet address, price and date of each purchase.
 - **Avatars** — uploaded files are stored in the **Supabase Storage** `avatar` bucket (must be public); only the URL is saved in the database. Works on read-only serverless hosts like Vercel.
-- Fully responsive, dark, stylish UI. All copy in English.
+- **Languages** — the whole site ships in **Japanese (default)** and English, switchable from the JA / EN control in the header. See [Internationalisation](#internationalisation).
+- Fully responsive, dark, stylish UI.
 
 ## Economy
 
@@ -85,6 +86,9 @@ Set these in **Vercel → Project → Settings → Environment Variables** (then
 | `GOOGLE_CLIENT_ID` | Yes (for Google login) |
 | `GOOGLE_CLIENT_SECRET` | Yes (for Google login) |
 | `SMTP_*`, `CONTACT_EMAIL` | If using email login / contact form |
+| `STRIPE_SECRET_KEY` | Yes (for card payments) |
+| `STRIPE_WEBHOOK_SECRET` | Yes (for card payments) |
+| `STRIPE_CURRENCY` | Optional (default `usd`) |
 
 ### Google login (production)
 
@@ -102,11 +106,67 @@ Set these in **Vercel → Project → Settings → Environment Variables** (then
 
 The app uses a **server-side Google OAuth** route (`/api/auth/google`) so the user's browser never opens `supabase.co` during sign-in. This fixes `ERR_TUNNEL_CONNECTION_FAILED` when `supabase.co` is blocked on the network.
 
+### Card payments (Stripe)
+
+The `/buy` page offers **card** and **crypto**. Card payments run through Stripe
+Checkout — no card details ever reach this site.
+
+1. **Get your keys** — Stripe Dashboard → Developers → API keys. Set
+   `STRIPE_SECRET_KEY` (server only; never expose it to the browser).
+
+2. **Add the webhook** — Stripe Dashboard → Developers → Webhooks → *Add endpoint*:
+   - URL: `https://YOUR-DOMAIN/api/stripe/webhook`
+   - Events: `checkout.session.completed`,
+     `checkout.session.async_payment_succeeded`,
+     `checkout.session.async_payment_failed`, `checkout.session.expired`
+   - Copy the signing secret (`whsec_…`) into `STRIPE_WEBHOOK_SECRET`.
+
+3. **Run the schema again** — [`supabase/schema.sql`](supabase/schema.sql) adds the
+   `stripe_session_id` / `stripe_payment_intent` columns and their unique index.
+   It is idempotent, so re-running it on an existing project is safe.
+
+4. **Test locally** with the Stripe CLI:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+
+**How a card purchase is credited**
+
+| Step | What happens |
+|------|--------------|
+| 1 | `/api/purchase/stripe` prices the pack **server-side**, writes a pending `purchases` row, and creates a Checkout Session carrying the order id. |
+| 2 | The buyer pays on Stripe's hosted page. |
+| 3 | The webhook (`checkout.session.completed`) verifies the signature and credits the silver. |
+| 4 | On return to `/buy`, `/api/purchase/stripe/status` asks Stripe directly so the balance updates immediately instead of waiting for the webhook. |
+
+Steps 3 and 4 both call `creditPurchase()`, which claims the order with a single
+`credited = false` UPDATE — whichever arrives first wins and the other is a
+no-op, so **one payment can never credit twice**. Prices are never taken from
+the browser, and the webhook rejects any request whose signature does not verify.
+
+## Internationalisation
+
+The site renders in **Japanese by default** and in English when the visitor picks
+`EN` in the header.
+
+- All copy lives in [`src/lib/i18n/messages/ja.ts`](src/lib/i18n/messages/ja.ts)
+  and [`en.ts`](src/lib/i18n/messages/en.ts). `ja.ts` defines the keys; `en.ts` is
+  typed as `Record<keyof typeof ja, string>`, so **TypeScript fails the build if a
+  translation is missing**.
+- The choice is stored in a `lang` cookie, so the server agrees with the client:
+  `<html lang>`, page metadata, API error messages and the login / password-reset
+  emails all follow it. With no cookie set, `Accept-Language` decides between the
+  two and anything that is not English falls back to Japanese.
+- Client components read it with `useI18n()`; server code uses `getT()` from
+  [`src/lib/i18n/server.ts`](src/lib/i18n/server.ts).
+- Strings with inline emphasis are rendered through `<RichText>`, which lets a
+  translation move the `<b>` / `<strong>` to wherever its own grammar needs it.
+
+To add a string: add the key to `ja.ts`, then `en.ts` (the compiler will point at
+it if you forget), and use `t("your.key")`.
+
 ### Other production notes
 
-- Replace the simulated checkout in [`src/app/api/purchase/route.ts`](src/app/api/purchase/route.ts)
-  with a real crypto provider (Coinbase Commerce / NOWPayments). Credit coins only
-  from a verified webhook, not from the client request.
 - Consider tightening the daily-bonus reset and adding rate limits.
 
 ## Project layout
@@ -119,11 +179,15 @@ src/
     buy/                  purchase silver
     exchange/             convert coins
     admin/                all-users dashboard
-    api/                  register, me, daily-bonus, game/start, game/pick, exchange, purchase, admin/users
-  components/             Nav, AuthModal, UserProvider, CoinIcon, CoinBalance
+    api/                  register, me, daily-bonus, game/*, exchange, purchase/*, stripe/webhook, admin/*
+  components/             Nav, AuthModal, UserProvider, CoinIcon, CoinBalance, LanguageToggle
   lib/
     coins.ts             economy constants + board builder
     auth.ts              requireProfile() helper
+    stripe.ts            Stripe client + currency helpers (server only)
+    purchase-credit.ts   idempotent "credit this order once" helper
+    chains.ts            on-chain payment verification
+    i18n/                messages (ja/en), provider, server helper
     supabase/            client / server / admin clients
 supabase/schema.sql      database + RLS
 ```

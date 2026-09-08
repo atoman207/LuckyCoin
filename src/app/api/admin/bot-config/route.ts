@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
+import { getT } from "@/lib/i18n/server";
+import { MAX_PER_RUN } from "@/lib/bots";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +19,12 @@ const todayKey = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC
 
 // ---- READ: current bot settings + today's drip progress -------------------
 export async function GET() {
+  const t = await getT();
   const ctx = await requireAdmin();
-  if (!ctx) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: t("api.admin.only") }, { status: 403 });
 
   const { data, error } = await ctx.admin.from("app_config").select("key, value");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
 
   const cfg = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
   const config = {
@@ -54,13 +57,16 @@ export async function GET() {
     config,
     today: plan ?? null,
     counts: { bots: botCount ?? 0, total: totalCount ?? 0 },
+    // The cap one Generate press may create (lib/bots.ts owns the number).
+    maxPerRun: MAX_PER_RUN,
   });
 }
 
 // ---- UPDATE: change the drip settings -------------------------------------
 export async function PATCH(req: Request) {
+  const t = await getT();
   const ctx = await requireAdmin();
-  if (!ctx) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: t("api.admin.only") }, { status: 403 });
 
   const b = await req.json().catch(() => ({}));
 
@@ -74,10 +80,10 @@ export async function PATCH(req: Request) {
   let max = Math.floor(Number(b.max));
   if (!Number.isFinite(min) || min < 0) min = 0;
   if (!Number.isFinite(max) || max < min) {
-    return NextResponse.json({ error: "Max must be a number ≥ min." }, { status: 400 });
+    return NextResponse.json({ error: t("api.admin.maxNumber") }, { status: 400 });
   }
   if (mode === "manual" && count <= 0) {
-    return NextResponse.json({ error: "Enter how many users to add per day (1 or more)." }, { status: 400 });
+    return NextResponse.json({ error: t("api.admin.countRequired") }, { status: 400 });
   }
 
   const now = new Date().toISOString();
@@ -92,7 +98,7 @@ export async function PATCH(req: Request) {
   ].map((r) => ({ ...r, updated_at: now }));
 
   const { error } = await ctx.admin.from("app_config").upsert(rows, { onConflict: "key" });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
 
   // In manual mode, apply the new count to TODAY immediately so the admin's
   // choice takes effect on this day's drip (not just future days). Auto-mode

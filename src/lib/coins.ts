@@ -1,4 +1,5 @@
 // Central place for the game's economy. Tune everything here.
+import type { MessageKey, TFunction } from "@/lib/i18n";
 
 // Value of each coin expressed in the base unit (bronze).
 export const COIN_VALUE = {
@@ -157,10 +158,16 @@ export function randomGemReward(): GemReward {
 }
 
 // Short human label for a gem reward (used in the UI + result text).
-export function gemRewardLabel(r: GemReward): string {
-  if (r.kind === "turns") return `+${r.turns} free turn${r.turns === 1 ? "" : "s"}`;
-  if (r.kind === "silver") return `+${r.amount} silver`;
-  return `+${r.amount.toLocaleString()} bronze`;
+// Localised name of a coin ("ゴールド" / "gold"), for use inside sentences.
+export function coinName(t: TFunction, type: CoinType | string): string {
+  return t(`coin.${type}` as MessageKey);
+}
+
+// The wording lives in the message catalogue, so pass in the caller's `t`.
+export function gemRewardLabel(t: TFunction, r: GemReward): string {
+  if (r.kind === "turns") return t("gem.turns", { turns: r.turns });
+  if (r.kind === "silver") return t("gem.silver", { amount: r.amount });
+  return t("gem.bronze", { amount: r.amount.toLocaleString() });
 }
 
 // Per-round board composition (rounds 1–10). The remaining tiles of the 50 are
@@ -263,11 +270,11 @@ export function dailyReward(streakDay: number): number {
 
 // Purchase packs — buy silver coins (crypto checkout, verified on-chain).
 // Minimum purchase is 10 silver. Base rate is $0.25 / silver.
-export type CoinPack = { silver: number; usd: number; label: string; tag?: string };
+export type CoinPack = { silver: number; usd: number; label: MessageKey; tag?: MessageKey };
 export const COIN_PACKS: CoinPack[] = [
-  { silver: 10, usd: 2, label: "10 Copper", tag: "Save 20%" },
-  { silver: 100, usd: 15, label: "100 Silver", tag: "Save 40%" },
-  { silver: 1000, usd: 100, label: "1,000 Silver", tag: "Best value" },
+  { silver: 10, usd: 2, label: "buy.pack10", tag: "buy.packSaveTag20" },
+  { silver: 100, usd: 15, label: "buy.pack100", tag: "buy.packSaveTag40" },
+  { silver: 1000, usd: 100, label: "buy.pack1000", tag: "buy.packBestValue" },
 ];
 
 // Custom purchase: any whole amount of silver from 1 to 100, at the base rate.

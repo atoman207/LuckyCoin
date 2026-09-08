@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import DemoCoinModal from "@/components/DemoCoinModal";
-import { buildBoardFrom, BASE_COMPOSITION, BOARD_SIZE, FREE_PLAYS, type BoardSlot, type CoinType } from "@/lib/coins";
-import { INTRO_TEASER } from "@/lib/content";
+import { buildBoardFrom, BASE_COMPOSITION, BOARD_SIZE, FREE_PLAYS, coinName, type BoardSlot, type CoinType } from "@/lib/coins";
+import { INTRO_TEASER_KEYS } from "@/lib/content";
+import { useI18n } from "@/lib/i18n/provider";
 
 const KEY = "lc_demo_plays";
 
@@ -25,6 +26,7 @@ function weightedOutcome(): BoardSlot {
 // a login gate links to the full introduction.
 export default function DemoGame() {
   const { openAuth } = useUser();
+  const { t } = useI18n();
   const router = useRouter();
   const [plays, setPlays] = useState(0);
   const [board, setBoard] = useState<BoardSlot[] | null>(null);
@@ -78,29 +80,26 @@ export default function DemoGame() {
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold">Try it free</h1>
+          <h1 className="text-3xl font-extrabold">{t("demo.title")}</h1>
           <p className="text-slate-400">
-            {left > 0 ? `${left} of ${FREE_PLAYS} free demo rounds left` : "Free rounds used"} · demo
-            wins evaporate the moment you blink — log in to keep them for real.
+            {left > 0 ? t("demo.left", { left, total: FREE_PLAYS }) : t("demo.used")} ·{" "}
+            {t("demo.subtitle")}
           </p>
         </div>
-        <button onClick={openAuth} className="btn-gold text-sm">Log in / Register</button>
+        <button onClick={openAuth} className="btn-gold text-sm">{t("common.loginRegister")}</button>
       </div>
 
       {!board ? (
         <div className="card flex flex-col items-center gap-4 p-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
-          <h2 className="text-2xl font-bold">Pick the lucky coin</h2>
-          <p className="max-w-sm text-slate-300">
-            {BOARD_SIZE} tiles, three kinds of coin, one shining moment. Crack one open and see what
-            fate coughs up!
-          </p>
+          <h2 className="text-2xl font-bold">{t("demo.pickTitle")}</h2>
+          <p className="max-w-sm text-slate-300">{t("demo.pickBody", { size: BOARD_SIZE })}</p>
           <button onClick={start} disabled={plays >= FREE_PLAYS} className="btn-gold text-lg !px-7 !py-3">
-            {plays >= FREE_PLAYS ? "Log in to keep playing" : "▶ Start free round"}
+            {plays >= FREE_PLAYS ? t("demo.loginToKeepPlaying") : t("demo.startRound")}
           </button>
           {plays >= FREE_PLAYS && (
             <button onClick={() => setGateOpen(true)} className="text-sm text-amber-300 underline">
-              Why log in?
+              {t("demo.whyLogin")}
             </button>
           )}
         </div>
@@ -132,7 +131,7 @@ export default function DemoGame() {
                       <CoinIcon type={shown} responsive />
                     </span>
                   ) : revealed ? (
-                    <span className="text-xs font-bold text-slate-500 sm:text-sm">No</span>
+                    <span className="text-xs font-bold text-slate-500 sm:text-sm">{t("coin.no")}</span>
                   ) : null}
                 </button>
               );
@@ -142,11 +141,13 @@ export default function DemoGame() {
 
           {result !== null && !coinModal && (
             <div className="card flex shrink-0 flex-col items-center gap-3 p-4 text-center sm:p-6">
-              <div className="text-xl font-bold capitalize">
-                {result === "empty" ? "Nothing but air this time (demo)" : `You unearthed 1 ${result} coin! (demo)`}
+              <div className="text-xl font-bold">
+                {result === "empty"
+                  ? t("demo.resultEmpty")
+                  : t("demo.resultCoin", { name: coinName(t, result) })}
               </div>
               <button onClick={start} className="btn-gold">
-                {left > 0 ? `Play again (${left} left)` : "Log in to keep playing"}
+                {left > 0 ? t("demo.playAgain", { left }) : t("demo.loginToKeepPlaying")}
               </button>
             </div>
           )}
@@ -160,16 +161,16 @@ export default function DemoGame() {
       {gateOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setGateOpen(false)}>
           <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold">Log in to keep playing</h2>
+            <h2 className="text-2xl font-bold">{t("demo.gateTitle")}</h2>
             <div className="mt-3 space-y-2 text-sm text-slate-300">
-              {INTRO_TEASER.map((line, i) => (
-                <p key={i}>{line}</p>
+              {INTRO_TEASER_KEYS.map((key) => (
+                <p key={key}>{t(key)}</p>
               ))}
             </div>
             <div className="mt-5 flex flex-col gap-2">
-              <button onClick={openAuth} className="btn-gold w-full">Log in / Register</button>
+              <button onClick={openAuth} className="btn-gold w-full">{t("common.loginRegister")}</button>
               <button onClick={() => router.push("/intro")} className="btn-ghost w-full">
-                Read More →
+                {t("intro.readMore")}
               </button>
             </div>
           </div>

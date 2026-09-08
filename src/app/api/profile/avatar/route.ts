@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { saveAvatarFile } from "@/lib/avatar";
+import { getT } from "@/lib/i18n/server";
+import { isMessageKey } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
 // Upload an avatar. The image is stored in Supabase Storage and only its public
 // URL is saved to the profiles table.
 export async function POST(req: Request) {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("avatar");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file uploaded." }, { status: 400 });
+    return NextResponse.json({ error: t("api.profile.noFile") }, { status: 400 });
   }
 
   const id = ctx.profile.id;
@@ -22,12 +25,12 @@ export async function POST(req: Request) {
   try {
     url = await saveAvatarFile(ctx.admin, id, file);
   } catch (e) {
-    // Validation errors (type/size) carry a user-facing message; anything else
-    // is treated as a storage failure.
+    // Validation errors (type/size) throw a MESSAGE KEY; anything else is
+    // treated as a storage failure.
     const msg = e instanceof Error ? e.message : "";
-    const isValidation = /Unsupported image type|2 MB/.test(msg);
+    const isValidation = isMessageKey(msg) && msg.startsWith("avatar.");
     return NextResponse.json(
-      { error: isValidation ? msg : "Could not save the image on the server." },
+      { error: isValidation ? t(msg) : t("api.profile.imageSaveFailed") },
       { status: isValidation ? 400 : 500 }
     );
   }
@@ -39,6 +42,6 @@ export async function POST(req: Request) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
   return NextResponse.json({ profile: data, avatar_url: url });
 }

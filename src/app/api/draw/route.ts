@@ -9,6 +9,7 @@ import {
   drawCooldownLeftMs,
   formatDrawCountdown,
 } from "@/lib/coins";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -25,8 +26,9 @@ function shuffle<T>(arr: T[]): T[] {
 // wheel, choose a WINNING segment that is never 1000 or 500, credit the bronze,
 // and return the layout + winning index so the client can spin to it.
 export async function POST() {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
   const now = Date.now();
@@ -36,7 +38,7 @@ export async function POST() {
     return NextResponse.json({
       spun: false,
       nextInMs: msLeft,
-      message: `Come back in ${formatDrawCountdown(msLeft)} for your next spin.`,
+      message: t("api.draw.comeBack", { time: formatDrawCountdown(msLeft) }),
       profile,
     });
   }
@@ -68,9 +70,9 @@ export async function POST() {
   q = profile.last_draw_at === null ? q.is("last_draw_at", null) : q.eq("last_draw_at", profile.last_draw_at);
   const { data: updated, error } = await q.select("*").maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
   if (!updated) {
-    return NextResponse.json({ spun: false, message: "Already spun today.", profile });
+    return NextResponse.json({ spun: false, message: t("api.draw.alreadySpun"), profile });
   }
 
   await admin.from("draws").insert({ user_id: profile.id, value, coin: WHEEL_REWARD_COIN });

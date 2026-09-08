@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMail } from "@/lib/mailer";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -8,9 +9,10 @@ export const runtime = "nodejs";
 // via our own SMTP. The link verifies on /auth/confirm and lands on
 // /reset-password where the user sets a new password.
 export async function POST(req: Request) {
+  const t = await getT();
   const { email } = await req.json().catch(() => ({}));
   if (typeof email !== "string" || !email.includes("@")) {
-    return NextResponse.json({ error: "Valid email required." }, { status: 400 });
+    return NextResponse.json({ error: t("api.auth.validEmail") }, { status: 400 });
   }
   const to = email.trim().toLowerCase();
   const origin = new URL(req.url).origin;
@@ -25,16 +27,16 @@ export async function POST(req: Request) {
     try {
       await sendMail({
         to,
-        subject: "Reset your Lucky Coin password",
-        text: `Reset your password:\n${link}\n\nThis link expires shortly and can be used once. If you didn't request this, ignore this email.`,
+        subject: t("email.reset.subject"),
+        text: `${t("email.reset.text")}\n${link}\n\n${t("email.reset.ignore")}`,
         html: `
           <div style="font-family:system-ui,Segoe UI,Roboto,sans-serif;max-width:480px;margin:auto">
-            <h2 style="color:#0b0f1a">🪙 Reset your password</h2>
-            <p>Click below to choose a new password. This link expires shortly and can be used once.</p>
+            <h2 style="color:#0b0f1a">${t("email.reset.heading")}</h2>
+            <p>${t("email.reset.body")}</p>
             <p style="margin:24px 0">
-              <a href="${link}" style="background:#f5b73d;color:#0b0f1a;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold">Reset password</a>
+              <a href="${link}" style="background:#f5b73d;color:#0b0f1a;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold">${t("email.reset.button")}</a>
             </p>
-            <p style="font-size:12px;color:#667">If you didn't request this, you can ignore this email.<br>${link}</p>
+            <p style="font-size:12px;color:#667">${t("email.reset.ignore")}<br>${link}</p>
           </div>`,
       });
     } catch {

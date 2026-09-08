@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { SHELL_REWARD, SILVER_CAP, randomGemReward, type BoardSlot, type GemReward } from "@/lib/coins";
+import { getT } from "@/lib/i18n/server";
 
 const NO_REWARD = { gold: 0, silver: 0, bronze: 0 } as const;
 
@@ -8,14 +9,15 @@ const NO_REWARD = { gold: 0, silver: 0, bronze: 0 } as const;
 // server looks up the stored board, credits the reward, closes the round, and
 // returns the full board so the UI can show where everything was.
 export async function POST(req: Request) {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
   const { roundId, index } = await req.json().catch(() => ({}));
 
   if (typeof roundId !== "string" || typeof index !== "number") {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    return NextResponse.json({ error: t("api.invalidRequest") }, { status: 400 });
   }
 
   const { data: round } = await admin
@@ -25,14 +27,14 @@ export async function POST(req: Request) {
     .eq("user_id", profile.id)
     .single();
 
-  if (!round) return NextResponse.json({ error: "Round not found." }, { status: 404 });
+  if (!round) return NextResponse.json({ error: t("api.game.roundNotFound") }, { status: 404 });
   if (round.status !== "active") {
-    return NextResponse.json({ error: "This round is already finished." }, { status: 400 });
+    return NextResponse.json({ error: t("api.game.roundFinished") }, { status: 400 });
   }
 
   const board = round.board as BoardSlot[];
   if (index < 0 || index >= board.length) {
-    return NextResponse.json({ error: "Invalid pick." }, { status: 400 });
+    return NextResponse.json({ error: t("api.game.invalidPick") }, { status: 400 });
   }
 
   const picked = board[index];
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
     .single();
 
   if (closeErr || !closed) {
-    return NextResponse.json({ error: "This round is already finished." }, { status: 400 });
+    return NextResponse.json({ error: t("api.game.roundFinished") }, { status: 400 });
   }
 
   // Credit the reward. Silver is capped at SILVER_CAP (10,000) per player.
@@ -110,7 +112,8 @@ export async function POST(req: Request) {
     .single();
 
   if (creditErr) {
-    return NextResponse.json({ error: creditErr.message }, { status: 500 });
+    console.error("[game/pick] could not credit reward:", creditErr);
+    return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
   }
 
   return NextResponse.json({

@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
 // Records an anonymous visit — one row per browser per UTC day (deduped by the
 // unique index). "Visitors" = people who opened the app to try it for free.
 export async function POST(req: Request) {
+  const t = await getT();
   const body = await req.json().catch(() => ({}));
   const visitor = typeof body.visitor_id === "string" ? body.visitor_id.slice(0, 64) : null;
-  if (!visitor) return NextResponse.json({ error: "Missing visitor id." }, { status: 400 });
+  if (!visitor) return NextResponse.json({ error: t("api.visit.missingVisitorId") }, { status: 400 });
 
   const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
   const admin = createAdminClient();

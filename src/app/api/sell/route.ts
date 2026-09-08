@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { isSellOpen, sellStatus, SELL_PRICE_USDT } from "@/lib/selling";
 import { getPaymentMethod } from "@/lib/wallets";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -10,23 +11,24 @@ export const runtime = "nodejs";
 // bypass it. Gold is deducted and a payout request is recorded for the admin
 // to fulfil — no crypto is auto-sent.
 export async function POST(req: Request) {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
 
   // Trading window (authoritative).
   if (!isSellOpen()) {
-    return NextResponse.json({ error: sellStatus().message, closed: true }, { status: 403 });
+    return NextResponse.json({ error: t(sellStatus().message), closed: true }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
   const gold = Math.floor(Number(body.gold));
   if (!Number.isFinite(gold) || gold < 1) {
-    return NextResponse.json({ error: "Enter how many gold coins to sell." }, { status: 400 });
+    return NextResponse.json({ error: t("api.sell.enterAmount") }, { status: 400 });
   }
   if (gold > profile.gold) {
-    return NextResponse.json({ error: `You only have ${profile.gold} gold.` }, { status: 400 });
+    return NextResponse.json({ error: t("api.sell.onlyHave", { count: profile.gold }) }, { status: 400 });
   }
 
   // Resolve the payout wallet: the one entered now, or the registered one.
@@ -35,7 +37,7 @@ export async function POST(req: Request) {
   const payoutAddress = enteredAddress || profile.payout_address || "";
   if (!payoutAddress) {
     return NextResponse.json(
-      { error: "Please enter a wallet address to receive your payout.", needWallet: true },
+      { error: t("api.sell.needWallet"), needWallet: true },
       { status: 400 }
     );
   }
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error || !updated) {
-    return NextResponse.json({ error: "Could not complete the sale." }, { status: 400 });
+    return NextResponse.json({ error: t("api.sell.failed") }, { status: 400 });
   }
 
   await admin.from("sells").insert({
@@ -74,9 +76,12 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     usdt,
-    message: `Sold ${gold} gold for ${usdt.toLocaleString()} USDT. Your payout will be sent to ${
-      methodLabel ? `${methodLabel} · ` : ""
-    }${payoutAddress}.`,
+    message: t("api.sell.done", {
+      gold,
+      usdt: usdt.toLocaleString(),
+      method: methodLabel ? `${methodLabel} · ` : "",
+      address: payoutAddress,
+    }),
     profile: updated,
   });
 }

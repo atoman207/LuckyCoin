@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 import CoinIcon from "@/components/CoinIcon";
-import { COIN_VALUE } from "@/lib/coins";
+import { coinName } from "@/lib/coins";
 import { getPaymentMethod } from "@/lib/wallets";
+import RichText from "@/components/RichText";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey, TFunction } from "@/lib/i18n";
 
 type Row = {
   id: string;
@@ -35,6 +38,36 @@ type Stats = {
 
 type SortKey = "created_at" | "nickname" | "last_sign_in_at" | "gold" | "silver" | "bronze";
 const PAGE_SIZE = 20;
+
+function SelectAllCheckbox({
+  checked,
+  indeterminate,
+  disabled,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onChange={onChange}
+      aria-label={label}
+      className="h-4 w-4 accent-amber-400"
+    />
+  );
+}
 
 type Txn = {
   id: string;
@@ -69,12 +102,41 @@ type Sell = {
   profiles: { nickname: string; email: string } | null;
 };
 
-const fmt = (d: string | null) => (d ? new Date(d).toLocaleString() : "—");
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+// Tab + column labels live in the message catalogue.
+const TAB_LABEL: Record<Tab, MessageKey> = {
+  users: "admin.tabUsers",
+  transactions: "admin.tabTransactions",
+  sells: "admin.tabSells",
+  messages: "admin.tabMessages",
+  bots: "admin.tabBots",
+};
+const KIND_LABEL: Record<"all" | "real" | "bot", MessageKey> = {
+  all: "admin.filterAll",
+  real: "admin.filterReal",
+  bot: "admin.filterBot",
+};
+// Order/sell statuses are stored in English in the database; show them
+// translated without changing what is persisted.
+const STATUS_LABEL: Record<string, MessageKey> = {
+  paid: "admin.statusPaid",
+  requested: "admin.statusRequested",
+  completed: "admin.statusCompleted",
+  awaiting_payment: "admin.statusAwaiting",
+  verification_failed: "admin.statusFailed",
+  failed: "admin.statusFailed",
+  canceled: "admin.statusCanceled",
+};
+const statusLabel = (t: TFunction, status: string) =>
+  STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status;
+
+type Tab = "users" | "transactions" | "sells" | "messages" | "bots";
 
 export default function AdminPage() {
   const { profile, loading } = useUser();
-  const [tab, setTab] = useState<"users" | "transactions" | "sells" | "messages" | "bots">("users");
+  const { t, intlLocale } = useI18n();
+  const fmt = (d: string | null) => (d ? new Date(d).toLocaleString(intlLocale) : "—");
+  const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString(intlLocale) : "—");
+  const [tab, setTab] = useState<Tab>("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
   const [sells, setSells] = useState<Sell[] | null>(null);
@@ -84,9 +146,11 @@ export default function AdminPage() {
   const [q, setQ] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "real" | "bot">("all");
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc"); // signup order by default
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc"); // newest signups first
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Row | "new" | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users", { cache: "no-store" });
@@ -142,12 +206,12 @@ export default function AdminPage() {
     loadSells();
   }
 
-  if (loading) return <div className="py-20 text-center text-slate-400">Loading…</div>;
+  if (loading) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
   if (!profile?.is_admin) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Admins only</h1>
-        <p className="mt-2 text-slate-400">This area is restricted.</p>
+        <h1 className="text-2xl font-bold">{t("admin.onlyTitle")}</h1>
+        <p className="mt-2 text-slate-400">{t("admin.onlyBody")}</p>
       </div>
     );
   }
@@ -186,6 +250,11 @@ export default function AdminPage() {
   const current = Math.min(page, pageCount);
   const pageRows = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
+  const selectableIds = sorted.filter((r) => r.id !== profile.id).map((r) => r.id);
+  const selectedCount = selectableIds.filter((id) => selected.has(id)).length;
+  const allFilteredSelected = selectableIds.length > 0 && selectedCount === selectableIds.length;
+  const someFilteredSelected = selectedCount > 0 && !allFilteredSelected;
+
   const botCount = (rows ?? []).filter((r) => r.kind === "bot").length;
   const realCount = (rows ?? []).filter((r) => r.kind === "real").length;
 
@@ -195,11 +264,68 @@ export default function AdminPage() {
   );
 
   async function remove(r: Row) {
-    if (!confirm(`Delete ${r.nickname} (${r.email})? This cannot be undone.`)) return;
+    if (!confirm(t("admin.deleteConfirm", { nickname: r.nickname, email: r.email }))) return;
     const res = await fetch(`/api/admin/users?id=${r.id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) return setError(data.error);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(r.id);
+      return next;
+    });
     loadUsers();
+  }
+
+  function toggleSelected(id: string) {
+    // Hoisted declaration, so `profile` is not narrowed by the guard above.
+    if (id === profile?.id) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        for (const id of selectableIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  }
+
+  async function removeSelected() {
+    const ids = selectableIds.filter((id) => selected.has(id));
+    if (ids.length === 0) {
+      setError(t("admin.deleteSelectedNone"));
+      return;
+    }
+    if (!confirm(t("admin.deleteSelectedConfirm", { count: ids.length }))) return;
+    setDeletingSelected(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+      if (data.error) setError(data.error);
+      setSelected(new Set());
+      await loadUsers();
+    } finally {
+      setDeletingSelected(false);
+    }
   }
 
   return (
@@ -208,21 +334,27 @@ export default function AdminPage() {
     <div className="space-y-6 mx-[calc(50%-50vw)] w-screen px-[3vw]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold">Admin dashboard</h1>
+          <h1 className="text-3xl font-extrabold">{t("admin.title")}</h1>
           <p className="text-slate-400">
-            {rows?.length ?? 0} players ({realCount} real · {botCount} bot) · {txns?.length ?? 0} transactions · {sells?.length ?? 0} sell requests
+            {t("admin.summary", {
+              players: rows?.length ?? 0,
+              real: realCount,
+              bots: botCount,
+              txns: txns?.length ?? 0,
+              sells: sells?.length ?? 0,
+            })}
           </p>
         </div>
         <div className="flex gap-2 rounded-xl bg-black/30 p-1">
-          {(["users", "transactions", "sells", "messages", "bots"] as const).map((t) => (
+          {(["users", "transactions", "sells", "messages", "bots"] as const).map((name) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-semibold capitalize transition ${
-                tab === t ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+              key={name}
+              onClick={() => setTab(name)}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+                tab === name ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
               }`}
             >
-              {t}
+              {t(TAB_LABEL[name])}
             </button>
           ))}
         </div>
@@ -230,24 +362,27 @@ export default function AdminPage() {
 
       {error && (
         <div className="rounded-xl bg-red-500/15 px-4 py-3 text-red-300">
-          {error} <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
+          {error}{" "}
+          <button onClick={() => setError(null)} className="ml-2 underline">
+            {t("common.dismiss")}
+          </button>
         </div>
       )}
 
       {/* Visitor / member stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Total visitors", value: stats?.visitorsTotal, hint: "tried for free", tone: "text-sky-300" },
-          { label: "Visitors today", value: stats?.visitorsToday, hint: "today", tone: "text-sky-300" },
-          { label: "Total members", value: stats?.membersTotal, hint: "registered", tone: "text-emerald-300" },
-          { label: "Members today", value: stats?.membersToday, hint: "joined/logged in", tone: "text-emerald-300" },
+          { label: "admin.visitorsTotal" as const, value: stats?.visitorsTotal, hint: "admin.visitorsTotalHint" as const, tone: "text-sky-300" },
+          { label: "admin.visitorsToday" as const, value: stats?.visitorsToday, hint: "admin.visitorsTodayHint" as const, tone: "text-sky-300" },
+          { label: "admin.membersTotal" as const, value: stats?.membersTotal, hint: "admin.membersTotalHint" as const, tone: "text-emerald-300" },
+          { label: "admin.membersToday" as const, value: stats?.membersToday, hint: "admin.membersTodayHint" as const, tone: "text-emerald-300" },
         ].map((s) => (
           <div key={s.label} className="card p-5">
-            <div className="text-sm text-slate-400">{s.label}</div>
+            <div className="text-sm text-slate-400">{t(s.label)}</div>
             <div className={`mt-1 text-3xl font-extrabold tabular-nums ${s.tone}`}>
               {s.value === undefined ? "…" : s.value.toLocaleString()}
             </div>
-            <div className="text-xs text-slate-500">{s.hint}</div>
+            <div className="text-xs text-slate-500">{t(s.hint)}</div>
           </div>
         ))}
       </div>
@@ -255,12 +390,12 @@ export default function AdminPage() {
       {tab === "users" && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            {(["gold", "silver", "bronze"] as const).map((t) => (
-              <div key={t} className="card flex items-center gap-3 p-5">
-                <CoinIcon type={t} size={44} />
+            {(["gold", "silver", "bronze"] as const).map((type) => (
+              <div key={type} className="card flex items-center gap-3 p-5">
+                <CoinIcon type={type} size={44} />
                 <div>
-                  <div className="text-sm capitalize text-slate-400">Total {t}</div>
-                  <div className="text-2xl font-extrabold">{totals[t].toLocaleString()}</div>
+                  <div className="text-sm text-slate-400">{t("admin.totalCoin", { name: coinName(t, type) })}</div>
+                  <div className="text-2xl font-extrabold">{totals[type].toLocaleString()}</div>
                 </div>
               </div>
             ))}
@@ -269,7 +404,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap items-center gap-3">
             <input
               className="input max-w-xs flex-1"
-              placeholder="Search name, email, country, Discord, type…"
+              placeholder={t("admin.searchPlaceholder")}
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
@@ -286,11 +421,11 @@ export default function AdminPage() {
                     setKindFilter(k);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3 py-1.5 font-semibold capitalize transition ${
+                  className={`rounded-lg px-3 py-1.5 font-semibold transition ${
                     kindFilter === k ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
                   }`}
                 >
-                  {k}
+                  {t(KIND_LABEL[k])}
                   {k === "real" && ` (${realCount})`}
                   {k === "bot" && ` (${botCount})`}
                 </button>
@@ -303,50 +438,87 @@ export default function AdminPage() {
               onChange={(e) => setSortKey(e.target.value as SortKey)}
               className="input max-w-[12rem]"
             >
-              <option value="created_at">Sort: Signup date</option>
-              <option value="nickname">Sort: Name</option>
-              <option value="last_sign_in_at">Sort: Last login</option>
-              <option value="gold">Sort: Gold</option>
-              <option value="silver">Sort: Silver</option>
-              <option value="bronze">Sort: Bronze</option>
+              <option value="created_at">{t("admin.sortCreated")}</option>
+              <option value="nickname">{t("admin.sortName")}</option>
+              <option value="last_sign_in_at">{t("admin.sortLastLogin")}</option>
+              <option value="gold">{t("admin.sortGold")}</option>
+              <option value="silver">{t("admin.sortSilver")}</option>
+              <option value="bronze">{t("admin.sortBronze")}</option>
             </select>
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
               className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
-              title={sortDir === "asc" ? "Ascending" : "Descending"}
+              title={sortDir === "asc" ? t("admin.ascending") : t("admin.descending")}
             >
-              {sortDir === "asc" ? "↑ Asc" : "↓ Desc"}
+              {sortDir === "asc" ? t("admin.asc") : t("admin.desc")}
             </button>
 
-            <button onClick={() => setEditing("new")} className="btn-gold ml-auto text-sm">+ New user</button>
+            <button onClick={() => setEditing("new")} className="btn-gold ml-auto text-sm">{t("admin.newUser")}</button>
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              disabled={selectableIds.length === 0}
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
+            >
+              {allFilteredSelected ? t("admin.deselectAll") : t("admin.selectAll")}
+            </button>
+            <button
+              type="button"
+              onClick={removeSelected}
+              disabled={selectedCount === 0 || deletingSelected}
+              className="rounded-lg border border-red-400/30 px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+            >
+              {deletingSelected
+                ? t("common.loading")
+                : `${t("admin.deleteSelected")}${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
+            </button>
           </div>
 
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="border-b border-white/10 text-slate-400">
                 <tr>
-                  <th className="px-4 py-3">Player</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Country</th>
-                  <th className="px-4 py-3">Discord</th>
-                  <th className="px-4 py-3">Last login</th>
-                  <th className="px-4 py-3">Joined</th>
-                  <th className="px-4 py-3 text-right">Draws</th>
-                  <th className="px-4 py-3 text-right">Gold</th>
-                  <th className="px-4 py-3 text-right">Silver</th>
-                  <th className="px-4 py-3 text-right">Bronze</th>
-                  <th className="px-4 py-3 text-center">Admin</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="w-10 px-4 py-3">
+                    <SelectAllCheckbox
+                      checked={allFilteredSelected}
+                      indeterminate={someFilteredSelected}
+                      disabled={selectableIds.length === 0}
+                      onChange={toggleSelectAll}
+                      label={t("admin.selectAll")}
+                    />
+                  </th>
+                  <th className="px-4 py-3">{t("admin.colPlayer")}</th>
+                  <th className="px-4 py-3">{t("admin.colType")}</th>
+                  <th className="px-4 py-3">{t("admin.colCountry")}</th>
+                  <th className="px-4 py-3">{t("admin.colDiscord")}</th>
+                  <th className="px-4 py-3">{t("admin.colLastLogin")}</th>
+                  <th className="px-4 py-3">{t("admin.colJoined")}</th>
+                  <th className="px-4 py-3 text-right">{t("admin.colDraws")}</th>
+                  <th className="px-4 py-3 text-right">{t("coin.gold")}</th>
+                  <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
+                  <th className="px-4 py-3 text-right">{t("coin.bronze")}</th>
+                  <th className="px-4 py-3 text-center">{t("admin.colAdmin")}</th>
+                  <th className="px-4 py-3 text-right">{t("admin.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows === null ? (
-                  <tr><td colSpan={12} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
                 ) : sorted.length === 0 ? (
-                  <tr><td colSpan={12} className="px-4 py-8 text-center text-slate-500">No players found.</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">{t("admin.noPlayers")}</td></tr>
                 ) : (
                   pageRows.map((r) => (
                     <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.03]">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(r.id)}
+                          disabled={r.id === profile.id}
+                          onChange={() => toggleSelected(r.id)}
+                          aria-label={t("admin.colSelect")}
+                          className="h-4 w-4 accent-amber-400 disabled:opacity-30"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar src={r.avatar_url} name={r.nickname} size={34} />
@@ -364,7 +536,7 @@ export default function AdminPage() {
                               : "bg-emerald-400/15 text-emerald-300"
                           }`}
                         >
-                          {r.kind === "bot" ? "bot" : "real"}
+                          {r.kind === "bot" ? t("admin.typeBot") : t("admin.typeReal")}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-300">{r.nationality ?? "—"}</td>
@@ -377,8 +549,8 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-right font-semibold text-orange-300">{r.bronze}</td>
                       <td className="px-4 py-3 text-center">{r.is_admin ? "✅" : "—"}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button onClick={() => setEditing(r)} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs hover:bg-white/10">Edit</button>
-                        <button onClick={() => remove(r)} className="ml-2 rounded-lg border border-red-400/30 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">Delete</button>
+                        <button onClick={() => setEditing(r)} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs hover:bg-white/10">{t("common.edit")}</button>
+                        <button onClick={() => remove(r)} className="ml-2 rounded-lg border border-red-400/30 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">{t("common.delete")}</button>
                       </td>
                     </tr>
                   ))
@@ -391,8 +563,11 @@ export default function AdminPage() {
           {sorted.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
               <span>
-                Showing {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, sorted.length)} of{" "}
-                {sorted.length}
+                {t("admin.showing", {
+                  from: (current - 1) * PAGE_SIZE + 1,
+                  to: Math.min(current * PAGE_SIZE, sorted.length),
+                  total: sorted.length,
+                })}
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -400,31 +575,31 @@ export default function AdminPage() {
                   disabled={current === 1}
                   className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
                 >
-                  « First
+                  {t("admin.pageFirst")}
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={current === 1}
                   className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
                 >
-                  ‹ Prev
+                  {t("admin.pagePrev")}
                 </button>
                 <span className="px-2 font-semibold text-slate-200">
-                  Page {current} / {pageCount}
+                  {t("admin.pageIndicator", { current, total: pageCount })}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                   disabled={current === pageCount}
                   className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
                 >
-                  Next ›
+                  {t("admin.pageNext")}
                 </button>
                 <button
                   onClick={() => setPage(pageCount)}
                   disabled={current === pageCount}
                   className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
                 >
-                  Last »
+                  {t("admin.pageLast")}
                 </button>
               </div>
             </div>
@@ -437,35 +612,35 @@ export default function AdminPage() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-white/10 text-slate-400">
               <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Buyer</th>
-                <th className="px-4 py-3 text-right">Silver</th>
-                <th className="px-4 py-3 text-right">Price (USD)</th>
-                <th className="px-4 py-3">Currency</th>
-                <th className="px-4 py-3">Paid from</th>
-                <th className="px-4 py-3">Paid to</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">{t("admin.colDate")}</th>
+                <th className="px-4 py-3">{t("admin.colBuyer")}</th>
+                <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
+                <th className="px-4 py-3 text-right">{t("admin.colPriceUsd")}</th>
+                <th className="px-4 py-3">{t("admin.colCurrency")}</th>
+                <th className="px-4 py-3">{t("admin.colPaidFrom")}</th>
+                <th className="px-4 py-3">{t("admin.colPaidTo")}</th>
+                <th className="px-4 py-3">{t("admin.colStatus")}</th>
               </tr>
             </thead>
             <tbody>
               {txns === null ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
               ) : txns.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No transactions yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("admin.noTransactions")}</td></tr>
               ) : (
-                txns.map((t) => (
-                  <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                    <td className="px-4 py-3 text-slate-400">{fmt(t.created_at)}</td>
+                txns.map((txn) => (
+                  <tr key={txn.id} className="border-b border-white/5 hover:bg-white/[0.03]">
+                    <td className="px-4 py-3 text-slate-400">{fmt(txn.created_at)}</td>
                     <td className="px-4 py-3">
-                      <div className="font-medium">{t.profiles?.nickname ?? "—"}</div>
-                      <div className="text-xs text-slate-500">{t.profiles?.email ?? ""}</div>
+                      <div className="font-medium">{txn.profiles?.nickname ?? "—"}</div>
+                      <div className="text-xs text-slate-500">{txn.profiles?.email ?? ""}</div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-200">{t.silver.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">${Number(t.usd_amount).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-slate-300">{t.currency ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{t.wallet_address ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-amber-200/80 break-all">{t.to_address ?? "—"}</td>
-                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-200">{t.status}</span></td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-200">{txn.silver.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">${Number(txn.usd_amount).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-slate-300">{txn.currency ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{txn.wallet_address ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-amber-200/80 break-all">{txn.to_address ?? "—"}</td>
+                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-200">{statusLabel(t, txn.status)}</span></td>
                   </tr>
                 ))
               )}
@@ -479,21 +654,21 @@ export default function AdminPage() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-white/10 text-slate-400">
               <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Seller</th>
-                <th className="px-4 py-3 text-right">Gold</th>
-                <th className="px-4 py-3 text-right">Payout (USDT)</th>
-                <th className="px-4 py-3">Receive as</th>
-                <th className="px-4 py-3">Wallet address</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Action</th>
+                <th className="px-4 py-3">{t("admin.colDate")}</th>
+                <th className="px-4 py-3">{t("admin.colSeller")}</th>
+                <th className="px-4 py-3 text-right">{t("coin.gold")}</th>
+                <th className="px-4 py-3 text-right">{t("admin.colPayoutUsdt")}</th>
+                <th className="px-4 py-3">{t("admin.colReceiveAs")}</th>
+                <th className="px-4 py-3">{t("admin.colWallet")}</th>
+                <th className="px-4 py-3">{t("admin.colStatus")}</th>
+                <th className="px-4 py-3 text-right">{t("admin.colAction")}</th>
               </tr>
             </thead>
             <tbody>
               {sells === null ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
               ) : sells.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No sell requests yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("admin.noSells")}</td></tr>
               ) : (
                 sells.map((s) => {
                   const method = getPaymentMethod(s.method_id);
@@ -511,7 +686,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{s.payout_address ?? "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs ${paid ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"}`}>
-                          {s.status}
+                          {statusLabel(t, s.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -519,7 +694,7 @@ export default function AdminPage() {
                           onClick={() => markSell(s.id, paid ? "requested" : "paid")}
                           className="btn-ghost text-xs"
                         >
-                          {paid ? "Mark unpaid" : "Mark paid"}
+                          {paid ? t("admin.markUnpaid") : t("admin.markPaid")}
                         </button>
                       </td>
                     </tr>
@@ -534,15 +709,15 @@ export default function AdminPage() {
       {tab === "messages" && (
         <div className="card divide-y divide-white/5 p-0">
           {contacts === null ? (
-            <div className="px-4 py-8 text-center text-slate-500">Loading…</div>
+            <div className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</div>
           ) : contacts.length === 0 ? (
-            <div className="px-4 py-8 text-center text-slate-500">No messages yet.</div>
+            <div className="px-4 py-8 text-center text-slate-500">{t("admin.noMessages")}</div>
           ) : (
             contacts.map((c) => (
               <div key={c.id} className="px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-semibold">
-                    {c.name ?? "Anonymous"}{" "}
+                    {c.name ?? t("admin.anonymous")}{" "}
                     {c.email && (
                       <a href={`mailto:${c.email}`} className="text-sm font-normal text-amber-300 hover:underline">
                         &lt;{c.email}&gt;
@@ -585,13 +760,18 @@ type BotConfig = {
   max: number;
 };
 type BotToday = { day: string; target: number; added: number; updated_at: string } | null;
+// What POST /api/admin/bots/generate reports back after a run.
+type BotRunResult = { target: number; created: number; failed: number; todayTotal: number };
 
 function BotsPanel({ onError }: { onError: (m: string) => void }) {
+  const { t, intlLocale } = useI18n();
   const [config, setConfig] = useState<BotConfig | null>(null);
   const [today, setToday] = useState<BotToday>(null);
   const [counts, setCounts] = useState<{ bots: number; total: number } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState<BotRunResult | null>(null);
+  // Server-owned cap on one Generate press (see lib/bots.ts).
+  const [maxPerRun, setMaxPerRun] = useState(500);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/bot-config", { cache: "no-store" });
@@ -600,188 +780,166 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
     setConfig(data.config);
     setToday(data.today);
     setCounts(data.counts);
+    if (typeof data.maxPerRun === "number") setMaxPerRun(data.maxPerRun);
   }, [onError]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function save() {
-    if (!config) return;
-    if (config.specificCount < 0) return onError("Specific users/day must be 0 or more.");
-    if (config.mode === "auto" && config.max < config.min) return onError("Max must be ≥ min.");
-    if (config.mode === "manual" && config.count < 1) return onError("Enter how many users to add per day (1 or more).");
-    setSaving(true);
+  // The Generate button: create today's players right now. "exact" uses the
+  // number the admin typed; "range" rolls a random count inside [min, max].
+  async function generate() {
+    if (!config || generating) return;
+    const exact = config.mode === "manual";
+    if (exact && config.count < 1) return onError(t("admin.botCountError"));
+    if (!exact && config.max < config.min) return onError(t("admin.botMaxError"));
+    if (!confirm(t("admin.botGenerateConfirm"))) return;
+
+    setGenerating(true);
+    setResult(null);
     try {
-      const res = await fetch("/api/admin/bot-config", {
-        method: "PATCH",
+      const res = await fetch("/api/admin/bots/generate", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(
+          exact
+            ? { mode: "exact", count: config.count }
+            : { mode: "range", min: config.min, max: config.max }
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setSavedAt(new Date());
+      setResult(data as BotRunResult);
       load();
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Save failed.");
+      onError(e instanceof Error ? e.message : t("common.saveFailed"));
     } finally {
-      setSaving(false);
+      setGenerating(false);
     }
   }
 
-  if (!config) return <div className="card p-6 text-slate-400">Loading bot settings…</div>;
+  if (!config) return <div className="card p-6 text-slate-400">{t("admin.botLoading")}</div>;
 
-  const pct = today && today.target > 0 ? Math.min(100, Math.round((today.added / today.target) * 100)) : 0;
+  const exact = config.mode === "manual";
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* Settings */}
+      {/* Generate */}
       <div className="card space-y-5 p-6">
         <div>
-          <h2 className="text-lg font-bold">Daily new users</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            New players are added in batches throughout each day. Enter a specific number to create
-            exactly that many users, randomly distributed across each 24-hour window (9:00 AM → 9:00 AM).
-            Coins are random (gold ≤ 10, silver &amp; bronze &lt; 1,000,000).
-          </p>
+          <h2 className="text-lg font-bold">{t("admin.botDailyTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-400">{t("admin.botDailyLead")}</p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
-          <div className="font-semibold text-emerald-300">Bot status: Always running</div>
-          <div className="mt-1 text-xs text-slate-500">
-            Started once, the worker keeps running on its own — it rolls a new target at 9:00 AM each
-            day and adds users across the 24h window, following the settings below.
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Specific users / day (exact target)</label>
-          <input
-            className="input"
-            type="number"
-            min={0}
-            value={config.specificCount}
-            onChange={(e) => setConfig({ ...config, specificCount: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-          />
-          <p className="mt-1 text-xs text-slate-500">
-            Set to 0 to use Automatic/Manual mode below. Any value above 0 overrides other modes and
-            creates exactly that many users in the current 9:00 AM → next 9:00 AM cycle.
-          </p>
-        </div>
-
-        {/* Mode: Automatic (random) vs Manual (admin sets the number) */}
+        {/* How today's number is decided: an exact figure, or a random range. */}
         <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
-          {(["auto", "manual"] as const).map((m) => (
+          {(["manual", "auto"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setConfig({ ...config, mode: m })}
-              className={`flex-1 rounded-lg px-3 py-2 font-semibold capitalize transition ${
+              className={`flex-1 rounded-lg px-3 py-2 font-semibold transition ${
                 config.mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
               }`}
             >
-              {m === "auto" ? "Automatic" : "Manual"}
+              {m === "manual" ? t("admin.botModeManual") : t("admin.botModeAuto")}
             </button>
           ))}
         </div>
 
-        {config.mode === "manual" ? (
+        {exact ? (
           <div>
-            <label className="label">Users to add per day</label>
+            <label className="label">{t("admin.botCount")}</label>
             <input
               className="input"
               type="number"
               min={1}
+              max={maxPerRun}
               value={config.count}
               onChange={(e) => setConfig({ ...config, count: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
             />
-            <p className="mt-1 text-xs text-slate-500">
-              Exactly this many new users are added each day (dripped in batches over 24h).
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t("admin.botCountHint")}</p>
           </div>
         ) : (
           <div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Min users / day</label>
+                <label className="label">{t("admin.botMin")}</label>
                 <input
                   className="input"
                   type="number"
-                  min={0}
+                  min={1}
+                  max={maxPerRun}
                   value={config.min}
                   onChange={(e) => setConfig({ ...config, min: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
                 />
               </div>
               <div>
-                <label className="label">Max users / day</label>
+                <label className="label">{t("admin.botMax")}</label>
                 <input
                   className="input"
                   type="number"
-                  min={0}
+                  min={1}
+                  max={maxPerRun}
                   value={config.max}
                   onChange={(e) => setConfig({ ...config, max: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
                 />
               </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              The bot picks a random number in this range each day (default 100–200, never below 50).
-              Used whenever you haven&apos;t set a specific number for the day.
-            </p>
+            <p className="mt-1 text-xs text-slate-500">{t("admin.botRangeHint")}</p>
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          <button onClick={save} className="btn-gold" disabled={saving}>
-            {saving ? "Saving…" : "Save settings"}
-          </button>
-          {savedAt && <span className="text-xs text-emerald-300">Saved {savedAt.toLocaleTimeString()}</span>}
-        </div>
-        <p className="text-xs text-slate-500">
-          Specific-target and manual changes apply to <strong>today</strong> right away. Automatic-range
-          changes affect future days after today&apos;s target has already been rolled.
-        </p>
+        <button onClick={generate} className="btn-gold w-full" disabled={generating}>
+          {generating ? t("admin.botGenerating") : t("admin.botGenerate")}
+        </button>
+
+        {generating && <p className="text-xs text-amber-200">{t("admin.botGeneratingHint")}</p>}
+
+        {result && (
+          <p className="rounded-lg bg-emerald-400/15 px-3 py-2 text-sm text-emerald-200">
+            {t("admin.botGenerated", { created: result.created, total: result.todayTotal })}
+            {result.failed > 0 && ` ${t("admin.botGenerateFailed", { failed: result.failed })}`}
+          </p>
+        )}
+
+        <p className="text-xs text-slate-500">{t("admin.botMaxHint", { max: maxPerRun })}</p>
       </div>
 
-      {/* Today's progress + totals */}
+      {/* Today's totals */}
       <div className="card space-y-5 p-6">
-        <h2 className="text-lg font-bold">Today</h2>
+        <h2 className="text-lg font-bold">{t("admin.botToday")}</h2>
         {today ? (
           <>
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-sm text-slate-400">Added / target ({today.day})</div>
-                <div className="text-3xl font-extrabold tabular-nums">
-                  {today.added.toLocaleString()}{" "}
-                  <span className="text-lg font-medium text-slate-400">/ {today.target.toLocaleString()}</span>
-                </div>
+            <div>
+              <div className="text-sm text-slate-400">{t("admin.botAddedToday", { day: today.day })}</div>
+              <div className="text-4xl font-extrabold tabular-nums text-emerald-300">
+                {today.added.toLocaleString()}
               </div>
-              <div className="text-2xl font-bold text-emerald-300">{pct}%</div>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+            <div className="text-xs text-slate-500">
+              {t("admin.botLastRun", { time: new Date(today.updated_at).toLocaleString(intlLocale) })}
             </div>
-            <div className="text-xs text-slate-500">Last run: {new Date(today.updated_at).toLocaleString()}</div>
           </>
         ) : (
-          <p className="text-sm text-slate-400">
-            No run yet today. The bot will roll today&apos;s target on its next cycle and begin adding players.
-          </p>
+          <p className="text-sm text-slate-400">{t("admin.botNoRun")}</p>
         )}
 
         <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
           <div>
-            <div className="text-sm text-slate-400">Total players</div>
+            <div className="text-sm text-slate-400">{t("admin.botTotalPlayers")}</div>
             <div className="text-2xl font-extrabold tabular-nums text-emerald-300">
               {counts?.total.toLocaleString() ?? "…"}
             </div>
           </div>
           <div>
-            <div className="text-sm text-slate-400">Bot players</div>
+            <div className="text-sm text-slate-400">{t("admin.botPlayers")}</div>
             <div className="text-2xl font-extrabold tabular-nums text-sky-300">
               {counts?.bots.toLocaleString() ?? "…"}
             </div>
           </div>
         </div>
-        <button onClick={load} className="btn-ghost text-sm">Refresh</button>
+        <button onClick={load} className="btn-ghost text-sm">{t("common.refresh")}</button>
       </div>
     </div>
   );
@@ -799,6 +957,7 @@ function UserModal({
   onSaved: () => void;
   onError: (m: string) => void;
 }) {
+  const { t } = useI18n();
   const isNew = row === null;
   const [f, setF] = useState({
     nickname: row?.nickname ?? "",
@@ -828,7 +987,7 @@ function UserModal({
       if (!res.ok) throw new Error(data.error);
       onSaved();
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Save failed.");
+      onError(e instanceof Error ? e.message : t("common.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -839,47 +998,49 @@ function UserModal({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="card relative w-full max-w-lg p-6 animate-pop" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-white">✕</button>
-        <h2 className="text-xl font-bold">{isNew ? "Create user" : `Edit ${row!.nickname}`}</h2>
+        <h2 className="text-xl font-bold">
+          {isNew ? t("admin.createUser") : t("admin.editUser", { nickname: row!.nickname })}
+        </h2>
 
         <form onSubmit={submit} className="mt-4 grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <label className="label">Nickname</label>
+            <label className="label">{t("profile.nickname")}</label>
             <input className="input" value={f.nickname} onChange={(e) => upd("nickname", e.target.value)} required />
           </div>
           <div className="col-span-2">
-            <label className="label">Email</label>
+            <label className="label">{t("profile.email")}</label>
             <input className="input" type="email" value={f.email} onChange={(e) => upd("email", e.target.value)} required />
           </div>
           <div className="col-span-2">
-            <label className="label">{isNew ? "Password" : "New password (leave blank to keep)"}</label>
+            <label className="label">{isNew ? t("admin.password") : t("admin.newPassword")}</label>
             <input className="input" type="text" value={f.password} onChange={(e) => upd("password", e.target.value)} required={isNew} placeholder={isNew ? "" : "••••••"} />
           </div>
           <div>
-            <label className="label">Nationality</label>
+            <label className="label">{t("profile.nationality")}</label>
             <input className="input" value={f.nationality} onChange={(e) => upd("nationality", e.target.value)} />
           </div>
           <div>
-            <label className="label">Discord ID</label>
+            <label className="label">{t("profile.discordId")}</label>
             <input className="input" value={f.discord_id} onChange={(e) => upd("discord_id", e.target.value)} />
           </div>
           <div>
-            <label className="label">Gold</label>
+            <label className="label">{t("coin.gold")}</label>
             <input className="input" type="number" min={0} value={f.gold} onChange={(e) => upd("gold", Number(e.target.value))} />
           </div>
           <div>
-            <label className="label">Silver</label>
+            <label className="label">{t("coin.silver")}</label>
             <input className="input" type="number" min={0} value={f.silver} onChange={(e) => upd("silver", Number(e.target.value))} />
           </div>
           <div>
-            <label className="label">Bronze</label>
+            <label className="label">{t("coin.bronze")}</label>
             <input className="input" type="number" min={0} value={f.bronze} onChange={(e) => upd("bronze", Number(e.target.value))} />
           </div>
           <label className="col-span-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={f.is_admin} onChange={(e) => upd("is_admin", e.target.checked)} className="h-4 w-4" />
-            Administrator
+            {t("admin.administrator")}
           </label>
           <button type="submit" className="btn-gold col-span-2 mt-2" disabled={saving}>
-            {saving ? "Saving…" : isNew ? "Create user" : "Save changes"}
+            {saving ? t("common.saving") : isNew ? t("admin.createUser") : t("admin.saveChanges")}
           </button>
         </form>
       </div>

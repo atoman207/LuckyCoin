@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { getPaymentMethod } from "@/lib/wallets";
+import { getT } from "@/lib/i18n/server";
 
 // Update the logged-in user's own personal info. Coins, admin flag and email
 // are intentionally NOT editable here — only profile details (and the payout
 // wallet used for selling gold back, which can be registered at any time).
 export async function PATCH(req: Request) {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const nickname = typeof body.nickname === "string" ? body.nickname.trim() : undefined;
@@ -21,10 +23,10 @@ export async function PATCH(req: Request) {
     typeof body.payout_method === "string" ? body.payout_method.trim() || null : undefined;
 
   if (nickname !== undefined && nickname.length === 0) {
-    return NextResponse.json({ error: "Nickname cannot be empty." }, { status: 400 });
+    return NextResponse.json({ error: t("api.profile.nicknameEmpty") }, { status: 400 });
   }
   if (payout_method !== undefined && payout_method !== null && !getPaymentMethod(payout_method)) {
-    return NextResponse.json({ error: "Unknown payout method." }, { status: 400 });
+    return NextResponse.json({ error: t("api.profile.unknownPayout") }, { status: 400 });
   }
 
   const patch: Record<string, unknown> = {};
@@ -35,7 +37,7 @@ export async function PATCH(req: Request) {
   if (payout_method !== undefined) patch.payout_method = payout_method;
 
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+    return NextResponse.json({ error: t("api.profile.nothingToUpdate") }, { status: 400 });
   }
 
   const { data, error } = await ctx.admin
@@ -45,6 +47,6 @@ export async function PATCH(req: Request) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
   return NextResponse.json({ profile: data });
 }

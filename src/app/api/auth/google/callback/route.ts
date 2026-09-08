@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOAuthProfile } from "@/lib/oauth-profile";
 import { getSiteOrigin } from "@/lib/site-url";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,7 @@ const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
 // token, hand it to Supabase on the server (Vercel can reach supabase.co even
 // when the user's browser cannot), set the session cookie, and send them home.
 export async function GET(request: Request) {
+  const t = await getT();
   const origin = getSiteOrigin(request);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -20,7 +22,8 @@ export async function GET(request: Request) {
     url.searchParams.get("error_description") || url.searchParams.get("error");
 
   if (oauthError) {
-    return NextResponse.redirect(`${origin}/?login_error=${encodeURIComponent(oauthError)}`);
+    console.error("[auth/google] provider error:", oauthError);
+    return NextResponse.redirect(`${origin}/?login_error=1`);
   }
 
   const expectedState = request.headers
@@ -37,7 +40,7 @@ export async function GET(request: Request) {
 
   if (!code || !state || !expectedState || state !== expectedState) {
     return clearState(
-      NextResponse.redirect(`${origin}/?login_error=${encodeURIComponent("Invalid OAuth state.")}`)
+      NextResponse.redirect(`${origin}/?login_error=${encodeURIComponent(t("api.auth.invalidState"))}`)
     );
   }
 
@@ -67,8 +70,12 @@ export async function GET(request: Request) {
   };
 
   if (!tokenRes.ok || !tokens.id_token) {
-    const msg = tokens.error_description || tokens.error || "Could not verify Google sign-in.";
-    return clearState(NextResponse.redirect(`${origin}/?login_error=${encodeURIComponent(msg)}`));
+    console.error("[auth/google] token exchange failed:", tokens.error_description || tokens.error);
+    return clearState(
+      NextResponse.redirect(
+        `${origin}/?login_error=${encodeURIComponent(t("api.auth.googleVerifyFailed"))}`
+      )
+    );
   }
 
   const supabase = await createClient();
@@ -78,8 +85,11 @@ export async function GET(request: Request) {
   });
 
   if (signInErr) {
+    console.error("[auth/google] supabase sign-in failed:", signInErr);
     return clearState(
-      NextResponse.redirect(`${origin}/?login_error=${encodeURIComponent(signInErr.message)}`)
+      NextResponse.redirect(
+        `${origin}/?login_error=${encodeURIComponent(t("api.auth.googleVerifyFailed"))}`
+      )
     );
   }
 
@@ -88,7 +98,17 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (user) {
-    await ensureOAuthProfile(createAdminClient(), user);
+    // A missing profiles row means no balances and no entry in the admin user
+    // list, so a failure here must not pass for a successful sign-up.
+    try {
+      await ensureOAuthProfile(createAdminClient(), user);
+    } catch {
+      return clearState(
+        NextResponse.redirect(
+          `${origin}/?login_error=${encodeURIComponent(t("api.auth.profileFailed"))}`
+        )
+      );
+    }
   }
 
   return clearState(NextResponse.redirect(`${origin}/?welcome=1`));

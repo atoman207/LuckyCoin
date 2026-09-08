@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
+import { useI18n } from "@/lib/i18n/provider";
 
 export default function ContactPage() {
   const { profile } = useUser();
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -21,7 +23,7 @@ export default function ContactPage() {
 
   function showToast(msg: string) {
     setToast(msg);
-    setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+    setTimeout(() => setToast((current) => (current === msg ? null : current)), 4000);
   }
 
   async function submit(e: React.FormEvent) {
@@ -36,10 +38,10 @@ export default function ContactPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      showToast(data.message ?? "Your message has been sent successfully!");
+      showToast(data.message ?? t("contact.sent"));
       setMessage("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not send.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("contact.failed"));
     } finally {
       setBusy(false);
     }
@@ -57,11 +59,8 @@ export default function ContactPage() {
       )}
 
       <div>
-        <h1 className="text-3xl font-extrabold">Contact us</h1>
-        <p className="text-slate-400">
-          Got a question, a bug, or a wild idea? Drop us a message and a real human will get back to
-          you (no robots, mostly).
-        </p>
+        <h1 className="text-3xl font-extrabold">{t("contact.title")}</h1>
+        <p className="text-slate-400">{t("contact.subtitle")}</p>
       </div>
 
       {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
@@ -69,37 +68,37 @@ export default function ContactPage() {
       <form onSubmit={submit} className="card space-y-4 p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Your name</label>
+            <label className="label">{t("contact.yourName")}</label>
             <input
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Your name"
+              placeholder={t("contact.yourNamePlaceholder")}
             />
           </div>
           <div>
-            <label className="label">Your email</label>
+            <label className="label">{t("contact.yourEmail")}</label>
             <input
               type="email"
               className="input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="So we can reply"
+              placeholder={t("contact.yourEmailPlaceholder")}
             />
           </div>
         </div>
 
         <div>
-          <label className="label">Inquiry</label>
+          <label className="label">{t("contact.inquiry")}</label>
           <textarea
             className="input min-h-[140px] resize-y"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             required
             maxLength={4000}
-            placeholder="How can we help?"
+            placeholder={t("contact.inquiryPlaceholder")}
           />
         </div>
 
@@ -108,7 +107,7 @@ export default function ContactPage() {
           disabled={busy || !name.trim() || !email.trim() || !message.trim()}
           className="btn-gold w-full text-lg"
         >
-          {busy ? "Sending…" : "Send message"}
+          {busy ? t("contact.sending") : t("contact.send")}
         </button>
       </form>
     </div>

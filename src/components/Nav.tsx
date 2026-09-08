@@ -8,16 +8,20 @@ import { useUser } from "@/components/UserProvider";
 import CoinBalance from "@/components/CoinBalance";
 import Avatar from "@/components/Avatar";
 import FirstLoginButtons from "@/components/FirstLoginButtons";
+import LanguageToggle from "@/components/LanguageToggle";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
 
 // Shop links live in the avatar dropdown menu.
-const MENU_LINKS = [
-  { href: "/buy", label: "Buy" },
-  { href: "/sell", label: "Sell" },
-  { href: "/exchange", label: "Exchange" },
+const MENU_LINKS: { href: string; label: MessageKey }[] = [
+  { href: "/buy", label: "nav.buy" },
+  { href: "/sell", label: "nav.sell" },
+  { href: "/exchange", label: "nav.exchange" },
 ];
 
 export default function Nav() {
   const { profile, loading, openAuth, signOut } = useUser();
+  const { t } = useI18n();
   const pathname = usePathname();
   const [menu, setMenu] = useState(false);
 
@@ -43,10 +47,13 @@ export default function Nav() {
             pathname === "/notice" ? "bg-white/10 text-amber-300" : "text-slate-200"
           }`}
         >
-          <span aria-hidden>🏆</span> <span className="hidden sm:inline">Rankings</span>
+          <span aria-hidden>🏆</span> <span className="hidden sm:inline">{t("nav.rankings")}</span>
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          {/* Language switch — Japanese ⇄ English, available to everyone. */}
+          <LanguageToggle />
+
           {loading ? null : profile ? (
             <>
               <FirstLoginButtons />
@@ -89,7 +96,7 @@ export default function Nav() {
                               pathname === l.href ? "bg-white/10 text-white" : ""
                             }`}
                           >
-                            {l.label}
+                            {t(l.label)}
                           </Link>
                         ))}
                       </div>
@@ -100,7 +107,7 @@ export default function Nav() {
                           onClick={() => setMenu(false)}
                           className="block border-t border-white/10 px-3 py-2 text-sm text-amber-300 hover:bg-white/5"
                         >
-                          Admin
+                          {t("nav.admin")}
                         </Link>
                       )}
                       <Link
@@ -108,7 +115,7 @@ export default function Nav() {
                         onClick={() => setMenu(false)}
                         className="block border-t border-white/10 px-3 py-2 text-sm hover:bg-white/5"
                       >
-                        Profile
+                        {t("nav.profile")}
                       </Link>
                       <button
                         onClick={() => {
@@ -117,7 +124,7 @@ export default function Nav() {
                         }}
                         className="w-full border-t border-white/10 px-3 py-2 text-left text-sm text-red-300 hover:bg-white/5"
                       >
-                        Sign out
+                        {t("nav.signOut")}
                       </button>
                     </div>
                   </div>
@@ -126,7 +133,7 @@ export default function Nav() {
             </>
           ) : (
             <button onClick={openAuth} className="btn-gold !px-4 !py-2 text-sm">
-              Log in
+              {t("common.login")}
             </button>
           )}
         </div>

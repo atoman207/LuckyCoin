@@ -4,6 +4,9 @@ import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX, customCost } from "@/
 import { getPaymentMethod } from "@/lib/wallets";
 import { getChainConfig } from "@/lib/chains";
 import { getUsdPrice } from "@/lib/pricing";
+import { buildContractCheckout } from "@/lib/payment-contract";
+import { getLocale } from "@/lib/i18n/server";
+import { createTranslator, isMessageKey } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -12,8 +15,10 @@ export const runtime = "nodejs";
 // credited only after the buyer submits their transaction hash and it is
 // verified on-chain (/api/purchase/verify).
 export async function POST(req: Request) {
+  const t = createTranslator(await getLocale());
+
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
   const body = await req.json().catch(() => ({}));
@@ -31,7 +36,7 @@ export async function POST(req: Request) {
     usd = customCost(reqSilver);
   } else {
     return NextResponse.json(
-      { error: `Choose a pack, or a custom amount between ${CUSTOM_SILVER_MIN} and ${CUSTOM_SILVER_MAX} silver.` },
+      { error: t("api.purchase.choosePack", { min: CUSTOM_SILVER_MIN, max: CUSTOM_SILVER_MAX }) },
       { status: 400 }
     );
   }
@@ -39,7 +44,7 @@ export async function POST(req: Request) {
   const method = getPaymentMethod(typeof body.method_id === "string" ? body.method_id : null);
   const cfg = method ? getChainConfig(method.id) : null;
   if (!method || !cfg) {
-    return NextResponse.json({ error: "Unsupported payment method." }, { status: 400 });
+    return NextResponse.json({ error: t("api.purchase.unsupportedMethod") }, { status: 400 });
   }
 
   // Lock the crypto amount to send from the USD price at order time.
@@ -47,8 +52,11 @@ export async function POST(req: Request) {
   try {
     price = await getUsdPrice(cfg.coingeckoId);
   } catch (e) {
+    // getUsdPrice throws a MESSAGE KEY so the reason can be shown in the
+    // visitor's language.
+    const raw = e instanceof Error ? e.message : "";
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Could not fetch exchange rate." },
+      { error: isMessageKey(raw) ? t(raw) : t("api.purchase.rateFailed") },
       { status: 502 }
     );
   }
@@ -76,7 +84,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error || !purchase) {
-    return NextResponse.json({ error: error?.message ?? "Could not start checkout." }, { status: 500 });
+    return NextResponse.json({ error: t("api.purchase.startFailed") }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -85,8 +93,14 @@ export async function POST(req: Request) {
     pay_amount: payAmount,
     asset: method.asset,
     network: method.network,
+    // A message key — the client renders it in the current language.
     memo: method.memo ?? null,
     usd,
     silver,
+    // Present when the LuckyCoinPayments contract is deployed for this chain.
+    // Paying through it stamps the order id into the transaction, so the order
+    // settles the moment the event lands instead of being matched by amount.
+    // Sending to `address` above still works exactly as before.
+    contract: buildContractCheckout(method.id, purchase.id, payAmount),
   });
 }

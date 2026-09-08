@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import NetworkIcon from "@/components/NetworkIcon";
+import RichText from "@/components/RichText";
+import { useI18n } from "@/lib/i18n/provider";
+import { formatUsdAsJpy } from "@/lib/fx-book";
 
 export type CheckoutOrder = {
   order_id: string;
@@ -12,11 +15,183 @@ export type CheckoutOrder = {
   pay_amount: number;
   asset: string;
   network: string;
-  memo: string | null;
+  memo: string | null; // message key returned by the API
   usd: number;
+  // Present when LuckyCoinPayments is deployed for this chain. Paying through
+  // it stamps the order id into the transaction, so the order settles the
+  // moment the event lands. Sending to `address` by hand still works.
+  contract?: ContractCheckout | null;
+};
+
+type ContractCheckout = {
+  address: string;
+  chainId: number;
+  chainIdHex: string;
+  orderIdHex: string;
+  data: string;
+  value: string; // wei, decimal string
+  token: string | null;
+  amount: string; // smallest units, decimal string
+  approve: { to: string; data: string } | null;
+};
+
+// The subset of EIP-1193 we use. Typed locally so the app takes no wallet SDK.
+type Eip1193 = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> };
+const getWallet = (): Eip1193 | null =>
+  typeof window !== "undefined" && "ethereum" in window
+    ? ((window as unknown as { ethereum: Eip1193 }).ethereum ?? null)
+    : null;
+
+const toHex = (decimal: string) => `0x${BigInt(decimal).toString(16)}`;
+
+// Chains a wallet may not know about yet, so we can offer to add them.
+const ADD_CHAIN: Record<number, Record<string, unknown>> = {
+  56: {
+    chainId: "0x38",
+    chainName: "BNB Smart Chain",
+    nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+    rpcUrls: ["https://bsc-dataseed.binance.org"],
+    blockExplorerUrls: ["https://bscscan.com"],
+  },
 };
 
 const WINDOW_SECONDS = 10 * 60; // 10-minute payment window
+
+/**
+ * One-click payment through the LuckyCoinPayments contract.
+ *
+ * The order id is already baked into `contract.data` by the server, so the
+ * transaction the wallet signs is self-identifying: the backend settles it from
+ * the emitted event rather than by matching amounts. For tokens this walks the
+ * buyer through the standard approve-then-pay pair.
+ */
+function WalletPayButton({
+  contract,
+  onSent,
+  onError,
+}: {
+  contract: ContractCheckout;
+  onSent: (hash: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const { t } = useI18n();
+  const [step, setStep] = useState<null | "connect" | "approve" | "pay">(null);
+  const busy = step !== null;
+
+  // Poll for a receipt; wallets give us a hash long before it is mined and the
+  // approval must actually land before payToken can spend the allowance.
+  async function waitForReceipt(w: Eip1193, hash: string) {
+    for (let i = 0; i < 120; i++) {
+      const r = await w.request({ method: "eth_getTransactionReceipt", params: [hash] });
+      if (r) {
+        const status = (r as { status?: string }).status;
+        if (status !== undefined && BigInt(status) !== BigInt(1)) throw new Error(t("checkout.walletReverted"));
+        return;
+      }
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+    throw new Error(t("checkout.walletTimeout"));
+  }
+
+  async function pay() {
+    const w = getWallet();
+    if (!w) return onError(t("checkout.walletNotFound"));
+
+    try {
+      setStep("connect");
+      const accounts = (await w.request({ method: "eth_requestAccounts" })) as string[];
+      const from = accounts?.[0];
+      if (!from) throw new Error(t("checkout.walletNoAccount"));
+
+      // Make sure the wallet is on the chain this order is priced for —
+      // otherwise the buyer would pay the right amount on the wrong network.
+      try {
+        await w.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: contract.chainIdHex }],
+        });
+      } catch (e) {
+        // 4902 = the wallet doesn't have this chain configured yet.
+        if ((e as { code?: number })?.code === 4902 && ADD_CHAIN[contract.chainId]) {
+          await w.request({
+            method: "wallet_addEthereumChain",
+            params: [ADD_CHAIN[contract.chainId]],
+          });
+        } else throw e;
+      }
+
+      // ERC-20 leg: make sure the contract is allowed to move exactly this much.
+      if (contract.approve && contract.token) {
+        setStep("approve");
+        const need = BigInt(contract.amount);
+
+        // allowance(owner,spender) — skip a redundant approval when possible.
+        const allowanceData =
+          "0xdd62ed3e" +
+          from.replace(/^0x/, "").toLowerCase().padStart(64, "0") +
+          contract.address.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+        const raw = (await w.request({
+          method: "eth_call",
+          params: [{ to: contract.token, data: allowanceData }, "latest"],
+        })) as string;
+        const current = raw && raw !== "0x" ? BigInt(raw) : BigInt(0);
+
+        if (current < need) {
+          // Tether refuses to change a non-zero allowance directly, so it has
+          // to be zeroed first. Harmless on well-behaved tokens.
+          if (current > BigInt(0)) {
+            const zero =
+              "0x095ea7b3" +
+              contract.address.replace(/^0x/, "").toLowerCase().padStart(64, "0") +
+              "0".repeat(64);
+            const h = (await w.request({
+              method: "eth_sendTransaction",
+              params: [{ from, to: contract.token, data: zero }],
+            })) as string;
+            await waitForReceipt(w, h);
+          }
+          const h = (await w.request({
+            method: "eth_sendTransaction",
+            params: [{ from, to: contract.approve.to, data: contract.approve.data }],
+          })) as string;
+          await waitForReceipt(w, h);
+        }
+      }
+
+      setStep("pay");
+      const params: Record<string, string> = {
+        from,
+        to: contract.address,
+        data: contract.data,
+      };
+      if (contract.value !== "0") params.value = toHex(contract.value);
+
+      const hash = (await w.request({ method: "eth_sendTransaction", params: [params] })) as string;
+      onSent(hash);
+    } catch (e) {
+      const err = e as { code?: number; message?: string };
+      // 4001 = the buyer dismissed the wallet prompt; not an error worth shouting about.
+      if (err?.code !== 4001) onError(err?.message || t("checkout.walletFailed"));
+    } finally {
+      setStep(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-300/30 bg-amber-300/5 p-3">
+      <button onClick={pay} disabled={busy} className="btn-gold w-full text-sm disabled:opacity-60">
+        {step === "connect"
+          ? t("checkout.walletConnecting")
+          : step === "approve"
+            ? t("checkout.walletApproving")
+            : step === "pay"
+              ? t("checkout.walletPaying")
+              : t("checkout.payWithWallet")}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-slate-400">{t("checkout.walletHint")}</p>
+    </div>
+  );
+}
 
 function ClipboardIcon({ done }: { done: boolean }) {
   return done ? (
@@ -50,6 +225,7 @@ function ClockIcon() {
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = useI18n();
   const [done, setDone] = useState(false);
   async function copy() {
     try {
@@ -63,7 +239,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   return (
     <button
       onClick={copy}
-      aria-label={`Copy ${label}`}
+      aria-label={t("checkout.copyAria", { label })}
       className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition ${
         done
           ? "border-emerald-300/40 text-emerald-300"
@@ -71,7 +247,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       }`}
     >
       <ClipboardIcon done={done} />
-      {done ? "Copied" : "Copy"}
+      {done ? t("checkout.copied") : t("checkout.copy")}
     </button>
   );
 }
@@ -93,6 +269,7 @@ export default function CheckoutModal({
   onCancel,
   busy,
   error,
+  memo,
 }: {
   order: CheckoutOrder;
   txHash: string;
@@ -101,13 +278,21 @@ export default function CheckoutModal({
   onCancel: () => void;
   busy: boolean;
   error: string | null;
+  /** Already-translated memo note for chains that need a destination tag. */
+  memo?: string;
 }) {
+  const { t, locale } = useI18n();
+
+  // Wallet errors are shown next to the button rather than in the page-level
+  // error slot, which belongs to the manual verify flow.
+  const [walletError, setWalletError] = useState<string | null>(null);
+
   // Countdown from 10:00. Resets whenever a new order is shown.
   const [left, setLeft] = useState(WINDOW_SECONDS);
   useEffect(() => {
     setLeft(WINDOW_SECONDS);
-    const t = setInterval(() => setLeft((s) => (s <= 0 ? 0 : s - 1)), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setLeft((s) => (s <= 0 ? 0 : s - 1)), 1000);
+    return () => clearInterval(timer);
   }, [order.order_id]);
 
   const expired = left <= 0;
@@ -128,12 +313,12 @@ export default function CheckoutModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold">Checkout</h2>
+            <h2 className="text-lg font-bold">{t("checkout.title")}</h2>
             <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-emerald-300">
-              <LockIcon /> Secure payment
+              <LockIcon /> {t("checkout.secure")}
             </span>
           </div>
-          <button onClick={onCancel} aria-label="Close" className="text-slate-400 hover:text-white">
+          <button onClick={onCancel} aria-label={t("common.close")} className="text-slate-400 hover:text-white">
             ✕
           </button>
         </div>
@@ -141,10 +326,12 @@ export default function CheckoutModal({
         <div className="max-h-[85vh] space-y-3 overflow-y-auto p-4">
           {/* Order summary */}
           <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Order summary</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("checkout.orderSummary")}
+            </p>
             <div className="space-y-2">
-              <Row label="Item">{order.item}</Row>
-              <Row label="Pay with">
+              <Row label={t("checkout.item")}>{order.item}</Row>
+              <Row label={t("checkout.payWith")}>
                 <span className="inline-flex items-center gap-2">
                   <NetworkIcon methodId={order.method_id} size={18} />
                   {order.asset} · {order.network}
@@ -153,8 +340,15 @@ export default function CheckoutModal({
             </div>
             <div className="my-3 h-px bg-white/10" />
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-300">Total</span>
-              <span className="text-2xl font-extrabold text-amber-300">${order.usd.toFixed(2)}</span>
+              <span className="text-sm font-semibold text-slate-300">{t("checkout.total")}</span>
+              <span className="text-right">
+                <span className="block text-2xl font-extrabold text-amber-300">
+                  {locale === "ja" ? formatUsdAsJpy(order.usd) : `$${order.usd.toFixed(2)}`}
+                </span>
+                {locale === "ja" && (
+                  <span className="block text-xs text-slate-400">${order.usd.toFixed(2)}</span>
+                )}
+              </span>
             </div>
           </div>
 
@@ -162,25 +356,45 @@ export default function CheckoutModal({
           <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-medium text-slate-400">Amount due</p>
+                <p className="text-xs font-medium text-slate-400">{t("checkout.amountDue")}</p>
                 <p className="mt-0.5 font-mono text-xl font-bold text-amber-100">
                   {order.pay_amount} {order.asset}
                 </p>
               </div>
-              <CopyButton text={String(order.pay_amount)} label="amount" />
+              <CopyButton text={String(order.pay_amount)} label={t("checkout.labelAmount")} />
             </div>
+
+            {order.contract && !expired && (
+              <div className="mt-3">
+                <WalletPayButton
+                  contract={order.contract}
+                  onSent={onTxHash}
+                  onError={setWalletError}
+                />
+                {walletError && (
+                  <p className="mt-2 break-words rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-300">
+                    {walletError}
+                  </p>
+                )}
+                <div className="mt-3 flex items-center gap-3 text-[11px] text-slate-500">
+                  <span className="h-px flex-1 bg-white/10" />
+                  {t("checkout.walletOrManual")}
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+              </div>
+            )}
 
             <div className="mt-3 flex justify-center">
               <div className="rounded-xl bg-white p-2">
                 <QRCodeSVG value={order.address} size={124} level="M" />
               </div>
             </div>
-            <p className="mt-2 text-center text-xs text-slate-500">Scan to pay, or copy the address below</p>
+            <p className="mt-2 text-center text-xs text-slate-500">{t("checkout.scanToPay")}</p>
 
             <div className="mt-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-slate-400">Recipient address</p>
-                <CopyButton text={order.address} label="address" />
+                <p className="text-xs font-medium text-slate-400">{t("checkout.recipient")}</p>
+                <CopyButton text={order.address} label={t("checkout.labelAddress")} />
               </div>
               <p className="mt-1 break-all rounded-lg bg-black/30 px-3 py-2 font-mono text-sm text-slate-200">
                 {order.address}
@@ -189,31 +403,30 @@ export default function CheckoutModal({
 
             <div className={`mt-4 flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold tabular-nums ${timerTone}`}>
               <ClockIcon />
-              {expired ? "Payment window expired" : <span>Time remaining {mm}:{ss}</span>}
+              {expired ? t("checkout.expired") : <span>{t("checkout.timeLeft", { time: `${mm}:${ss}` })}</span>}
             </div>
           </div>
 
-          <p className="text-xs text-slate-500">
-            Send only <b className="text-slate-300">{order.asset}</b> over{" "}
-            <b className="text-slate-300">{order.network}</b>. The amount must match (small rounding is
-            fine) or the payment can&apos;t be verified.
-          </p>
-          {order.memo && <p className="text-xs text-slate-500">{order.memo}</p>}
+          <RichText
+            as="p"
+            className="text-xs text-slate-500"
+            k="checkout.warning"
+            vars={{ asset: order.asset, network: order.network }}
+          />
+          {memo && <p className="text-xs text-slate-500">{memo}</p>}
 
           {expired ? (
             <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-300">
-              This checkout expired. Close and start again for a fresh 10-minute window.
+              {t("checkout.expiredBody")}
             </div>
           ) : (
             <>
               <div>
-                <label className="text-xs font-medium text-slate-400">
-                  Not detected automatically? Paste your transaction hash to confirm
-                </label>
+                <label className="text-xs font-medium text-slate-400">{t("checkout.txLabel")}</label>
                 <input
                   value={txHash}
                   onChange={(e) => onTxHash(e.target.value)}
-                  placeholder="0x… / transaction id"
+                  placeholder={t("checkout.txPlaceholder")}
                   className="mt-1.5 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-amber-300/60 focus:ring-2 focus:ring-amber-300/20"
                 />
               </div>
@@ -225,7 +438,7 @@ export default function CheckoutModal({
                 disabled={busy || !txHash.trim()}
                 className="w-full rounded-lg bg-amber-400 px-4 py-2.5 font-bold text-slate-900 transition hover:bg-amber-300 disabled:opacity-50"
               >
-                {busy ? "Verifying on-chain…" : "I've paid — verify payment"}
+                {busy ? t("checkout.verifying") : t("checkout.iPaid")}
               </button>
             </>
           )}
@@ -234,11 +447,11 @@ export default function CheckoutModal({
             onClick={onCancel}
             className="w-full rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:bg-white/5"
           >
-            {expired ? "Start again" : "Cancel"}
+            {expired ? t("checkout.startAgain") : t("common.cancel")}
           </button>
 
           <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
-            <LockIcon /> Verified directly on-chain — no third-party processor.
+            <LockIcon /> {t("checkout.footer")}
           </p>
         </div>
       </div>

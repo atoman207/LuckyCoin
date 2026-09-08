@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getSiteOrigin } from "@/lib/site-url";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
@@ -10,13 +11,14 @@ const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 // (not supabase.co/auth/v1/authorize), which avoids ERR_TUNNEL_CONNECTION_FAILED
 // when supabase.co is blocked on the user's network.
 export async function GET(request: Request) {
+  const t = await getT();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     const origin = getSiteOrigin(request);
     return NextResponse.redirect(
       `${origin}/?login_error=${encodeURIComponent(
-        "Google login is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Vercel, then redeploy."
+        t("api.auth.googleNotConfigured")
       )}`
     );
   }

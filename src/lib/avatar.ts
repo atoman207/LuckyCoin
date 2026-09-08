@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MessageKey } from "@/lib/i18n";
 
 // Saves an uploaded avatar to Supabase Storage (bucket "avatar", object
 // "<userId>.<ext>") and returns its public URL. Used by registration and the
@@ -32,8 +33,9 @@ export async function saveAvatarFile(
   file: File
 ): Promise<string> {
   const ext = EXT[file.type];
-  if (!ext) throw new Error("Unsupported image type. Use PNG, JPG, WEBP or GIF.");
-  if (file.size > MAX_BYTES) throw new Error("Image must be 2 MB or smaller.");
+  // Validation failures throw a MESSAGE KEY; the calling route translates it.
+  if (!ext) throw new Error("avatar.unsupportedType" satisfies MessageKey);
+  if (file.size > MAX_BYTES) throw new Error("avatar.tooLarge" satisfies MessageKey);
 
   await ensureBucket(admin);
 

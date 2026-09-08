@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/lib/supabase/server";
 import { compareRank } from "@/lib/ranking";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // always live — the notice page polls this
@@ -19,6 +20,7 @@ const sameCoins = (a: Row, b: Row) =>
 // then bronze (see src/lib/ranking.ts). The notice page polls this every few
 // seconds, so rankings track the database in near real time.
 export async function GET() {
+  const t = await getT();
   const admin = createAdminClient();
 
   // Pull every non-admin player (paged). Only the columns we rank on.
@@ -30,7 +32,7 @@ export async function GET() {
       .select("id, nickname, avatar_url, gold, silver, bronze")
       .eq("is_admin", false)
       .range(from, from + PAGE - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
     all.push(...((data ?? []) as Row[]));
     if (!data || data.length < PAGE) break;
   }

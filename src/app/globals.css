@@ -379,13 +379,15 @@ table { border-radius: 4px; }
   animation: raySpin 14s linear infinite;
 }
 
-/* Landing hero — bold luck-forward typography */
+/* Landing hero — each heading stays on one line; body wraps at punctuation. */
 .hero-eyebrow {
-  font-size: 0.72rem;
+  max-width: 100%;
+  font-size: clamp(0.62rem, 1.7vw, 0.84rem);
   font-weight: 700;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: rgba(251, 191, 36, 0.82);
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+  word-break: keep-all;
+  color: rgba(251, 191, 36, 0.9);
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
 }
 
@@ -393,24 +395,30 @@ table { border-radius: 4px; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15em;
-  max-width: 14ch;
+  gap: 0.22em;
+  width: 100%;
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.15;
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.85);
 }
 
 .hero-title-line {
-  font-size: clamp(1.35rem, 4.2vw, 2.15rem);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: rgba(255, 248, 235, 0.95);
+  display: block;
+  font-size: clamp(1.2rem, 3.4vw, 2.45rem);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  color: #fff8eb;
+  text-shadow:
+    0 2px 18px rgba(0, 0, 0, 0.85),
+    0 0 36px rgba(251, 191, 36, 0.18);
 }
 
 .hero-title-accent {
-  font-size: clamp(1.1rem, 3.2vw, 1.65rem);
+  font-size: clamp(0.98rem, 2.5vw, 1.7rem);
   font-weight: 600;
-  color: rgba(226, 232, 240, 0.88);
+  letter-spacing: 0.14em;
+  color: rgba(253, 230, 138, 0.96);
 }
 
 .hero-luck-word {
@@ -449,21 +457,44 @@ table { border-radius: 4px; }
 }
 
 .hero-subtitle {
-  font-size: clamp(1rem, 2.4vw, 1.35rem);
-  line-height: 1.65;
+  max-width: min(72rem, 94vw);
+  font-size: clamp(0.82rem, 1.2vw, 1.05rem);
+  line-height: 1.9;
   font-weight: 500;
-  color: rgba(241, 245, 249, 0.9);
+  letter-spacing: 0.02em;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  color: rgba(241, 245, 249, 0.92);
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
 }
 
+.hero-subtitle strong {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.hero-subtitle em {
+  font-style: normal;
+  font-weight: 700;
+}
+
 .hero-footnote {
+  max-width: min(42rem, 94vw);
   font-size: 0.875rem;
+  word-break: keep-all;
   color: rgba(254, 243, 199, 0.82);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 }
 
 .hero-footnote strong {
   color: #fcd34d;
+}
+
+@media (min-width: 1024px) {
+  .hero-eyebrow,
+  .hero-subtitle {
+    white-space: nowrap;
+  }
 }
 
 .landing-section-title {

@@ -9,6 +9,7 @@ import {
   drawCooldownLeftMs,
   formatDrawCountdown,
 } from "@/lib/coins";
+import { useI18n } from "@/lib/i18n/provider";
 
 const SEG = 360 / WHEEL_VALUES.length;
 
@@ -23,6 +24,7 @@ function shuffle(arr: number[]) {
 
 export default function DrawPage() {
   const { profile, loading, openAuth, setProfile } = useUser();
+  const { t } = useI18n();
   const [layout, setLayout] = useState<number[]>(() => shuffle(WHEEL_VALUES));
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -51,13 +53,13 @@ export default function DrawPage() {
   if (!loading && !profile) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Log in to spin</h1>
-        <p className="mt-2 text-slate-300">The daily prize wheel is free for members, once every 24 hours — no membership card, no velvet rope.</p>
-        <button onClick={openAuth} className="btn-gold mt-6">Log in / Register</button>
+        <h1 className="text-2xl font-bold">{t("draw.loginTitle")}</h1>
+        <p className="mt-2 text-slate-300">{t("draw.loginBody")}</p>
+        <button onClick={openAuth} className="btn-gold mt-6">{t("common.loginRegister")}</button>
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
 
   async function spin() {
     if (spinning || !canSpinNow) return;
@@ -92,7 +94,7 @@ export default function DrawPage() {
         setSpinning(false);
       }, WHEEL_SPIN_MS + 100);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Spin failed.");
+      setMessage(e instanceof Error ? e.message : t("draw.failed"));
       setSpinning(false);
     }
   }
@@ -100,8 +102,8 @@ export default function DrawPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6 text-center">
       <div>
-        <h1 className="text-3xl font-extrabold">Daily prize wheel</h1>
-        <p className="text-slate-400">One free spin every 24 hours. Give it a whirl and win up to 1000 bronze!</p>
+        <h1 className="text-3xl font-extrabold">{t("draw.title")}</h1>
+        <p className="text-slate-400">{t("draw.subtitle")}</p>
       </div>
 
       <PrizeWheel layout={layout} rotation={rotation} spinning={spinning} spinMs={WHEEL_SPIN_MS} />
@@ -112,15 +114,12 @@ export default function DrawPage() {
           disabled={spinning || !canSpinNow}
           className="btn-gold text-lg !px-10 !py-3 font-mono tabular-nums"
         >
-          {spinning ? "Spinning…" : canSpinNow ? "▶ Start" : formatDrawCountdown(msUntilNext)}
+          {spinning ? t("draw.spinning") : canSpinNow ? t("draw.start") : formatDrawCountdown(msUntilNext)}
         </button>
 
       </div>
 
-      <p className="text-xs text-slate-500">
-        The 1,000 and 500 segments are teasers — the pointer never lands there. Wins are added to
-        your wallet as bronze (never silver or gold coins).
-      </p>
+      <p className="text-xs text-slate-500">{t("draw.note")}</p>
 
       {/* All results shown in a modal. */}
       {(result !== null || message) && (
@@ -136,22 +135,24 @@ export default function DrawPage() {
               result > 0 ? (
                 <>
                   <div className="text-6xl">🎉</div>
-                  <h2 className="mt-3 text-2xl font-extrabold text-amber-200">You won {result} bronze!</h2>
+                  <h2 className="mt-3 text-2xl font-extrabold text-amber-200">
+                    {t("draw.wonTitle", { value: result })}
+                  </h2>
                   <p className="mt-2 text-slate-300">
-                    Added to your wallet. Come back in {formatDrawCountdown(msUntilNext)} for another spin.
+                    {t("draw.wonBody", { time: formatDrawCountdown(msUntilNext) })}
                   </p>
                 </>
               ) : (
                 <>
                   <div className="text-5xl">🪙</div>
-                  <h2 className="mt-3 text-2xl font-extrabold text-slate-200">No coins available</h2>
-                  <p className="mt-2 text-slate-300">Insufficient coins this time — better luck on your next spin!</p>
+                  <h2 className="mt-3 text-2xl font-extrabold text-slate-200">{t("draw.noCoinsTitle")}</h2>
+                  <p className="mt-2 text-slate-300">{t("draw.noCoinsBody")}</p>
                 </>
               )
             ) : (
               <>
                 <div className="text-5xl">⏳</div>
-                <h2 className="mt-3 text-xl font-bold text-amber-200">Not yet</h2>
+                <h2 className="mt-3 text-xl font-bold text-amber-200">{t("draw.notYetTitle")}</h2>
                 <p className="mt-2 font-mono text-slate-300">{message}</p>
               </>
             )}
@@ -162,7 +163,7 @@ export default function DrawPage() {
               }}
               className="btn-gold mt-5"
             >
-              Close
+              {t("common.close")}
             </button>
           </div>
         </div>

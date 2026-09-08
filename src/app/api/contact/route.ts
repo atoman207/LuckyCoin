@@ -2,16 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMail } from "@/lib/mailer";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
 // Contact form: stores the message (shown on the admin page) and emails a copy
 // to the contact address via SMTP. Works for logged-in and anonymous senders.
 export async function POST(req: Request) {
+  const t = await getT();
   const body = await req.json().catch(() => ({}));
   const message = String(body.message ?? "").trim();
-  if (!message) return NextResponse.json({ error: "Please enter a message." }, { status: 400 });
-  if (message.length > 4000) return NextResponse.json({ error: "Message is too long." }, { status: 400 });
+  if (!message) return NextResponse.json({ error: t("api.contact.enterMessage") }, { status: 400 });
+  if (message.length > 4000) return NextResponse.json({ error: t("api.contact.tooLong") }, { status: 400 });
 
   let name = String(body.name ?? "").trim() || null;
   let email = String(body.email ?? "").trim().toLowerCase() || null;
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
     email,
     message,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
 
   // Email a copy to the contact address (best-effort).
   const contactTo = process.env.CONTACT_EMAIL;
@@ -47,15 +49,21 @@ export async function POST(req: Request) {
     try {
       await sendMail({
         to: contactTo,
-        subject: `Lucky Coin contact${name ? ` from ${name}` : ""}`,
+        subject: name
+          ? t("email.contact.subjectFrom", { name })
+          : t("email.contact.subject"),
         replyTo: email || undefined,
-        text: `From: ${name || "Anonymous"} <${email || "no email"}>\n\n${message}`,
-        html: `<p><b>From:</b> ${name || "Anonymous"} &lt;${email || "no email"}&gt;</p><p>${message.replace(/\n/g, "<br>")}</p>`,
+        text: `${t("email.contact.from")}: ${name || t("email.contact.anonymous")} <${
+          email || t("email.contact.noEmail")
+        }>\n\n${message}`,
+        html: `<p><b>${t("email.contact.from")}:</b> ${name || t("email.contact.anonymous")} &lt;${
+          email || t("email.contact.noEmail")
+        }&gt;</p><p>${message.replace(/\n/g, "<br>")}</p>`,
       });
     } catch {
       /* still saved to the admin page even if the email fails */
     }
   }
 
-  return NextResponse.json({ ok: true, message: "Thanks! Your message has been sent." });
+  return NextResponse.json({ ok: true, message: t("api.contact.sent") });
 }

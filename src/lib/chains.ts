@@ -10,6 +10,7 @@
 // =====================================================================
 
 import { RECEIVING_WALLETS } from "@/lib/wallets";
+import type { MessageKey, Vars } from "@/lib/i18n";
 
 // Underpayment tolerance — absorbs rounding / dust without allowing a
 // meaningful shortfall (1%).
@@ -26,7 +27,8 @@ export type VerifyResult = {
   paid: number; // amount received at our address (in the asset's whole units)
   confirmed: boolean; // had enough confirmations / reached finality
   timestamp?: number; // block/ledger time of the tx, unix seconds (when known)
-  reason?: string; // human-readable failure reason when !ok
+  reason?: MessageKey; // message key for the failure when !ok
+  reasonVars?: Vars; // values interpolated into that message
 };
 
 type ChainKind =
@@ -301,10 +303,10 @@ export async function verifyPayment(
   orderCreatedAtMs: number
 ): Promise<VerifyResult> {
   const cfg = CHAIN_CONFIG[methodId];
-  if (!cfg) return fail("Unsupported payment method.");
+  if (!cfg) return fail("chain.unsupportedMethod");
 
   const tx = txHash.trim();
-  if (!tx) return fail("Enter the transaction hash / ID.");
+  if (!tx) return fail("chain.enterTxHash");
 
   let res: VerifyResult;
   try {
@@ -318,21 +320,26 @@ export async function verifyPayment(
       case "sol-token": res = await verifySolToken(cfg, tx); break;
       case "xrp": res = await verifyXrp(cfg, tx); break;
       case "xlm": res = await verifyXlm(cfg, tx); break;
-      default: return fail("Unsupported chain.");
+      default: return fail("chain.unsupportedChain");
     }
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Could not verify the transaction.");
+    // Network/explorer trouble — keep the technical detail as a variable so the
+    // translated sentence can still show what went wrong.
+    return fail("chain.verifyFailed", {
+      detail: e instanceof Error ? e.message : String(e),
+    });
   }
 
   if (!res.ok) return res;
   if (!res.confirmed) {
-    return { ...res, ok: false, reason: "Transaction found but not yet confirmed. Try again shortly." };
+    return { ...res, ok: false, reason: "chain.notConfirmed" };
   }
   if (res.paid + 1e-12 < expectedAmount * (1 - AMOUNT_TOLERANCE)) {
     return {
       ...res,
       ok: false,
-      reason: `Underpaid: received ${res.paid}, expected ${expectedAmount}.`,
+      reason: "chain.underpaid",
+      reasonVars: { paid: res.paid, expected: expectedAmount },
     };
   }
 
@@ -340,29 +347,29 @@ export async function verifyPayment(
   // on-chain timestamp, so an older/unrelated payment to the same address
   // can't be replayed and late payments are rejected.
   if (!res.timestamp) {
-    return { ...res, ok: false, reason: "Transaction time not available yet. Try again shortly." };
+    return { ...res, ok: false, reason: "chain.noTimestamp" };
   }
   const txMs = res.timestamp * 1000;
   if (txMs < orderCreatedAtMs - CLOCK_SKEW_MS) {
     return {
       ...res,
       ok: false,
-      reason: "This transaction predates the order. Start a new checkout and pay the amount shown.",
+      reason: "chain.beforeOrder",
     };
   }
   if (txMs > orderCreatedAtMs + PAYMENT_WINDOW_MS + CLOCK_SKEW_MS) {
     return {
       ...res,
       ok: false,
-      reason: "The 10-minute payment window has expired. Start a new checkout.",
+      reason: "chain.windowExpired",
     };
   }
 
   return res;
 }
 
-function fail(reason: string): VerifyResult {
-  return { ok: false, paid: 0, confirmed: false, reason };
+function fail(reason: MessageKey, reasonVars?: Vars): VerifyResult {
+  return { ok: false, paid: 0, confirmed: false, reason, reasonVars };
 }
 
 // --- helpers ----------------------------------------------------------
@@ -468,13 +475,13 @@ function bigIntToAmount(units: bigint, decimals: number): number {
 
 async function verifyBtc(cfg: ChainConfig, txid: string): Promise<VerifyResult> {
   const tx = await getJson(`https://blockstream.info/api/tx/${txid}`);
-  if (!tx) return fail("Transaction not found.");
+  if (!tx) return fail("chain.txNotFound");
 
   let sats = 0;
   for (const vout of tx.vout ?? []) {
     if (vout.scriptpubkey_address === cfg.address) sats += vout.value;
   }
-  if (sats === 0) return fail("This transaction does not pay the expected Bitcoin address.");
+  if (sats === 0) return fail("chain.notPayBtc");
 
   const tip = await getJson(`https://blockstream.info/api/blocks/tip/height`);
   const confirmed = tx.status?.confirmed === true;
@@ -505,13 +512,13 @@ async function evmBlockInfo(
 
 async function verifyEvmNative(cfg: ChainConfig, hash: string): Promise<VerifyResult> {
   const tx = await evmRpc(cfg, "eth_getTransactionByHash", [hash]);
-  if (!tx) return fail("Transaction not found.");
+  if (!tx) return fail("chain.txNotFound");
   const receipt = await evmRpc(cfg, "eth_getTransactionReceipt", [hash]);
   if (!receipt) return { ok: true, paid: 0, confirmed: false };
-  if (receipt.status !== "0x1") return fail("Transaction failed on-chain.");
+  if (receipt.status !== "0x1") return fail("chain.txFailed");
 
   if ((tx.to ?? "").toLowerCase() !== cfg.address.toLowerCase()) {
-    return fail("This transaction does not pay the expected address.");
+    return fail("chain.notPayAddress");
   }
   const paid = Number(BigInt(tx.value)) / 10 ** cfg.decimals;
   const { confirmations, timestamp } = await evmBlockInfo(cfg, tx.blockNumber);
@@ -525,10 +532,10 @@ async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyRes
   if (!receipt) {
     // Maybe still pending — distinguish "unknown" from "not yet mined".
     const tx = await evmRpc(cfg, "eth_getTransactionByHash", [hash]);
-    if (!tx) return fail("Transaction not found.");
+    if (!tx) return fail("chain.txNotFound");
     return { ok: true, paid: 0, confirmed: false };
   }
-  if (receipt.status !== "0x1") return fail("Transaction failed on-chain.");
+  if (receipt.status !== "0x1") return fail("chain.txFailed");
 
   const contract = cfg.tokenContract!.toLowerCase();
   const want = cfg.address.toLowerCase().replace(/^0x/, "");
@@ -540,7 +547,7 @@ async function verifyEvmToken(cfg: ChainConfig, hash: string): Promise<VerifyRes
     if (to !== want) continue;
     units += BigInt(log.data);
   }
-  if (units === BigInt(0)) return fail("This transaction does not transfer USDT to the expected address.");
+  if (units === BigInt(0)) return fail("chain.notUsdtTransfer");
 
   const { confirmations, timestamp } = await evmBlockInfo(cfg, receipt.blockNumber);
   return {
@@ -567,15 +574,15 @@ async function verifyTronNative(cfg: ChainConfig, txid: string): Promise<VerifyR
     headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
-  if (!tx || !tx.txID) return fail("Transaction not found.");
+  if (!tx || !tx.txID) return fail("chain.txNotFound");
   if (tx.ret?.[0]?.contractRet && tx.ret[0].contractRet !== "SUCCESS") {
-    return fail("Transaction failed on-chain.");
+    return fail("chain.txFailed");
   }
   const c = tx.raw_data?.contract?.[0];
-  if (c?.type !== "TransferContract") return fail("Not a TRX transfer.");
+  if (c?.type !== "TransferContract") return fail("chain.notTrxTransfer");
   const v = c.parameter?.value ?? {};
   if ((v.to_address ?? "").toLowerCase() !== tronToHex(cfg.address)) {
-    return fail("This transaction does not pay the expected TRON address.");
+    return fail("chain.notPayTron");
   }
   const info = await getJson(`${TRON_API}/wallet/gettransactioninfobyid`, {
     method: "POST",
@@ -597,22 +604,22 @@ async function verifyTronToken(cfg: ChainConfig, txid: string): Promise<VerifyRe
     headers: tronJsonHeaders(),
     body: JSON.stringify({ value: txid }),
   });
-  if (!tx || !tx.txID) return fail("Transaction not found.");
+  if (!tx || !tx.txID) return fail("chain.txNotFound");
   if (tx.ret?.[0]?.contractRet && tx.ret[0].contractRet !== "SUCCESS") {
-    return fail("Transaction failed on-chain.");
+    return fail("chain.txFailed");
   }
   const c = tx.raw_data?.contract?.[0];
-  if (c?.type !== "TriggerSmartContract") return fail("Not a TRC-20 transfer.");
+  if (c?.type !== "TriggerSmartContract") return fail("chain.notTrc20Transfer");
   const v = c.parameter?.value ?? {};
   if ((v.contract_address ?? "").toLowerCase() !== tronToHex(cfg.tokenContract!)) {
-    return fail("This transaction is not a USDT (TRC-20) transfer.");
+    return fail("chain.notTrc20Usdt");
   }
   // data = selector(4) + to(32) + amount(32)
   const data: string = (v.data ?? "").toLowerCase();
-  if (!data.startsWith("a9059cbb") || data.length < 136) return fail("Not a TRC-20 transfer call.");
+  if (!data.startsWith("a9059cbb") || data.length < 136) return fail("chain.notTrc20Call");
   const to = "41" + data.slice(32, 72); // 20-byte address with TRON prefix
   if (to !== tronToHex(cfg.address)) {
-    return fail("This transaction does not pay the expected TRON address.");
+    return fail("chain.notPayTron");
   }
   const units = BigInt("0x" + data.slice(72, 136));
   const info = await getJson(`${TRON_API}/wallet/gettransactioninfobyid`, {
@@ -641,29 +648,29 @@ async function getSolTx(sig: string): Promise<any> {
 async function verifySolNative(cfg: ChainConfig, sig: string): Promise<VerifyResult> {
   const tx = await getSolTx(sig);
   if (!tx) return { ok: true, paid: 0, confirmed: false }; // not yet finalized / unknown
-  if (tx.meta?.err) return fail("Transaction failed on-chain.");
+  if (tx.meta?.err) return fail("chain.txFailed");
 
   const keys: any[] = tx.transaction?.message?.accountKeys ?? [];
   const idx = keys.findIndex((k) => (typeof k === "string" ? k : k.pubkey) === cfg.address);
-  if (idx < 0) return fail("This transaction does not involve the expected address.");
+  if (idx < 0) return fail("chain.notInvolveAddress");
   const delta = (tx.meta.postBalances[idx] - tx.meta.preBalances[idx]) / 10 ** cfg.decimals;
-  if (delta <= 0) return fail("No SOL was received at the expected address.");
+  if (delta <= 0) return fail("chain.noSolReceived");
   return { ok: true, paid: delta, confirmed: true, timestamp: tx.blockTime ?? 0 }; // finalized => final
 }
 
 async function verifySolToken(cfg: ChainConfig, sig: string): Promise<VerifyResult> {
   const tx = await getSolTx(sig);
   if (!tx) return { ok: true, paid: 0, confirmed: false };
-  if (tx.meta?.err) return fail("Transaction failed on-chain.");
+  if (tx.meta?.err) return fail("chain.txFailed");
 
   const post: any[] = tx.meta?.postTokenBalances ?? [];
   const pre: any[] = tx.meta?.preTokenBalances ?? [];
   const match = post.find((b) => b.mint === cfg.tokenMint && b.owner === cfg.address);
-  if (!match) return fail("This transaction does not transfer USDT to the expected address.");
+  if (!match) return fail("chain.notUsdtTransfer");
   const before = pre.find((b) => b.accountIndex === match.accountIndex);
   const delta =
     Number(match.uiTokenAmount?.uiAmount ?? 0) - Number(before?.uiTokenAmount?.uiAmount ?? 0);
-  if (delta <= 0) return fail("No USDT was received at the expected address.");
+  if (delta <= 0) return fail("chain.noUsdtReceived");
   return { ok: true, paid: delta, confirmed: true, timestamp: tx.blockTime ?? 0 };
 }
 
@@ -676,15 +683,15 @@ async function verifyXrp(cfg: ChainConfig, hash: string): Promise<VerifyResult> 
     body: JSON.stringify({ method: "tx", params: [{ transaction: hash, binary: false }] }),
   });
   const r = j?.result;
-  if (!r || r.status === "error") return fail("Transaction not found.");
-  if (r.TransactionType !== "Payment") return fail("Not an XRP payment.");
-  if (r.Destination !== cfg.address) return fail("This transaction does not pay the expected XRP address.");
+  if (!r || r.status === "error") return fail("chain.txNotFound");
+  if (r.TransactionType !== "Payment") return fail("chain.notXrpPayment");
+  if (r.Destination !== cfg.address) return fail("chain.notPayXrp");
   if (r.meta?.TransactionResult && r.meta.TransactionResult !== "tesSUCCESS") {
-    return fail("Transaction failed on-chain.");
+    return fail("chain.txFailed");
   }
 
   const delivered = r.meta?.delivered_amount ?? r.Amount;
-  if (typeof delivered !== "string") return fail("Payment was not in XRP."); // issued currency => object
+  if (typeof delivered !== "string") return fail("chain.notXrpAmount"); // issued currency => object
   // XRP `date` is seconds since the Ripple epoch (2000-01-01) → unix seconds.
   const timestamp = typeof r.date === "number" ? r.date + 946684800 : 0;
   return {
@@ -699,8 +706,8 @@ async function verifyXrp(cfg: ChainConfig, hash: string): Promise<VerifyResult> 
 
 async function verifyXlm(cfg: ChainConfig, hash: string): Promise<VerifyResult> {
   const tx = await getJson(`https://horizon.stellar.org/transactions/${hash}`);
-  if (!tx) return fail("Transaction not found.");
-  if (tx.successful === false) return fail("Transaction failed on-chain.");
+  if (!tx) return fail("chain.txNotFound");
+  if (tx.successful === false) return fail("chain.txFailed");
 
   const ops = await getJson(`https://horizon.stellar.org/transactions/${hash}/operations`);
   const records: any[] = ops?._embedded?.records ?? [];
@@ -713,7 +720,7 @@ async function verifyXlm(cfg: ChainConfig, hash: string): Promise<VerifyResult> 
       paid += Number(amount);
     }
   }
-  if (paid === 0) return fail("This transaction does not pay XLM to the expected address.");
+  if (paid === 0) return fail("chain.notPayXlm");
   const ts = tx.created_at ? Math.floor(Date.parse(tx.created_at) / 1000) : 0;
   return { ok: true, paid, confirmed: true, timestamp: ts || undefined }; // Stellar = immediate finality
 }

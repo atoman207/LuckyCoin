@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
+import { getT } from "@/lib/i18n/server";
 
 // End the current game session (New Game). Clears profile progress and closes
 // any active round without paying out.
 export async function POST() {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
 
@@ -27,7 +29,7 @@ export async function POST() {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: t("api.serverError") }, { status: 500 });
 
   return NextResponse.json({ profile: updated });
 }

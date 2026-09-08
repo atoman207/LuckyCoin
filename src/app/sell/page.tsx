@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
-import { SELL_PRICE_USDT, SELL_HOURS_LABEL, sellStatus } from "@/lib/selling";
+import { SELL_PRICE_USDT, SELL_HOURS_KEY, sellStatus } from "@/lib/selling";
 import { PAYMENT_METHODS, getPaymentMethod } from "@/lib/wallets";
+import { useI18n } from "@/lib/i18n/provider";
 
 export default function SellPage() {
   const { profile, loading, openAuth, setProfile } = useUser();
+  const { t } = useI18n();
   const [amount, setAmount] = useState(1);
   const [status, setStatus] = useState(() => sellStatus());
   const [busy, setBusy] = useState(false);
@@ -36,12 +38,12 @@ export default function SellPage() {
   if (!loading && !profile) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">Log in to sell coins</h1>
-        <button onClick={openAuth} className="btn-gold mt-6">Log in / Register</button>
+        <h1 className="text-2xl font-bold">{t("sell.loginTitle")}</h1>
+        <button onClick={openAuth} className="btn-gold mt-6">{t("common.loginRegister")}</button>
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">Loading…</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
 
   async function saveWallet() {
     if (!address.trim()) return;
@@ -57,9 +59,9 @@ export default function SellPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       if (data.profile) setProfile(data.profile);
-      setWalletMsg("✓ Wallet saved.");
+      setWalletMsg(t("sell.walletSaved"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save the wallet.");
+      setError(e instanceof Error ? e.message : t("sell.walletSaveFailed"));
     } finally {
       setSavingWallet(false);
     }
@@ -81,7 +83,7 @@ export default function SellPage() {
       setDone(data.message);
       setAmount(1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sale failed.");
+      setError(e instanceof Error ? e.message : t("sell.failed"));
     } finally {
       setBusy(false);
     }
@@ -91,19 +93,25 @@ export default function SellPage() {
   const registered = profile.payout_address || null;
   const hasAddress = !!address.trim();
   const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold && hasAddress;
+  const registeredMethodLabel = getPaymentMethod(profile.payout_method)?.label;
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold">Sell gold coins</h1>
+        <h1 className="text-3xl font-extrabold">{t("sell.title")}</h1>
         <p className="text-slate-400">
-          1 gold = <span className="font-semibold text-amber-300">{SELL_PRICE_USDT.toLocaleString()} USDT</span> — turn your good luck into actual lunch money.
+          {t("sell.subtitlePre")}
+          <span className="font-semibold text-amber-300">
+            {SELL_PRICE_USDT.toLocaleString()} USDT
+          </span>
+          {t("sell.subtitlePost")}
         </p>
       </div>
 
       {/* Trading window banner */}
       <div className="rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
-        <span className="font-semibold">● Open now</span> — sell your gold {SELL_HOURS_LABEL}.
+        <span className="font-semibold">{t("sell.openNow")}</span>{" "}
+        {t("sell.openBody", { hours: t(SELL_HOURS_KEY) })}
       </div>
 
       {done && (
@@ -116,10 +124,10 @@ export default function SellPage() {
       {/* Payout wallet — choose the crypto/network and address. Editable any time,
           even with no gold, so you can register it in advance. */}
       <div className="card space-y-4 p-6">
-        <h2 className="text-lg font-bold">Payout wallet</h2>
+        <h2 className="text-lg font-bold">{t("sell.walletTitle")}</h2>
 
         <div>
-          <label className="label">Receive as</label>
+          <label className="label">{t("sell.receiveAs")}</label>
           <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
             {PAYMENT_METHODS.map((m) => (
               <option key={m.id} value={m.id}>
@@ -130,13 +138,13 @@ export default function SellPage() {
         </div>
 
         <div>
-          <label className="label">Your wallet address</label>
+          <label className="label">{t("sell.walletAddress")}</label>
           <div className="flex items-center gap-2">
             <input
               className="input font-mono text-sm"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Paste your wallet address"
+              placeholder={t("sell.walletPlaceholder")}
               spellCheck={false}
             />
             <button
@@ -144,7 +152,7 @@ export default function SellPage() {
               disabled={savingWallet || !hasAddress}
               className="btn-ghost shrink-0 text-sm"
             >
-              {savingWallet ? "Saving…" : "Save"}
+              {savingWallet ? t("common.saving") : t("common.save")}
             </button>
           </div>
           {walletMsg && <p className="mt-1 text-xs text-emerald-300">{walletMsg}</p>}
@@ -152,20 +160,17 @@ export default function SellPage() {
           {/* Registered-wallet / prompt messaging */}
           {registered ? (
             <p className="mt-2 text-xs text-slate-400">
-              Registered wallet{getPaymentMethod(profile.payout_method)?.label ? ` (${getPaymentMethod(profile.payout_method)!.label})` : ""}:{" "}
-              <span className="font-mono text-slate-300 break-all">{registered}</span>. If you don&apos;t
-              change it, your payout will be sent there.
+              {t("sell.registeredWallet", {
+                method: registeredMethodLabel ? ` (${registeredMethodLabel})` : "",
+              })}
+              <span className="font-mono text-slate-300 break-all">{registered}</span>
+              {t("sell.registeredWalletTail")}
             </p>
           ) : !hasAddress ? (
-            <p className="mt-2 text-xs text-amber-300">
-              No wallet address is registered yet — please enter a wallet address to receive payouts.
-            </p>
+            <p className="mt-2 text-xs text-amber-300">{t("sell.noWallet")}</p>
           ) : null}
 
-          <p className="mt-2 text-xs text-amber-200/90">
-            ⚠ Please double-check that the wallet address is correct — crypto payouts are irreversible
-            and sent to exactly this address.
-          </p>
+          <p className="mt-2 text-xs text-amber-200/90">{t("sell.warning")}</p>
         </div>
       </div>
 
@@ -173,13 +178,13 @@ export default function SellPage() {
       <div className="card p-6">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-slate-300">
-            <CoinIcon type="gold" size={28} /> Your gold
+            <CoinIcon type="gold" size={28} /> {t("sell.yourGold")}
           </span>
           <span className="text-xl font-bold text-amber-300">{gold}</span>
         </div>
 
         <div className="mt-5">
-          <label className="label">Gold to sell</label>
+          <label className="label">{t("sell.goldToSell")}</label>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -195,13 +200,13 @@ export default function SellPage() {
               className="btn-ghost shrink-0 text-sm"
               disabled={gold < 1}
             >
-              Max
+              {t("common.max")}
             </button>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between rounded-xl bg-black/30 px-4 py-3">
-          <span className="text-slate-300">You receive</span>
+          <span className="text-slate-300">{t("sell.youReceive")}</span>
           <span className="text-xl font-extrabold text-emerald-300">
             {(Math.min(amount, gold || 0) * SELL_PRICE_USDT).toLocaleString()} USDT
           </span>
@@ -209,17 +214,15 @@ export default function SellPage() {
 
         <button onClick={sell} disabled={busy || !canSell} className="btn-gold mt-5 w-full text-lg">
           {busy
-            ? "Processing…"
+            ? t("sell.processing")
             : gold < 1
-              ? "No gold to sell"
+              ? t("sell.noGold")
               : !hasAddress
-                ? "Enter a wallet address"
-                : `Sell ${Math.min(amount, gold)} gold`}
+                ? t("sell.enterWallet")
+                : t("sell.sellAction", { count: Math.min(amount, gold) })}
         </button>
 
-        <p className="mt-3 text-center text-xs text-slate-500">
-          Payouts are sent to your wallet by the team after the sale is recorded.
-        </p>
+        <p className="mt-3 text-center text-xs text-slate-500">{t("sell.payoutNote")}</p>
       </div>
     </div>
   );

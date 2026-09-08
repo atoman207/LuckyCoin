@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n";
+import { authErrorMessage } from "@/lib/i18n/auth-errors";
 
 type Mode = "login" | "register" | "forgot";
 
@@ -11,8 +14,14 @@ const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB (matches the upload route)
 const MIN_PASSWORD = 8;
 
+const TAB_LABEL: Record<"login" | "register", MessageKey> = {
+  login: "auth.tabLogin",
+  register: "auth.tabRegister",
+};
+
 export default function AuthModal() {
   const { authOpen, closeAuth, refresh } = useUser();
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +33,6 @@ export default function AuthModal() {
     password: "",
     confirm: "",
     nationality: "",
-    discord_id: "",
   });
 
   // Avatar chosen during registration (uploaded right after sign-in).
@@ -39,10 +47,10 @@ export default function AuthModal() {
     const params = new URLSearchParams(window.location.search);
     const reason = params.get("login_error");
     if (reason) {
-      setError(reason === "1" ? "Sign-in failed. Please try again." : decodeURIComponent(reason));
+      setError(reason === "1" ? t("auth.signInFailed") : decodeURIComponent(reason));
       window.history.replaceState({}, "", "/");
     }
-  }, [authOpen]);
+  }, [authOpen, t]);
 
   if (!authOpen) return null;
 
@@ -62,11 +70,11 @@ export default function AuthModal() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!AVATAR_TYPES.includes(file.type)) {
-      setError("Avatar must be a PNG, JPG, WEBP or GIF image.");
+      setError(t("auth.avatarType"));
       return;
     }
     if (file.size > AVATAR_MAX_BYTES) {
-      setError("Avatar must be 2 MB or smaller.");
+      setError(t("auth.avatarSize"));
       return;
     }
     setError(null);
@@ -108,7 +116,7 @@ export default function AuthModal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Could not send the login email.");
+      if (!res.ok) throw new Error((await res.json()).error ?? t("auth.magicLinkFailed"));
     }
 
     try {
@@ -118,16 +126,16 @@ export default function AuthModal() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
-        setNotice(`If an account exists for ${email}, we've sent a password-reset link. Open it in this browser.`);
+        setNotice(t("auth.forgotSent", { email }));
         return;
       }
 
       if (mode === "register") {
         if (form.password.length < MIN_PASSWORD) {
-          throw new Error(`Password must be at least ${MIN_PASSWORD} characters.`);
+          throw new Error(t("auth.passwordTooShort", { min: MIN_PASSWORD }));
         }
         if (form.password !== form.confirm) {
-          throw new Error("Passwords don't match.");
+          throw new Error(t("auth.passwordMismatch"));
         }
         // Multipart so the avatar is uploaded at sign-up.
         const fd = new FormData();
@@ -135,23 +143,23 @@ export default function AuthModal() {
         fd.append("email", email);
         fd.append("password", form.password);
         fd.append("nationality", form.nationality);
-        fd.append("discord_id", form.discord_id);
         if (avatarFile) fd.append("avatar", avatarFile);
 
         const res = await fetch("/api/register", { method: "POST", body: fd });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Registration failed.");
+        if (!res.ok) throw new Error(data.error ?? t("auth.registerFailed"));
 
         // First login is confirmed by an email magic link (sent via SMTP).
         await sendMagicLink();
         clearAvatar();
-        setNotice(`Account created! We've emailed a login link to ${email}. Open it to finish your first login.`);
+        setNotice(t("auth.accountCreated", { email }));
         return;
       }
 
       // Login with password.
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: form.password });
-      if (signInErr) throw new Error(signInErr.message);
+      // Supabase reports auth failures in English — show our own wording.
+      if (signInErr) throw new Error(authErrorMessage(t, signInErr.message));
 
       // First login still needs email confirmation — send the link and sign out.
       const meRes = await fetch("/api/me", { cache: "no-store" });
@@ -159,14 +167,14 @@ export default function AuthModal() {
       if (me?.profile && me.profile.first_login_done === false) {
         await supabase.auth.signOut();
         await sendMagicLink();
-        setNotice(`For security, your first login must be confirmed by email. We've sent a login link to ${email}.`);
+        setNotice(t("auth.firstLoginEmail", { email }));
         return;
       }
 
       await refresh();
       closeAuth();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : t("common.somethingWrong"));
     } finally {
       setLoading(false);
     }
@@ -185,33 +193,37 @@ export default function AuthModal() {
         <button
           onClick={closeAuth}
           className="absolute right-4 top-4 text-slate-400 hover:text-white"
-          aria-label="Close"
+          aria-label={t("common.close")}
         >
           ✕
         </button>
 
         <h2 className="text-2xl font-bold">
-          {mode === "login" ? "Welcome back" : mode === "register" ? "Create your account" : "Reset your password"}
+          {mode === "login"
+            ? t("auth.loginTitle")
+            : mode === "register"
+              ? t("auth.registerTitle")
+              : t("auth.forgotTitle")}
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           {mode === "login"
-            ? "Log in to pick your lucky coin."
+            ? t("auth.loginLead")
             : mode === "register"
-              ? "Register and get a starting bonus of coins."
-              : "Enter your email and we'll send a reset link."}
+              ? t("auth.registerLead")
+              : t("auth.forgotLead")}
         </p>
 
         {mode !== "forgot" && (
           <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-black/30 p-1">
-            {(["login", "register"] as Mode[]).map((m) => (
+            {(["login", "register"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => switchMode(m)}
-                className={`rounded-lg py-2 text-sm font-semibold capitalize transition ${
+                className={`rounded-lg py-2 text-sm font-semibold transition ${
                   mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
                 }`}
               >
-                {m}
+                {t(TAB_LABEL[m])}
               </button>
             ))}
           </div>
@@ -231,11 +243,11 @@ export default function AuthModal() {
                 <path fill="#4CAF50" d="M24 43.5c5.5 0 10.3-1.9 13.8-5.1l-6.4-5.4c-2 1.5-4.6 2.5-7.4 2.5-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39 16.2 43.5 24 43.5z" />
                 <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.4 5.4c-.5.4 6.8-5 6.8-14.9 0-1.2-.1-2.3-.4-3.5z" />
               </svg>
-              Continue with Google
+              {t("auth.google")}
             </button>
             <div className="flex items-center gap-3 py-1 text-xs text-slate-500">
               <span className="h-px flex-1 bg-white/10" />
-              or use your email
+              {t("auth.orEmail")}
               <span className="h-px flex-1 bg-white/10" />
             </div>
           </div>
@@ -248,17 +260,17 @@ export default function AuthModal() {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 className="relative rounded-full transition hover:opacity-90"
-                aria-label="Choose an avatar"
+                aria-label={t("auth.chooseAvatar")}
               >
                 <Avatar src={avatarPreview} name={form.nickname || "?"} size={76} />
                 <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-amber-400 text-sm font-bold text-slate-900 ring-2 ring-[#121829]">
                   ＋
                 </span>
               </button>
-              <p className="text-xs text-slate-400">Add a profile avatar (optional)</p>
+              <p className="text-xs text-slate-400">{t("auth.avatarOptional")}</p>
               {avatarPreview && (
                 <button type="button" onClick={clearAvatar} className="text-xs text-red-300 hover:underline">
-                  Remove
+                  {t("auth.remove")}
                 </button>
               )}
               <input
@@ -272,43 +284,56 @@ export default function AuthModal() {
           )}
           {mode === "register" && (
             <div>
-              <label className="label">Nickname</label>
-              <input className="input" value={form.nickname} onChange={set("nickname")} required placeholder="CoinHunter" />
+              <label className="label">{t("auth.nickname")}</label>
+              <input
+                className="input"
+                value={form.nickname}
+                onChange={set("nickname")}
+                required
+                placeholder={t("auth.nicknamePlaceholder")}
+              />
             </div>
           )}
           <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={form.email} onChange={set("email")} required placeholder="you@example.com" />
+            <label className="label">{t("auth.email")}</label>
+            <input
+              className="input"
+              type="email"
+              value={form.email}
+              onChange={set("email")}
+              required
+              placeholder={t("auth.emailPlaceholder")}
+            />
           </div>
 
           {mode !== "forgot" && (
             <div>
-              <label className="label">Password</label>
+              <label className="label">{t("auth.password")}</label>
               <input
                 className="input"
                 type="password"
                 value={form.password}
                 onChange={set("password")}
                 required
-                placeholder="At least 8 characters"
+                placeholder={t("auth.passwordPlaceholder")}
                 minLength={MIN_PASSWORD}
               />
               {mode === "register" && (
-                <p className="mt-1 text-xs text-slate-500">Use at least {MIN_PASSWORD} characters.</p>
+                <p className="mt-1 text-xs text-slate-500">{t("auth.passwordHint", { min: MIN_PASSWORD })}</p>
               )}
             </div>
           )}
 
           {mode === "register" && (
             <div>
-              <label className="label">Confirm password</label>
+              <label className="label">{t("auth.confirmPassword")}</label>
               <input
                 className="input"
                 type="password"
                 value={form.confirm}
                 onChange={set("confirm")}
                 required
-                placeholder="Re-enter your password"
+                placeholder={t("auth.confirmPlaceholder")}
                 minLength={MIN_PASSWORD}
               />
             </div>
@@ -320,20 +345,19 @@ export default function AuthModal() {
               onClick={() => switchMode("forgot")}
               className="text-xs text-amber-300 hover:underline"
             >
-              Forgot password?
+              {t("auth.forgotLink")}
             </button>
           )}
 
           {mode === "register" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label">Nationality</label>
-                <input className="input" value={form.nationality} onChange={set("nationality")} placeholder="e.g. USA" />
-              </div>
-              <div>
-                <label className="label">Discord ID</label>
-                <input className="input" value={form.discord_id} onChange={set("discord_id")} placeholder="name#0000" />
-              </div>
+            <div>
+              <label className="label">{t("auth.nationality")}</label>
+              <input
+                className="input"
+                value={form.nationality}
+                onChange={set("nationality")}
+                placeholder={t("auth.nationalityPlaceholder")}
+              />
             </div>
           )}
 
@@ -346,12 +370,12 @@ export default function AuthModal() {
 
           <button type="submit" className="btn-gold w-full" disabled={loading}>
             {loading
-              ? "Please wait…"
+              ? t("common.pleaseWait")
               : mode === "login"
-                ? "Log in"
+                ? t("auth.submitLogin")
                 : mode === "register"
-                  ? "Create account"
-                  : "Send reset link"}
+                  ? t("auth.submitRegister")
+                  : t("auth.submitReset")}
           </button>
 
           {mode === "forgot" && (
@@ -360,7 +384,7 @@ export default function AuthModal() {
               onClick={() => switchMode("login")}
               className="block w-full text-center text-xs text-slate-400 hover:underline"
             >
-              ← Back to login
+              {t("auth.backToLogin")}
             </button>
           )}
         </form>

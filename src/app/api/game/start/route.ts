@@ -12,6 +12,7 @@ import {
   type RoundCurrency,
   type PlayMode,
 } from "@/lib/coins";
+import { getT } from "@/lib/i18n/server";
 
 // Start a round. Two actions:
 //   • "new"     — fresh game: round 1, base board, restart counter reset.
@@ -20,8 +21,9 @@ import {
 //                 SERVER-SIDE from the mode + round so it can't be spoofed.
 // Pay with EITHER 1 silver OR 10 bronze. Admins play free.
 export async function POST(req: Request) {
+  const t = await getT();
   const ctx = await requireProfile();
-  if (!ctx) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
 
   const { admin, profile } = ctx;
   const body = await req.json().catch(() => ({}));
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
     const used = profile.game_restarts ?? 0;
     if (used >= MAX_RESTARTS) {
       return NextResponse.json(
-        { error: `Restart limit reached (${MAX_RESTARTS}). Start a New Game.` },
+        { error: t("api.game.restartLimit", { max: MAX_RESTARTS }) },
         { status: 400 }
       );
     }
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
   if (!profile.is_admin && profile[unit] < cost) {
     return NextResponse.json(
       {
-        error: `You need ${cost} ${unit} to start this stage (×${increase}), but only have ${profile[unit]}.`,
+        error: t("api.game.needCoins", { need: cost, name: t(unit === "silver" ? "coin.silver" : "coin.bronze"), mult: increase, have: profile[unit] }),
         currency,
         insufficient: true,
       },
@@ -97,7 +99,7 @@ export async function POST(req: Request) {
     .single();
 
   if (chargeErr || !charged) {
-    return NextResponse.json({ error: "Could not start round." }, { status: 400 });
+    return NextResponse.json({ error: t("api.game.couldNotStart") }, { status: 400 });
   }
 
   const board = buildBoardFrom(composition);
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
       .from("profiles")
       .update({ [unit]: charged[unit] + cost })
       .eq("id", profile.id);
-    return NextResponse.json({ error: "Could not start round." }, { status: 500 });
+    return NextResponse.json({ error: t("api.game.couldNotStart") }, { status: 500 });
   }
 
   const gem = composition.gem ?? 0;
