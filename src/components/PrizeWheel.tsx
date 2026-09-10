@@ -37,7 +37,7 @@ export default function PrizeWheel({
           borderLeft: "12px solid transparent",
           borderRight: "12px solid transparent",
           borderTop: "22px solid #f5b73d",
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,.5))",
+          filter: "drop-shadow(0 2px 3px rgba(120,90,40,.35))",
         }}
       />
       <svg
@@ -56,19 +56,19 @@ export default function PrizeWheel({
           const [x2, y2] = pt(end, R);
           const [lx, ly] = pt(i * SEG, R * 0.66);
           const blocked = WHEEL_BLOCKED.includes(v);
-          const fill = blocked ? "#3a2d12" : i % 2 ? "#1b2440" : "#28335a";
+          const fill = blocked ? "#f7d98a" : i % 2 ? "#fff8ec" : "#ffeccc";
           return (
             <g key={i}>
               <path
                 d={`M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2} Z`}
                 fill={fill}
-                stroke="#0b0f1a"
+                stroke="#e8dcc6"
                 strokeWidth="1"
               />
               <text
                 x={lx}
                 y={ly}
-                fill={blocked ? "#f5b73d" : "#e7ecf5"}
+                fill={blocked ? "#8a5f08" : "#4a3f31"}
                 fontSize="13"
                 fontWeight="bold"
                 textAnchor="middle"
@@ -80,7 +80,7 @@ export default function PrizeWheel({
             </g>
           );
         })}
-        <circle cx={CX} cy={CY} r="24" fill="#0b0f1a" stroke="#f5b73d" strokeWidth="3" />
+        <circle cx={CX} cy={CY} r="24" fill="#ffffff" stroke="#e2a022" strokeWidth="3" />
       </svg>
     </div>
   );

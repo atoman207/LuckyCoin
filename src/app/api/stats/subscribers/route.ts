@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getT } from "@/lib/i18n/server";
 
@@ -12,10 +13,17 @@ const CHART_START_UTC = Date.UTC(2026, 8, 9); // September 9, 2026 (month is 0-b
 
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10); // YYYY-MM-DD
 
-// Public: daily new-subscriber counts since the chart start, read live from the
-// DB. "Subscribers" = every non-admin profile (real signups + generated ones).
+// 管理者限定: グラフ開始日以降の日別新規登録者数を、DB から直接集計します。
+// 「登録者」= 管理者以外のすべてのプロフィール（実ユーザー＋生成ユーザー）。
+//
+// 以前はトップページの公開グラフ用に誰でも呼べるルートでしたが、運営用の指標
+// なので管理画面へ移し、ここも管理者だけが読めるようにしています。画面から
+// グラフを外すだけでは、この URL を直接叩けば数字が取れてしまうためです。
 export async function GET() {
   const t = await getT();
+  const ctx = await requireAdmin();
+  if (!ctx) return NextResponse.json({ error: t("api.admin.only") }, { status: 403 });
+
   const admin = createAdminClient();
 
   const { data, error } = await admin

@@ -22,7 +22,7 @@ export default function WelcomeModal() {
   if (!welcomeOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4" onClick={closeWelcome}>
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-[#4a3f31]/35 p-4" onClick={closeWelcome}>
       <div
         className="card relative w-full max-w-sm p-8 text-center animate-pop"
         onClick={(e) => e.stopPropagation()}
@@ -30,14 +30,14 @@ export default function WelcomeModal() {
         <button
           onClick={closeWelcome}
           aria-label={t("common.close")}
-          className="absolute right-4 top-4 text-slate-400 hover:text-white"
+          className="absolute right-4 top-4 text-muted hover:text-body"
         >
           ✕
         </button>
         <CoinIcon type="gold" size={72} className="mx-auto animate-pop" />
         <h2 className="mt-4 text-2xl font-extrabold">{t("welcome.title")}</h2>
-        <p className="mt-2 text-lg text-slate-200">{t("welcome.body")}</p>
-        <p className="mt-4 text-xs text-slate-500">{t("welcome.autoClose")}</p>
+        <p className="mt-2 text-lg text-body">{t("welcome.body")}</p>
+        <p className="mt-4 text-xs text-faint">{t("welcome.autoClose")}</p>
       </div>
     </div>
   );

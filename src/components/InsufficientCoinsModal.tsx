@@ -29,11 +29,11 @@ export default function InsufficientCoinsModal({
   }, [router]);
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-[#4a3f31]/35 p-4" onClick={onClose}>
       <div className="card w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-red-400/15 text-2xl">⚠️</div>
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-red-50 text-2xl">⚠️</div>
         <h2 className="mt-3 text-xl font-bold">{t("insufficient.title")}</h2>
-        <p className="mt-2 text-sm text-slate-300">{message || t("insufficient.body")}</p>
+        <p className="mt-2 text-sm text-body">{message || t("insufficient.body")}</p>
 
         <button onClick={() => router.push("/buy")} className="btn-gold mt-5 w-full text-lg">
           {t("insufficient.topUp")}
@@ -42,7 +42,7 @@ export default function InsufficientCoinsModal({
           {t("common.cancel")}
         </button>
 
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-faint">
           {t("insufficient.redirect", { seconds: left })}
         </p>
       </div>

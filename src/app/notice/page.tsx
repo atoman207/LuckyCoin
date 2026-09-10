@@ -25,22 +25,22 @@ const medal = (rank: number) => (rank === 1 ? "🥇" : rank === 2 ? "🥈" : ran
 
 // Gold / silver / bronze styling for the top three places.
 const PODIUM: Record<number, { ring: string; row: string; tag: string; label: MessageKey; place: MessageKey }> = {
-  1: { ring: "ring-amber-400/60", row: "border-l-4 border-amber-400 bg-amber-400/10", tag: "bg-amber-400 text-slate-900", label: "coin.gold", place: "notice.first" },
-  2: { ring: "ring-slate-300/60", row: "border-l-4 border-slate-300 bg-slate-300/10", tag: "bg-slate-300 text-slate-900", label: "coin.silver", place: "notice.second" },
-  3: { ring: "ring-orange-400/60", row: "border-l-4 border-orange-400 bg-orange-400/10", tag: "bg-orange-400 text-slate-900", label: "coin.bronze", place: "notice.third" },
+  1: { ring: "ring-amber-400", row: "border-l-4 border-amber-400 bg-amber-50", tag: "bg-amber-400 text-slate-900", label: "coin.gold", place: "notice.first" },
+  2: { ring: "ring-slate-300/60", row: "border-l-4 border-slate-300 bg-slate-100", tag: "bg-slate-300 text-slate-900", label: "coin.silver", place: "notice.second" },
+  3: { ring: "ring-orange-400", row: "border-l-4 border-orange-400 bg-orange-50", tag: "bg-orange-400 text-slate-900", label: "coin.bronze", place: "notice.third" },
 };
 
 // Coin counts shown inline next to a player's avatar + name.
 function Coins({ gold, silver, bronze }: { gold: number; silver: number; bronze: number }) {
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-      <span className="inline-flex items-center gap-1 text-amber-300">
+      <span className="inline-flex items-center gap-1 text-amber-600">
         <CoinIcon type="gold" size={15} /> {gold.toLocaleString()}
       </span>
-      <span className="inline-flex items-center gap-1 text-slate-200">
+      <span className="inline-flex items-center gap-1 text-body">
         <CoinIcon type="silver" size={15} /> {silver.toLocaleString()}
       </span>
-      <span className="inline-flex items-center gap-1 text-orange-300">
+      <span className="inline-flex items-center gap-1 text-orange-600">
         <CoinIcon type="bronze" size={15} /> {bronze.toLocaleString()}
       </span>
     </div>
@@ -94,40 +94,40 @@ export default function NoticePage() {
     <div className="mx-auto max-w-4xl space-y-8">
       <header className="text-center">
         <h1 className="text-3xl font-extrabold sm:text-4xl">{t("notice.title")}</h1>
-        <p className="mt-2 text-slate-400">{t("notice.lead")}</p>
+        <p className="mt-2 text-muted">{t("notice.lead")}</p>
       </header>
 
       {error && (
-        <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>
       )}
 
       {/* Headline stats + "My ranking" button */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="card p-6 text-center">
-          <div className="text-sm text-slate-400">{t("notice.totalParticipants")}</div>
-          <div className="mt-1 text-4xl font-extrabold tabular-nums text-emerald-300">
+          <div className="text-sm text-muted">{t("notice.totalParticipants")}</div>
+          <div className="mt-1 text-4xl font-extrabold tabular-nums text-emerald-600">
             {board ? total.toLocaleString() : "…"}
           </div>
         </div>
         <div className="card flex flex-col items-center justify-center gap-3 p-6 text-center">
           <div>
-            <div className="text-sm text-slate-400">{t("notice.yourRank")}</div>
-            <div className="mt-1 text-4xl font-extrabold tabular-nums text-amber-300">
+            <div className="text-sm text-muted">{t("notice.yourRank")}</div>
+            <div className="mt-1 text-4xl font-extrabold tabular-nums text-amber-600">
               {!profile ? (
-                <span className="text-lg font-semibold text-slate-400">{t("notice.notLoggedIn")}</span>
+                <span className="text-lg font-semibold text-muted">{t("notice.notLoggedIn")}</span>
               ) : you ? (
                 <>
                   #{you.rank.toLocaleString()}
-                  <span className="ml-2 text-base font-medium text-slate-400">
+                  <span className="ml-2 text-base font-medium text-muted">
                     {t("notice.ofTotal", { total: total.toLocaleString() })}
                   </span>
                 </>
               ) : (
-                <span className="text-lg font-semibold text-slate-400">{t("notice.unranked")}</span>
+                <span className="text-lg font-semibold text-muted">{t("notice.unranked")}</span>
               )}
             </div>
             {profile && you && percentile && (
-              <div className="mt-1 text-xs text-slate-500">{t("notice.percentile", { percent: percentile })}</div>
+              <div className="mt-1 text-xs text-faint">{t("notice.percentile", { percent: percentile })}</div>
             )}
           </div>
           <button onClick={showMyRanking} className="btn-gold text-sm">
@@ -155,7 +155,7 @@ export default function NoticePage() {
                 <div className="font-bold">
                   {r.nickname}
                   {mine && (
-                    <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
                       {t("common.you")}
                     </span>
                   )}
@@ -169,9 +169,9 @@ export default function NoticePage() {
 
       {/* Top 50 list — avatar + name with coin counts alongside */}
       <section className="card p-0">
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="text-lg font-bold">{t("notice.top50")}</h2>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-faint">
             {updatedAt
               ? t("notice.updatedAt", { time: updatedAt.toLocaleTimeString(intlLocale) })
               : t("common.loading")}
@@ -179,11 +179,11 @@ export default function NoticePage() {
         </div>
 
         {board === null ? (
-          <div className="px-5 py-10 text-center text-slate-500">{t("notice.loadingRankings")}</div>
+          <div className="px-5 py-10 text-center text-faint">{t("notice.loadingRankings")}</div>
         ) : board.top.length === 0 ? (
-          <div className="px-5 py-10 text-center text-slate-500">{t("notice.noPlayers")}</div>
+          <div className="px-5 py-10 text-center text-faint">{t("notice.noPlayers")}</div>
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line">
             {board.top.map((r) => {
               const mine = profile?.id === r.id;
               const p = PODIUM[r.rank];
@@ -192,12 +192,12 @@ export default function NoticePage() {
                   key={r.id}
                   id={mine ? "my-rank" : undefined}
                   className={`flex items-center gap-3 px-4 py-3 transition ${
-                    p ? p.row : mine ? "bg-amber-400/10" : "hover:bg-white/[0.03]"
+                    p ? p.row : mine ? "bg-amber-50" : "hover:bg-cream"
                   } ${mine && flash ? "ring-2 ring-amber-400" : ""}`}
                 >
                   {/* Rank badge */}
                   <div className="w-10 shrink-0 text-center text-lg font-bold tabular-nums">
-                    {medal(r.rank) ?? <span className="text-slate-400">{r.rank}</span>}
+                    {medal(r.rank) ?? <span className="text-muted">{r.rank}</span>}
                   </div>
                   <Avatar src={r.avatar_url} name={r.nickname} size={40} />
                   {/* Name + inline coin counts */}
@@ -205,7 +205,7 @@ export default function NoticePage() {
                     <div className="flex items-center gap-2 font-semibold">
                       <span className="truncate">{r.nickname}</span>
                       {mine && (
-                        <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
                           {t("common.you")}
                         </span>
                       )}
@@ -222,16 +222,16 @@ export default function NoticePage() {
       {/* Your standing when you're outside the top 50 */}
       {profile && you && you.rank > 50 && (
         <section id="my-rank" className={`card p-0 ${flash ? "ring-2 ring-amber-400" : ""}`}>
-          <div className="border-b border-white/10 px-5 py-3 text-sm font-semibold text-slate-300">
+          <div className="border-b border-line px-5 py-3 text-sm font-semibold text-body">
             {t("notice.yourStanding", { rank: you.rank.toLocaleString(), total: total.toLocaleString() })}
           </div>
-          <div className="flex items-center gap-3 bg-amber-400/10 px-4 py-3">
+          <div className="flex items-center gap-3 bg-amber-50 px-4 py-3">
             <div className="w-10 shrink-0 text-center text-lg font-bold tabular-nums">{you.rank}</div>
             <Avatar src={you.avatar_url} name={you.nickname} size={40} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 font-semibold">
                 <span className="truncate">{you.nickname}</span>
-                <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-200">{t("common.you")}</span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{t("common.you")}</span>
               </div>
               <Coins gold={you.gold} silver={you.silver} bronze={you.bronze} />
             </div>

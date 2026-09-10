@@ -37,48 +37,52 @@ const CONCURRENCY = 8;
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-// --- name generation --------------------------------------------------------
-// Word banks chosen so combinations read like real Discord display names.
+// --- 表示名の生成 ------------------------------------------------------------
+// 日本国内向けのサイトなので、ランキングに並ぶ名前も日本語にします。
+// 実際の日本人プレイヤーが付けそうな「ひらがな＋名詞」「苗字＋名前」
+// 「カタカナのハンドル」などが混ざるよう語彙を用意しています。
 const ADJ = [
-  "Silent", "Crimson", "Lunar", "Solar", "Velvet", "Frost", "Shadow", "Golden",
-  "Ember", "Cosmic", "Mystic", "Royal", "Swift", "Wild", "Hidden", "Brave",
-  "Quiet", "Neon", "Iron", "Jade", "Amber", "Onyx", "Stormy", "Misty",
-  "Radiant", "Feral", "Noble", "Dusty", "Electric", "Frozen", "Scarlet", "Wandering",
+  "しずかな", "まっかな", "つきよの", "たいようの", "ゆきの", "かげの", "きんいろ",
+  "ほしぞらの", "みならい", "ゆうかんな", "しあわせ", "こがねの", "はやての",
+  "そらいろ", "こもれび", "あさひの", "ゆうやけ", "はるかぜ", "なつぞら", "あきかぜ",
 ] as const;
 const NOUN = [
-  "Fox", "Raven", "Wolf", "Falcon", "Tiger", "Otter", "Hawk", "Lynx", "Bear",
-  "Viper", "Crane", "Heron", "Koi", "Moth", "Comet", "Ember", "Willow", "Cedar",
-  "River", "Ridge", "Drift", "Echo", "Sage", "Frost", "Storm", "Ash", "Maple",
-  "Phoenix", "Sparrow", "Panther", "Dragon", "Gecko",
+  "きつね", "からす", "おおかみ", "たか", "とら", "かわうそ", "やまねこ", "くま",
+  "つる", "こい", "ほたる", "うさぎ", "たぬき", "ふくろう", "いるか", "ぺんぎん",
+  "もみじ", "さくら", "かえで", "やなぎ", "こだま", "しずく", "ひかり", "つばめ",
 ] as const;
-const FIRST = [
-  "Liam", "Mara", "Noah", "Yuki", "Sara", "Kai", "Aria", "Leo", "Mia", "Theo",
-  "Ivan", "Lena", "Omar", "Nina", "Ravi", "Elsa", "Hugo", "Zoe", "Finn", "Ada",
-  "Ezra", "Luca", "Maya", "Niko", "Tara", "Dmitri", "Hana", "Sven", "Priya", "Diego",
-  "Anya", "Mateo", "Freya", "Rohan", "Lara", "Bjorn", "Amara", "Cyrus", "Iris", "Otto",
+// カタカナのハンドル用。
+const KATAKANA = [
+  "ラッキー", "コイン", "ミラクル", "ドリーム", "スター", "サンダー", "レインボー",
+  "チャレンジ", "フォーチュン", "マスター", "キング", "クイーン", "ヒーロー", "ルーキー",
 ] as const;
-const LAST = [
-  "Carter", "Quinn", "Voss", "Tanaka", "Hale", "Brooks", "Nash", "Reyes", "Park",
-  "Lowe", "Frost", "Vance", "Cole", "Mori", "Adler", "Bennett", "Cruz", "Dane",
-  "Flynn", "Grey", "Holt", "Kane", "Mercer", "Novak", "Pace", "Rhodes", "Sable",
-  "Thorne", "Vega", "Ward", "Yates", "Zane",
+const SURNAME = [
+  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
+  "吉田", "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水",
+  "山崎", "阿部", "森", "池田", "橋本", "石川", "前田", "藤田", "後藤", "岡田",
 ] as const;
+const GIVEN = [
+  "ゆうき", "はると", "さくら", "ひなた", "あおい", "りく", "みなと", "つむぎ",
+  "そうた", "いつき", "めい", "ゆい", "こはる", "れん", "ひろと", "あかり",
+  "なぎさ", "かえで", "たくみ", "みお", "しおり", "けんと", "ゆづき", "そら",
+] as const;
+// 国籍。日本向けサイトなので日本が大半で、ときどき他国が混ざります。
 const COUNTRIES = [
-  "USA", "Japan", "Germany", "Brazil", "India", "Canada", "France", "Korea",
-  "Spain", "Italy", "Mexico", "Australia", "Nigeria", "Turkey", "Sweden",
-  "Poland", "Vietnam", "Egypt", "Chile", "Thailand", "Argentina", "Netherlands",
+  "日本", "日本", "日本", "日本", "日本", "日本", "日本", "日本",
+  "アメリカ", "韓国", "台湾", "中国", "イギリス", "ドイツ", "フランス",
+  "ブラジル", "カナダ", "オーストラリア", "タイ", "ベトナム",
 ] as const;
 
-// One fresh, plausible display name. Styles are weighted toward what real
-// Discord users pick: PascalCase combos, lowercase handles, and real names.
+// 名前をひとつ生成します。実在のプレイヤーが付けそうな書き方に寄せて、
+// ひらがな複合語・姓名・カタカナ＋数字などを混ぜています。
 function makeName(): string {
   switch (randInt(1, 6)) {
-    case 1: return `${pick(ADJ)}${pick(NOUN)}`;                               // SilentFalcon
-    case 2: return `${pick(ADJ).toLowerCase()}.${pick(NOUN).toLowerCase()}`;  // silent.falcon
-    case 3: return `${pick(ADJ).toLowerCase()}_${pick(NOUN).toLowerCase()}`;  // silent_falcon
-    case 4: return `${pick(FIRST)} ${pick(LAST)}`;                            // Mara Quinn
-    case 5: return `${pick(FIRST).toLowerCase()}${pick(LAST).toLowerCase()}`; // maraquinn
-    default: return `${pick(NOUN)}${randInt(2, 99)}`;                         // Falcon42
+    case 1: return `${pick(ADJ)}${pick(NOUN)}`;                  // しずかなきつね
+    case 2: return `${pick(NOUN)}${randInt(2, 99)}`;             // きつね42
+    case 3: return `${pick(SURNAME)}${pick(GIVEN)}`;             // 田中ゆうき
+    case 4: return `${pick(SURNAME)} ${pick(GIVEN)}`;            // 田中 ゆうき
+    case 5: return `${pick(KATAKANA)}${pick(KATAKANA)}`;         // ラッキースター
+    default: return `${pick(KATAKANA)}${randInt(2, 999)}`;       // コイン123
   }
 }
 
@@ -103,12 +107,24 @@ function uniqueNames(count: number, taken: Set<string>): string[] {
   return out;
 }
 
-// A handle-style discord_id derived from the display name (about 60% of users
-// have one, like a real player base where not everyone fills the field in).
-function discordHandle(name: string): string | null {
+// ハンドル風の discord_id（約 60% のユーザーが設定している想定。実際の
+// プレイヤー層でも全員が入力するわけではないため）。
+//
+// Discord のハンドルは半角英数字なので、表示名が日本語でもここはローマ字です。
+// 表示名から機械的に変換すると空文字になってしまうため、専用の語彙から作ります。
+const HANDLE_WORDS = [
+  "yuki", "haru", "sora", "kaze", "hikari", "tsuki", "hoshi", "mori", "umi",
+  "koi", "sakura", "momiji", "kitsune", "usagi", "tanuki", "fukurou", "tsubame",
+  "lucky", "coin", "star", "dream", "miracle", "rookie", "master", "fortune",
+] as const;
+
+function discordHandle(): string | null {
   if (Math.random() > 0.6) return null;
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "user";
-  return `${base}${randInt(0, 999)}`;
+  const base =
+    Math.random() < 0.5
+      ? `${pick(HANDLE_WORDS)}_${pick(HANDLE_WORDS)}`
+      : pick(HANDLE_WORDS);
+  return `${base.slice(0, 14)}${randInt(0, 999)}`;
 }
 
 // Every nickname already in use, so generated names never collide.
@@ -203,7 +219,7 @@ export async function generateBots(
       nickname: u.name,
       email: u.email,
       nationality: pick(COUNTRIES),
-      discord_id: discordHandle(u.name),
+      discord_id: discordHandle(),
       avatar_url: avatarUrl(u.id),
       gold: randInt(0, GOLD_MAX),
       silver: randInt(0, SILVER_MAX),

@@ -16,7 +16,7 @@
 //     the final hour. Re-running an hour only adds the shortfall — it's safe.
 //
 // Each generated user gets:
-//   • a unique, human-meaningful Discord-style display name;
+//   • a unique, Japanese display name (the site is Japan-only);
 //   • a Discord avatar URL from the resource library (src/lib/avatars.ts);
 //   • random coins: gold 0–10, silver and bronze each 0–999,999;
 //   • kind = 'bot', a created_at randomized within the current 24h window.
@@ -68,56 +68,57 @@ const BRONZE_MAX = 999_999;
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// --- name generation --------------------------------------------------------
-// Word banks chosen so combinations read like real Discord display names.
+// --- 表示名の生成 ------------------------------------------------------------
+// 日本国内向けのサイトなので、ランキングに並ぶ名前も日本語にします。
+// 語彙と組み合わせ方は src/lib/bots.ts と同じものを使っています（管理画面の
+// 「今すぐ生成」と、この定期実行スクリプトで名前の傾向がずれないように）。
 const ADJ = [
-  "Silent", "Crimson", "Lunar", "Solar", "Velvet", "Frost", "Shadow", "Golden",
-  "Ember", "Cosmic", "Mystic", "Royal", "Swift", "Wild", "Hidden", "Brave",
-  "Quiet", "Neon", "Iron", "Jade", "Amber", "Onyx", "Stormy", "Misty",
-  "Radiant", "Feral", "Noble", "Dusty", "Electric", "Frozen", "Scarlet", "Wandering",
+  "しずかな", "まっかな", "つきよの", "たいようの", "ゆきの", "かげの", "きんいろ",
+  "ほしぞらの", "みならい", "ゆうかんな", "しあわせ", "こがねの", "はやての",
+  "そらいろ", "こもれび", "あさひの", "ゆうやけ", "はるかぜ", "なつぞら", "あきかぜ",
 ];
 const NOUN = [
-  "Fox", "Raven", "Wolf", "Falcon", "Tiger", "Otter", "Hawk", "Lynx", "Bear",
-  "Viper", "Crane", "Heron", "Koi", "Moth", "Comet", "Ember", "Willow", "Cedar",
-  "River", "Ridge", "Drift", "Echo", "Sage", "Frost", "Storm", "Ash", "Maple",
-  "Phoenix", "Sparrow", "Panther", "Dragon", "Gecko",
+  "きつね", "からす", "おおかみ", "たか", "とら", "かわうそ", "やまねこ", "くま",
+  "つる", "こい", "ほたる", "うさぎ", "たぬき", "ふくろう", "いるか", "ぺんぎん",
+  "もみじ", "さくら", "かえで", "やなぎ", "こだま", "しずく", "ひかり", "つばめ",
 ];
-const FIRST = [
-  "Liam", "Mara", "Noah", "Yuki", "Sara", "Kai", "Aria", "Leo", "Mia", "Theo",
-  "Ivan", "Lena", "Omar", "Nina", "Ravi", "Elsa", "Hugo", "Zoe", "Finn", "Ada",
-  "Ezra", "Luca", "Maya", "Niko", "Tara", "Dmitri", "Hana", "Sven", "Priya", "Diego",
-  "Anya", "Mateo", "Freya", "Rohan", "Lara", "Bjorn", "Amara", "Cyrus", "Iris", "Otto",
+const KATAKANA = [
+  "ラッキー", "コイン", "ミラクル", "ドリーム", "スター", "サンダー", "レインボー",
+  "チャレンジ", "フォーチュン", "マスター", "キング", "クイーン", "ヒーロー", "ルーキー",
 ];
-const LAST = [
-  "Carter", "Quinn", "Voss", "Tanaka", "Hale", "Brooks", "Nash", "Reyes", "Park",
-  "Lowe", "Frost", "Vance", "Cole", "Mori", "Adler", "Bennett", "Cruz", "Dane",
-  "Flynn", "Grey", "Holt", "Kane", "Mercer", "Novak", "Pace", "Rhodes", "Sable",
-  "Thorne", "Vega", "Ward", "Yates", "Zane",
+const SURNAME = [
+  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
+  "吉田", "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水",
+  "山崎", "阿部", "森", "池田", "橋本", "石川", "前田", "藤田", "後藤", "岡田",
 ];
+const GIVEN = [
+  "ゆうき", "はると", "さくら", "ひなた", "あおい", "りく", "みなと", "つむぎ",
+  "そうた", "いつき", "めい", "ゆい", "こはる", "れん", "ひろと", "あかり",
+  "なぎさ", "かえで", "たくみ", "みお", "しおり", "けんと", "ゆづき", "そら",
+];
+// 国籍。日本向けサイトなので日本が大半で、ときどき他国が混ざります。
 const COUNTRIES = [
-  "USA", "Japan", "Germany", "Brazil", "India", "Canada", "France", "Korea",
-  "Spain", "Italy", "Mexico", "Australia", "Nigeria", "Turkey", "Sweden",
-  "Poland", "Vietnam", "Egypt", "Chile", "Thailand", "Argentina", "Netherlands",
+  "日本", "日本", "日本", "日本", "日本", "日本", "日本", "日本",
+  "アメリカ", "韓国", "台湾", "中国", "イギリス", "ドイツ", "フランス",
+  "ブラジル", "カナダ", "オーストラリア", "タイ", "ベトナム",
 ];
 
-// One fresh, plausible display name. Styles are weighted toward what real
-// Discord users pick: PascalCase combos, lowercase handles, and real names.
+// 名前をひとつ生成します。
 function makeName() {
   switch (randInt(1, 6)) {
     case 1:
-      return `${pick(ADJ)}${pick(NOUN)}`; // SilentFalcon
+      return `${pick(ADJ)}${pick(NOUN)}`; // しずかなきつね
     case 2:
-      return `${pick(ADJ).toLowerCase()}.${pick(NOUN).toLowerCase()}`; // silent.falcon
+      return `${pick(NOUN)}${randInt(2, 99)}`; // きつね42
     case 3:
-      return `${pick(ADJ).toLowerCase()}_${pick(NOUN).toLowerCase()}`; // silent_falcon
+      return `${pick(SURNAME)}${pick(GIVEN)}`; // 田中ゆうき
     case 4:
-      return `${pick(FIRST)} ${pick(LAST)}`; // Mara Quinn
+      return `${pick(SURNAME)} ${pick(GIVEN)}`; // 田中 ゆうき
     case 5:
-      return `${pick(FIRST).toLowerCase()}${pick(LAST).toLowerCase()}`; // maraquinn
+      return `${pick(KATAKANA)}${pick(KATAKANA)}`; // ラッキースター
     default:
-      return `${pick(NOUN)}${randInt(2, 99)}`; // Falcon42
+      return `${pick(KATAKANA)}${randInt(2, 999)}`; // コイン123
   }
 }
 
@@ -143,11 +144,20 @@ function uniqueNames(count, taken) {
   return out;
 }
 
-// A handle-style discord_id derived from the display name (for ~60% of users).
-function discordHandle(name) {
+// ハンドル風の discord_id（約 60% のユーザーが設定している想定）。
+// Discord のハンドルは半角英数字なので、表示名が日本語でもここはローマ字です。
+const HANDLE_WORDS = [
+  "yuki", "haru", "sora", "kaze", "hikari", "tsuki", "hoshi", "mori", "umi",
+  "koi", "sakura", "momiji", "kitsune", "usagi", "tanuki", "fukurou", "tsubame",
+  "lucky", "coin", "star", "dream", "miracle", "rookie", "master", "fortune",
+];
+function discordHandle() {
   if (Math.random() > 0.6) return null;
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "user";
-  return `${base}${randInt(0, 999)}`;
+  const base =
+    Math.random() < 0.5
+      ? `${pick(HANDLE_WORDS)}_${pick(HANDLE_WORDS)}`
+      : pick(HANDLE_WORDS);
+  return `${base.slice(0, 14)}${randInt(0, 999)}`;
 }
 
 // --- config + plan ----------------------------------------------------------
@@ -277,7 +287,7 @@ function getWindow(nowMs) {
 // --- create one bot ---------------------------------------------------------
 async function createBot(name, now, dayStart) {
   const nationality = pick(COUNTRIES);
-  const discord_id = discordHandle(name);
+  const discord_id = discordHandle();
   const gold = randInt(0, GOLD_MAX);
   const silver = randInt(0, SILVER_MAX);
   const bronze = randInt(0, BRONZE_MAX);

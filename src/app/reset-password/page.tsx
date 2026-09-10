@@ -39,10 +39,10 @@ export default function ResetPasswordPage() {
     <div className="mx-auto max-w-md">
       <div className="card p-6 sm:p-8">
         <h1 className="text-2xl font-bold">{t("reset.title")}</h1>
-        <p className="mt-1 text-sm text-slate-400">{t("reset.lead")}</p>
+        <p className="mt-1 text-sm text-muted">{t("reset.lead")}</p>
 
         {done ? (
-          <div className="mt-6 rounded-lg bg-emerald-400/15 px-4 py-3 text-center font-semibold text-emerald-200">
+          <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
             {t("reset.done")}
           </div>
         ) : (
@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
                 placeholder={t("auth.confirmPlaceholder")}
               />
             </div>
-            {error && <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>}
+            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
             <button type="submit" disabled={busy} className="btn-gold w-full">
               {busy ? t("reset.updating") : t("reset.update")}
             </button>

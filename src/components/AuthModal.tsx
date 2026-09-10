@@ -185,14 +185,14 @@ export default function AuthModal() {
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={closeAuth}
     >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
       <div
         className="card relative w-full max-w-md p-6 sm:p-8 animate-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={closeAuth}
-          className="absolute right-4 top-4 text-slate-400 hover:text-white"
+          className="absolute right-4 top-4 text-muted hover:text-body"
           aria-label={t("common.close")}
         >
           ✕
@@ -205,7 +205,7 @@ export default function AuthModal() {
               ? t("auth.registerTitle")
               : t("auth.forgotTitle")}
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-muted">
           {mode === "login"
             ? t("auth.loginLead")
             : mode === "register"
@@ -214,13 +214,13 @@ export default function AuthModal() {
         </p>
 
         {mode !== "forgot" && (
-          <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-black/30 p-1">
+          <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-cream p-1">
             {(["login", "register"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => switchMode(m)}
                 className={`rounded-lg py-2 text-sm font-semibold transition ${
-                  mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                  mode === m ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
                 }`}
               >
                 {t(TAB_LABEL[m])}
@@ -245,10 +245,10 @@ export default function AuthModal() {
               </svg>
               {t("auth.google")}
             </button>
-            <div className="flex items-center gap-3 py-1 text-xs text-slate-500">
-              <span className="h-px flex-1 bg-white/10" />
+            <div className="flex items-center gap-3 py-1 text-xs text-faint">
+              <span className="h-px flex-1 bg-sand" />
               {t("auth.orEmail")}
-              <span className="h-px flex-1 bg-white/10" />
+              <span className="h-px flex-1 bg-sand" />
             </div>
           </div>
         )}
@@ -263,13 +263,13 @@ export default function AuthModal() {
                 aria-label={t("auth.chooseAvatar")}
               >
                 <Avatar src={avatarPreview} name={form.nickname || "?"} size={76} />
-                <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-amber-400 text-sm font-bold text-slate-900 ring-2 ring-[#121829]">
+                <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-amber-400 text-sm font-bold text-slate-900 ring-2 ring-white">
                   ＋
                 </span>
               </button>
-              <p className="text-xs text-slate-400">{t("auth.avatarOptional")}</p>
+              <p className="text-xs text-muted">{t("auth.avatarOptional")}</p>
               {avatarPreview && (
-                <button type="button" onClick={clearAvatar} className="text-xs text-red-300 hover:underline">
+                <button type="button" onClick={clearAvatar} className="text-xs text-red-600 hover:underline">
                   {t("auth.remove")}
                 </button>
               )}
@@ -319,7 +319,7 @@ export default function AuthModal() {
                 minLength={MIN_PASSWORD}
               />
               {mode === "register" && (
-                <p className="mt-1 text-xs text-slate-500">{t("auth.passwordHint", { min: MIN_PASSWORD })}</p>
+                <p className="mt-1 text-xs text-faint">{t("auth.passwordHint", { min: MIN_PASSWORD })}</p>
               )}
             </div>
           )}
@@ -343,7 +343,7 @@ export default function AuthModal() {
             <button
               type="button"
               onClick={() => switchMode("forgot")}
-              className="text-xs text-amber-300 hover:underline"
+              className="text-xs text-amber-600 hover:underline"
             >
               {t("auth.forgotLink")}
             </button>
@@ -362,10 +362,10 @@ export default function AuthModal() {
           )}
 
           {notice && (
-            <p className="rounded-lg bg-emerald-400/15 px-3 py-2 text-sm text-emerald-200">✉️ {notice}</p>
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">✉️ {notice}</p>
           )}
           {error && (
-            <p className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">{error}</p>
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
 
           <button type="submit" className="btn-gold w-full" disabled={loading}>
@@ -382,7 +382,7 @@ export default function AuthModal() {
             <button
               type="button"
               onClick={() => switchMode("login")}
-              className="block w-full text-center text-xs text-slate-400 hover:underline"
+              className="block w-full text-center text-xs text-muted hover:underline"
             >
               {t("auth.backToLogin")}
             </button>

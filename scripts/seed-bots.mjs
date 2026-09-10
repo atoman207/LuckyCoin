@@ -37,9 +37,14 @@ const TOTAL = DAILY.reduce((a, b) => a + b, 0); // 246
 const PASSWORD = "LuckyBot#2026"; // same for every bot (loginable for testing)
 const emailFor = (i) => `bot${String(i).padStart(4, "0")}@luckycoin.bot`;
 
-const FIRST = ["Lucky", "Golden", "Swift", "Crimson", "Silver", "Cosmic", "Mighty", "Royal", "Shadow", "Neon", "Turbo", "Frosty", "Solar", "Lunar", "Vivid", "Jade", "Amber", "Ruby", "Onyx", "Pixel"];
-const LAST = ["Coin", "Fox", "Tiger", "Falcon", "Wolf", "Panda", "Dragon", "Otter", "Hawk", "Lynx", "Raven", "Bear", "Koi", "Viper", "Moth", "Crane", "Bison", "Gecko", "Heron", "Mole"];
-const COUNTRIES = ["USA", "Japan", "Germany", "Brazil", "India", "Canada", "France", "Korea", "Spain", "Italy", "Mexico", "Australia", "Nigeria", "Turkey", "Sweden", "Poland", "Vietnam", "Egypt", "Chile", "Thailand"];
+// 表示名の語彙。日本国内向けサイトなので、ランキングに並ぶ名前も日本語です
+// （src/lib/bots.ts / scripts/daily-bots.mjs と同じ傾向に揃えています）。
+const FIRST = ["ラッキー", "こがねの", "はやての", "まっかな", "しろがねの", "ほしぞらの", "ゆうかんな", "きんいろ", "かげの", "そらいろ", "はるかぜ", "ゆきの", "たいようの", "つきよの", "あさひの", "こもれび", "しあわせ", "なつぞら", "あきかぜ", "みならい"];
+const LAST = ["こいん", "きつね", "とら", "たか", "おおかみ", "ぱんだ", "りゅう", "かわうそ", "はやぶさ", "やまねこ", "からす", "くま", "こい", "へび", "ほたる", "つる", "うさぎ", "いるか", "さぎ", "もぐら"];
+// 国籍。日本向けサイトなので日本が大半で、ときどき他国が混ざります。
+const COUNTRIES = ["日本", "日本", "日本", "日本", "日本", "日本", "日本", "日本", "アメリカ", "韓国", "台湾", "中国", "イギリス", "ドイツ", "フランス", "ブラジル", "カナダ", "オーストラリア", "タイ", "ベトナム"];
+// Discord のハンドルは半角英数字なので、表示名とは別のローマ字語彙から作ります。
+const HANDLE_WORDS = ["yuki", "haru", "sora", "kaze", "hikari", "tsuki", "hoshi", "mori", "umi", "koi", "sakura", "momiji", "kitsune", "usagi", "tanuki", "fukurou", "tsubame", "lucky", "coin", "star", "dream", "fortune"];
 
 // Deterministic PRNG so re-runs produce stable data.
 function mulberry32(seed) {
@@ -71,7 +76,7 @@ function buildBots() {
         email: emailFor(n),
         nickname,
         nationality: pick(rnd, COUNTRIES),
-        discord_id: rnd() < 0.6 ? `${pick(rnd, FIRST).toLowerCase()}_${Math.floor(rnd() * 9000 + 1000)}` : null,
+        discord_id: rnd() < 0.6 ? `${pick(rnd, HANDLE_WORDS)}_${Math.floor(rnd() * 9000 + 1000)}` : null,
         avatar_url: avatarUrl(nickname),
         gold: Math.floor(rnd() * 3),
         silver: Math.floor(rnd() * 40),

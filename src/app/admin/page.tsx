@@ -5,8 +5,10 @@ import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 import CoinIcon from "@/components/CoinIcon";
 import { coinName } from "@/lib/coins";
-import { getPaymentMethod } from "@/lib/wallets";
+import { getPayoutMethod } from "@/lib/payout-methods";
 import RichText from "@/components/RichText";
+import StripePaymentsPanel from "@/components/StripePaymentsPanel";
+import SubscriberChart from "@/components/SubscriberChart";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey, TFunction } from "@/lib/i18n";
 
@@ -109,6 +111,7 @@ const TAB_LABEL: Record<Tab, MessageKey> = {
   sells: "admin.tabSells",
   messages: "admin.tabMessages",
   bots: "admin.tabBots",
+  payments: "admin.tabPayments",
 };
 const KIND_LABEL: Record<"all" | "real" | "bot", MessageKey> = {
   all: "admin.filterAll",
@@ -129,7 +132,7 @@ const STATUS_LABEL: Record<string, MessageKey> = {
 const statusLabel = (t: TFunction, status: string) =>
   STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status;
 
-type Tab = "users" | "transactions" | "sells" | "messages" | "bots";
+type Tab = "users" | "transactions" | "sells" | "messages" | "bots" | "payments";
 
 export default function AdminPage() {
   const { profile, loading } = useUser();
@@ -206,12 +209,12 @@ export default function AdminPage() {
     loadSells();
   }
 
-  if (loading) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
   if (!profile?.is_admin) {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
         <h1 className="text-2xl font-bold">{t("admin.onlyTitle")}</h1>
-        <p className="mt-2 text-slate-400">{t("admin.onlyBody")}</p>
+        <p className="mt-2 text-muted">{t("admin.onlyBody")}</p>
       </div>
     );
   }
@@ -335,7 +338,7 @@ export default function AdminPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">{t("admin.title")}</h1>
-          <p className="text-slate-400">
+          <p className="text-muted">
             {t("admin.summary", {
               players: rows?.length ?? 0,
               real: realCount,
@@ -345,13 +348,13 @@ export default function AdminPage() {
             })}
           </p>
         </div>
-        <div className="flex gap-2 rounded-xl bg-black/30 p-1">
-          {(["users", "transactions", "sells", "messages", "bots"] as const).map((name) => (
+        <div className="flex gap-2 rounded-xl bg-cream p-1">
+          {(["users", "payments", "transactions", "sells", "messages", "bots"] as const).map((name) => (
             <button
               key={name}
               onClick={() => setTab(name)}
               className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
-                tab === name ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                tab === name ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
               }`}
             >
               {t(TAB_LABEL[name])}
@@ -361,7 +364,7 @@ export default function AdminPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl bg-red-500/15 px-4 py-3 text-red-300">
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-red-600">
           {error}{" "}
           <button onClick={() => setError(null)} className="ml-2 underline">
             {t("common.dismiss")}
@@ -372,17 +375,17 @@ export default function AdminPage() {
       {/* Visitor / member stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "admin.visitorsTotal" as const, value: stats?.visitorsTotal, hint: "admin.visitorsTotalHint" as const, tone: "text-sky-300" },
-          { label: "admin.visitorsToday" as const, value: stats?.visitorsToday, hint: "admin.visitorsTodayHint" as const, tone: "text-sky-300" },
-          { label: "admin.membersTotal" as const, value: stats?.membersTotal, hint: "admin.membersTotalHint" as const, tone: "text-emerald-300" },
-          { label: "admin.membersToday" as const, value: stats?.membersToday, hint: "admin.membersTodayHint" as const, tone: "text-emerald-300" },
+          { label: "admin.visitorsTotal" as const, value: stats?.visitorsTotal, hint: "admin.visitorsTotalHint" as const, tone: "text-sky-600" },
+          { label: "admin.visitorsToday" as const, value: stats?.visitorsToday, hint: "admin.visitorsTodayHint" as const, tone: "text-sky-600" },
+          { label: "admin.membersTotal" as const, value: stats?.membersTotal, hint: "admin.membersTotalHint" as const, tone: "text-emerald-600" },
+          { label: "admin.membersToday" as const, value: stats?.membersToday, hint: "admin.membersTodayHint" as const, tone: "text-emerald-600" },
         ].map((s) => (
           <div key={s.label} className="card p-5">
-            <div className="text-sm text-slate-400">{t(s.label)}</div>
+            <div className="text-sm text-muted">{t(s.label)}</div>
             <div className={`mt-1 text-3xl font-extrabold tabular-nums ${s.tone}`}>
               {s.value === undefined ? "…" : s.value.toLocaleString()}
             </div>
-            <div className="text-xs text-slate-500">{t(s.hint)}</div>
+            <div className="text-xs text-faint">{t(s.hint)}</div>
           </div>
         ))}
       </div>
@@ -394,11 +397,17 @@ export default function AdminPage() {
               <div key={type} className="card flex items-center gap-3 p-5">
                 <CoinIcon type={type} size={44} />
                 <div>
-                  <div className="text-sm text-slate-400">{t("admin.totalCoin", { name: coinName(t, type) })}</div>
+                  <div className="text-sm text-muted">{t("admin.totalCoin", { name: coinName(t, type) })}</div>
                   <div className="text-2xl font-extrabold">{totals[type].toLocaleString()}</div>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* 新規登録者数の推移。以前はトップページに出していましたが、
+              運営用の指標なので管理画面に移しました（API 側も管理者限定）。 */}
+          <div className="card">
+            <SubscriberChart />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -413,7 +422,7 @@ export default function AdminPage() {
             />
 
             {/* Kind filter */}
-            <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+            <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
               {(["all", "real", "bot"] as const).map((k) => (
                 <button
                   key={k}
@@ -422,7 +431,7 @@ export default function AdminPage() {
                     setPage(1);
                   }}
                   className={`rounded-lg px-3 py-1.5 font-semibold transition ${
-                    kindFilter === k ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                    kindFilter === k ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
                   }`}
                 >
                   {t(KIND_LABEL[k])}
@@ -447,7 +456,7 @@ export default function AdminPage() {
             </select>
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
               title={sortDir === "asc" ? t("admin.ascending") : t("admin.descending")}
             >
               {sortDir === "asc" ? t("admin.asc") : t("admin.desc")}
@@ -458,7 +467,7 @@ export default function AdminPage() {
               type="button"
               onClick={toggleSelectAll}
               disabled={selectableIds.length === 0}
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-40"
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand disabled:opacity-40"
             >
               {allFilteredSelected ? t("admin.deselectAll") : t("admin.selectAll")}
             </button>
@@ -466,7 +475,7 @@ export default function AdminPage() {
               type="button"
               onClick={removeSelected}
               disabled={selectedCount === 0 || deletingSelected}
-              className="rounded-lg border border-red-400/30 px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+              className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
             >
               {deletingSelected
                 ? t("common.loading")
@@ -476,7 +485,7 @@ export default function AdminPage() {
 
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="border-b border-white/10 text-slate-400">
+              <thead className="border-b border-line text-muted">
                 <tr>
                   <th className="w-10 px-4 py-3">
                     <SelectAllCheckbox
@@ -503,12 +512,12 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {rows === null ? (
-                  <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
                 ) : sorted.length === 0 ? (
-                  <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">{t("admin.noPlayers")}</td></tr>
+                  <tr><td colSpan={13} className="px-4 py-8 text-center text-faint">{t("admin.noPlayers")}</td></tr>
                 ) : (
                   pageRows.map((r) => (
-                    <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.03]">
+                    <tr key={r.id} className="border-b border-line hover:bg-cream">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -524,7 +533,7 @@ export default function AdminPage() {
                           <Avatar src={r.avatar_url} name={r.nickname} size={34} />
                           <div>
                             <div className="font-semibold">{r.nickname}</div>
-                            <div className="text-xs text-slate-500">{r.email}</div>
+                            <div className="text-xs text-faint">{r.email}</div>
                           </div>
                         </div>
                       </td>
@@ -532,25 +541,25 @@ export default function AdminPage() {
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                             r.kind === "bot"
-                              ? "bg-sky-400/15 text-sky-300"
-                              : "bg-emerald-400/15 text-emerald-300"
+                              ? "bg-sky-50 text-sky-600"
+                              : "bg-emerald-50 text-emerald-600"
                           }`}
                         >
                           {r.kind === "bot" ? t("admin.typeBot") : t("admin.typeReal")}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{r.nationality ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-300">{r.discord_id ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-400">{fmt(r.last_sign_in_at)}</td>
-                      <td className="px-4 py-3 text-slate-400">{fmtDate(r.created_at)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-sky-300">{r.draws}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-amber-300">{r.gold}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-200">{r.silver}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-orange-300">{r.bronze}</td>
+                      <td className="px-4 py-3 text-body">{r.nationality ?? "—"}</td>
+                      <td className="px-4 py-3 text-body">{r.discord_id ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted">{fmt(r.last_sign_in_at)}</td>
+                      <td className="px-4 py-3 text-muted">{fmtDate(r.created_at)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-sky-600">{r.draws}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-amber-600">{r.gold}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-body">{r.silver}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-orange-600">{r.bronze}</td>
                       <td className="px-4 py-3 text-center">{r.is_admin ? "✅" : "—"}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button onClick={() => setEditing(r)} className="rounded-lg border border-white/15 px-2.5 py-1 text-xs hover:bg-white/10">{t("common.edit")}</button>
-                        <button onClick={() => remove(r)} className="ml-2 rounded-lg border border-red-400/30 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">{t("common.delete")}</button>
+                        <button onClick={() => setEditing(r)} className="rounded-lg border border-line px-2.5 py-1 text-xs hover:bg-sand">{t("common.edit")}</button>
+                        <button onClick={() => remove(r)} className="ml-2 rounded-lg border border-red-300 px-2.5 py-1 text-xs text-red-600 hover:bg-red-100">{t("common.delete")}</button>
                       </td>
                     </tr>
                   ))
@@ -561,7 +570,7 @@ export default function AdminPage() {
 
           {/* Pagination — 20 users per page */}
           {sorted.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
               <span>
                 {t("admin.showing", {
                   from: (current - 1) * PAGE_SIZE + 1,
@@ -573,31 +582,31 @@ export default function AdminPage() {
                 <button
                   onClick={() => setPage(1)}
                   disabled={current === 1}
-                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
                 >
                   {t("admin.pageFirst")}
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={current === 1}
-                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
                 >
                   {t("admin.pagePrev")}
                 </button>
-                <span className="px-2 font-semibold text-slate-200">
+                <span className="px-2 font-semibold text-body">
                   {t("admin.pageIndicator", { current, total: pageCount })}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                   disabled={current === pageCount}
-                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
                 >
                   {t("admin.pageNext")}
                 </button>
                 <button
                   onClick={() => setPage(pageCount)}
                   disabled={current === pageCount}
-                  className="rounded-lg border border-white/15 px-2.5 py-1 disabled:opacity-40 hover:bg-white/10"
+                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
                 >
                   {t("admin.pageLast")}
                 </button>
@@ -610,7 +619,7 @@ export default function AdminPage() {
       {tab === "transactions" && (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-white/10 text-slate-400">
+            <thead className="border-b border-line text-muted">
               <tr>
                 <th className="px-4 py-3">{t("admin.colDate")}</th>
                 <th className="px-4 py-3">{t("admin.colBuyer")}</th>
@@ -624,23 +633,23 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {txns === null ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
               ) : txns.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("admin.noTransactions")}</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("admin.noTransactions")}</td></tr>
               ) : (
                 txns.map((txn) => (
-                  <tr key={txn.id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                    <td className="px-4 py-3 text-slate-400">{fmt(txn.created_at)}</td>
+                  <tr key={txn.id} className="border-b border-line hover:bg-cream">
+                    <td className="px-4 py-3 text-muted">{fmt(txn.created_at)}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium">{txn.profiles?.nickname ?? "—"}</div>
-                      <div className="text-xs text-slate-500">{txn.profiles?.email ?? ""}</div>
+                      <div className="text-xs text-faint">{txn.profiles?.email ?? ""}</div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-200">{txn.silver.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">${Number(txn.usd_amount).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-slate-300">{txn.currency ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{txn.wallet_address ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-amber-200/80 break-all">{txn.to_address ?? "—"}</td>
-                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-200">{statusLabel(t, txn.status)}</span></td>
+                    <td className="px-4 py-3 text-right font-semibold text-body">{txn.silver.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-600">${Number(txn.usd_amount).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-body">{txn.currency ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted break-all">{txn.wallet_address ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-amber-700 break-all">{txn.to_address ?? "—"}</td>
+                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">{statusLabel(t, txn.status)}</span></td>
                   </tr>
                 ))
               )}
@@ -652,7 +661,7 @@ export default function AdminPage() {
       {tab === "sells" && (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-white/10 text-slate-400">
+            <thead className="border-b border-line text-muted">
               <tr>
                 <th className="px-4 py-3">{t("admin.colDate")}</th>
                 <th className="px-4 py-3">{t("admin.colSeller")}</th>
@@ -666,26 +675,26 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {sells === null ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
               ) : sells.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">{t("admin.noSells")}</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("admin.noSells")}</td></tr>
               ) : (
                 sells.map((s) => {
-                  const method = getPaymentMethod(s.method_id);
+                  const method = getPayoutMethod(s.method_id);
                   const paid = s.status === "paid";
                   return (
-                    <tr key={s.id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                      <td className="px-4 py-3 text-slate-400">{fmt(s.created_at)}</td>
+                    <tr key={s.id} className="border-b border-line hover:bg-cream">
+                      <td className="px-4 py-3 text-muted">{fmt(s.created_at)}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium">{s.profiles?.nickname ?? "—"}</div>
-                        <div className="text-xs text-slate-500">{s.profiles?.email ?? ""}</div>
+                        <div className="text-xs text-faint">{s.profiles?.email ?? ""}</div>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-amber-300">{s.gold.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-emerald-300">{Number(s.usdt_amount).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-slate-300">{method?.label ?? s.method_id ?? "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-400 break-all">{s.payout_address ?? "—"}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-amber-600">{s.gold.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-600">{Number(s.usdt_amount).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-body">{method?.label ?? s.method_id ?? "—"}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted break-all">{s.payout_address ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${paid ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                           {statusLabel(t, s.status)}
                         </span>
                       </td>
@@ -707,11 +716,11 @@ export default function AdminPage() {
       )}
 
       {tab === "messages" && (
-        <div className="card divide-y divide-white/5 p-0">
+        <div className="card divide-y divide-line p-0">
           {contacts === null ? (
-            <div className="px-4 py-8 text-center text-slate-500">{t("common.loading")}</div>
+            <div className="px-4 py-8 text-center text-faint">{t("common.loading")}</div>
           ) : contacts.length === 0 ? (
-            <div className="px-4 py-8 text-center text-slate-500">{t("admin.noMessages")}</div>
+            <div className="px-4 py-8 text-center text-faint">{t("admin.noMessages")}</div>
           ) : (
             contacts.map((c) => (
               <div key={c.id} className="px-5 py-4">
@@ -719,19 +728,21 @@ export default function AdminPage() {
                   <div className="font-semibold">
                     {c.name ?? t("admin.anonymous")}{" "}
                     {c.email && (
-                      <a href={`mailto:${c.email}`} className="text-sm font-normal text-amber-300 hover:underline">
+                      <a href={`mailto:${c.email}`} className="text-sm font-normal text-amber-600 hover:underline">
                         &lt;{c.email}&gt;
                       </a>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500">{fmt(c.created_at)}</div>
+                  <div className="text-xs text-faint">{fmt(c.created_at)}</div>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{c.message}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-body">{c.message}</p>
               </div>
             ))
           )}
         </div>
       )}
+
+      {tab === "payments" && <StripePaymentsPanel onError={setError} />}
 
       {tab === "bots" && <BotsPanel onError={setError} />}
 
@@ -819,7 +830,7 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
     }
   }
 
-  if (!config) return <div className="card p-6 text-slate-400">{t("admin.botLoading")}</div>;
+  if (!config) return <div className="card p-6 text-muted">{t("admin.botLoading")}</div>;
 
   const exact = config.mode === "manual";
 
@@ -829,17 +840,17 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
       <div className="card space-y-5 p-6">
         <div>
           <h2 className="text-lg font-bold">{t("admin.botDailyTitle")}</h2>
-          <p className="mt-1 text-sm text-slate-400">{t("admin.botDailyLead")}</p>
+          <p className="mt-1 text-sm text-muted">{t("admin.botDailyLead")}</p>
         </div>
 
         {/* How today's number is decided: an exact figure, or a random range. */}
-        <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+        <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
           {(["manual", "auto"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setConfig({ ...config, mode: m })}
               className={`flex-1 rounded-lg px-3 py-2 font-semibold transition ${
-                config.mode === m ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                config.mode === m ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
               }`}
             >
               {m === "manual" ? t("admin.botModeManual") : t("admin.botModeAuto")}
@@ -858,7 +869,7 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
               value={config.count}
               onChange={(e) => setConfig({ ...config, count: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
             />
-            <p className="mt-1 text-xs text-slate-500">{t("admin.botCountHint")}</p>
+            <p className="mt-1 text-xs text-faint">{t("admin.botCountHint")}</p>
           </div>
         ) : (
           <div>
@@ -886,7 +897,7 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
                 />
               </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{t("admin.botRangeHint")}</p>
+            <p className="mt-1 text-xs text-faint">{t("admin.botRangeHint")}</p>
           </div>
         )}
 
@@ -894,16 +905,16 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           {generating ? t("admin.botGenerating") : t("admin.botGenerate")}
         </button>
 
-        {generating && <p className="text-xs text-amber-200">{t("admin.botGeneratingHint")}</p>}
+        {generating && <p className="text-xs text-amber-700">{t("admin.botGeneratingHint")}</p>}
 
         {result && (
-          <p className="rounded-lg bg-emerald-400/15 px-3 py-2 text-sm text-emerald-200">
+          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             {t("admin.botGenerated", { created: result.created, total: result.todayTotal })}
             {result.failed > 0 && ` ${t("admin.botGenerateFailed", { failed: result.failed })}`}
           </p>
         )}
 
-        <p className="text-xs text-slate-500">{t("admin.botMaxHint", { max: maxPerRun })}</p>
+        <p className="text-xs text-faint">{t("admin.botMaxHint", { max: maxPerRun })}</p>
       </div>
 
       {/* Today's totals */}
@@ -912,29 +923,29 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
         {today ? (
           <>
             <div>
-              <div className="text-sm text-slate-400">{t("admin.botAddedToday", { day: today.day })}</div>
-              <div className="text-4xl font-extrabold tabular-nums text-emerald-300">
+              <div className="text-sm text-muted">{t("admin.botAddedToday", { day: today.day })}</div>
+              <div className="text-4xl font-extrabold tabular-nums text-emerald-600">
                 {today.added.toLocaleString()}
               </div>
             </div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-faint">
               {t("admin.botLastRun", { time: new Date(today.updated_at).toLocaleString(intlLocale) })}
             </div>
           </>
         ) : (
-          <p className="text-sm text-slate-400">{t("admin.botNoRun")}</p>
+          <p className="text-sm text-muted">{t("admin.botNoRun")}</p>
         )}
 
-        <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+        <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
           <div>
-            <div className="text-sm text-slate-400">{t("admin.botTotalPlayers")}</div>
-            <div className="text-2xl font-extrabold tabular-nums text-emerald-300">
+            <div className="text-sm text-muted">{t("admin.botTotalPlayers")}</div>
+            <div className="text-2xl font-extrabold tabular-nums text-emerald-600">
               {counts?.total.toLocaleString() ?? "…"}
             </div>
           </div>
           <div>
-            <div className="text-sm text-slate-400">{t("admin.botPlayers")}</div>
-            <div className="text-2xl font-extrabold tabular-nums text-sky-300">
+            <div className="text-sm text-muted">{t("admin.botPlayers")}</div>
+            <div className="text-2xl font-extrabold tabular-nums text-sky-600">
               {counts?.bots.toLocaleString() ?? "…"}
             </div>
           </div>
@@ -995,9 +1006,9 @@ function UserModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
       <div className="card relative w-full max-w-lg p-6 animate-pop" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-white">✕</button>
+        <button onClick={onClose} className="absolute right-4 top-4 text-muted hover:text-body">✕</button>
         <h2 className="text-xl font-bold">
           {isNew ? t("admin.createUser") : t("admin.editUser", { nickname: row!.nickname })}
         </h2>

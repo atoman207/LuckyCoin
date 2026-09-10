@@ -21,7 +21,7 @@ export default function ClaimPage() {
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
   const claimed = !!profile.rewards_claimed;
   const dailyDays = [1, 2, 3, 4, 5, 6, 7];
@@ -46,20 +46,20 @@ export default function ClaimPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold">{t("claim.title")}</h1>
-        <p className="text-slate-400">{t("claim.subtitle")}</p>
+        <p className="text-muted">{t("claim.subtitle")}</p>
       </div>
 
       {done && (
-        <div className="card animate-pop border-emerald-300/40 bg-emerald-300/10 px-4 py-3 text-center font-semibold text-emerald-100">
+        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
           ✓ {done}
         </div>
       )}
-      {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
 
       {/* Rules table */}
       <div className="card overflow-hidden p-0">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-white/10 bg-black/20 text-slate-400">
+          <thead className="border-b border-line bg-cream text-muted">
             <tr>
               <th className="px-4 py-3">{t("claim.reward")}</th>
               <th className="px-4 py-3">{t("claim.when")}</th>
@@ -67,30 +67,30 @@ export default function ClaimPage() {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-line">
               <td className="px-4 py-3 font-semibold">{t("claim.signupBonus")}</td>
-              <td className="px-4 py-3 text-slate-300">{t("claim.signupWhen")}</td>
-              <td className="px-4 py-3 text-right font-bold text-amber-300">{SIGNUP_WELCOME_BRONZE}</td>
+              <td className="px-4 py-3 text-body">{t("claim.signupWhen")}</td>
+              <td className="px-4 py-3 text-right font-bold text-amber-600">{SIGNUP_WELCOME_BRONZE}</td>
             </tr>
             {dailyDays.map((d) => (
-              <tr key={d} className="border-b border-white/5">
+              <tr key={d} className="border-b border-line">
                 <td className="px-4 py-3 font-semibold">
                   {t("claim.dailyReward")}{" "}
-                  {d === 1 && <span className="text-xs text-emerald-300">{t("claim.includedFirst")}</span>}
+                  {d === 1 && <span className="text-xs text-emerald-600">{t("claim.includedFirst")}</span>}
                 </td>
-                <td className="px-4 py-3 text-slate-300">
+                <td className="px-4 py-3 text-body">
                   {t("claim.dailyWhen", { day: `${d}${d === 7 ? "+" : ""}` })}
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-amber-300">{dailyReward(d)}</td>
+                <td className="px-4 py-3 text-right font-bold text-amber-600">{dailyReward(d)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-black/20">
+            <tr className="bg-cream">
               <td className="px-4 py-3 font-bold" colSpan={2}>
                 {t("claim.firstTotal")}
               </td>
-              <td className="px-4 py-3 text-right font-extrabold text-emerald-300">
+              <td className="px-4 py-3 text-right font-extrabold text-emerald-600">
                 {SIGNUP_WELCOME_BRONZE + dailyReward(1)}
               </td>
             </tr>
@@ -98,17 +98,17 @@ export default function ClaimPage() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-500">{t("claim.note")}</p>
+      <p className="text-xs text-faint">{t("claim.note")}</p>
 
       <div className="card flex flex-col items-center gap-3 p-6 text-center">
         <CoinIcon type="bronze" size={48} className="animate-pop" />
         {claimed ? (
-          <p className="text-lg font-semibold text-emerald-200">{t("claim.already")}</p>
+          <p className="text-lg font-semibold text-emerald-700">{t("claim.already")}</p>
         ) : (
           <>
-            <p className="text-slate-300">
+            <p className="text-body">
               {t("claim.claimNowPre")}
-              <strong className="text-amber-300">
+              <strong className="text-amber-600">
                 {t("claim.claimNowStrong", { amount: SIGNUP_WELCOME_BRONZE + dailyReward(1) })}
               </strong>
               {t("claim.claimNowPost")}

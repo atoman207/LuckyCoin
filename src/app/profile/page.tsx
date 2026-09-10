@@ -36,7 +36,7 @@ export default function ProfilePage() {
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -103,11 +103,11 @@ export default function ProfilePage() {
       </div>
 
       {msg && (
-        <div className="card animate-pop border-emerald-300/40 bg-emerald-300/10 px-4 py-3 text-center font-semibold text-emerald-100">
+        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
           ✓ {msg}
         </div>
       )}
-      {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
         {/* Avatar + summary */}
@@ -127,18 +127,18 @@ export default function ProfilePage() {
           >
             {uploading ? t("profile.uploading") : t("profile.uploadAvatar")}
           </button>
-          <p className="text-xs text-slate-500">{t("profile.avatarNote")}</p>
+          <p className="text-xs text-faint">{t("profile.avatarNote")}</p>
 
-          <div className="mt-2 w-full space-y-2 border-t border-white/10 pt-4 text-left text-sm">
-            <div className="flex justify-between"><span className="text-slate-400">{t("profile.email")}</span><span>{profile.email}</span></div>
-            <div className="flex justify-between"><span className="text-slate-400">{t("profile.memberSince")}</span><span>{joined}</span></div>
-            <div className="flex justify-between"><span className="text-slate-400">{t("profile.loginStreak")}</span><span>{t("profile.days", { count: profile.streak })}</span></div>
+          <div className="mt-2 w-full space-y-2 border-t border-line pt-4 text-left text-sm">
+            <div className="flex justify-between"><span className="text-muted">{t("profile.email")}</span><span>{profile.email}</span></div>
+            <div className="flex justify-between"><span className="text-muted">{t("profile.memberSince")}</span><span>{joined}</span></div>
+            <div className="flex justify-between"><span className="text-muted">{t("profile.loginStreak")}</span><span>{t("profile.days", { count: profile.streak })}</span></div>
             {profile.is_admin && (
-              <div className="flex justify-between"><span className="text-slate-400">{t("profile.role")}</span><span className="text-amber-300">{t("profile.administrator")}</span></div>
+              <div className="flex justify-between"><span className="text-muted">{t("profile.role")}</span><span className="text-amber-600">{t("profile.administrator")}</span></div>
             )}
           </div>
-          <div className="w-full border-t border-white/10 pt-4">
-            <div className="mb-2 text-left text-sm text-slate-400">{t("profile.coinsHeld")}</div>
+          <div className="w-full border-t border-line pt-4">
+            <div className="mb-2 text-left text-sm text-muted">{t("profile.coinsHeld")}</div>
             <CoinBalance profile={profile} size={24} />
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function ProfilePage() {
           <div>
             <label className="label">{t("profile.email")}</label>
             <input className="input opacity-60" value={profile.email} disabled />
-            <p className="mt-1 text-xs text-slate-500">{t("profile.emailNote")}</p>
+            <p className="mt-1 text-xs text-faint">{t("profile.emailNote")}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

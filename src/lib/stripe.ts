@@ -1,29 +1,35 @@
 // =====================================================================
-//  Stripe — card checkout. SERVER ONLY.
-//  The secret key never leaves the server: the browser only ever receives
-//  the hosted Checkout URL that Stripe returns.
+//  Stripe — カード決済。サーバー専用。
+//  シークレットキーがブラウザに渡ることはありません。ブラウザが受け取る
+//  のは Stripe が返すホスト型 Checkout の URL だけです。
 //
-//  Required environment variables (see .env.example):
+//  必須の環境変数（.env.example を参照）:
 //    STRIPE_SECRET_KEY      sk_live_… / sk_test_…
-//    STRIPE_WEBHOOK_SECRET  whsec_…  (from the webhook endpoint you create)
-//  Optional:
-//    STRIPE_CURRENCY        3-letter ISO code. Forces ONE currency for every
-//                           buyer. Left unset, the charge currency follows the
-//                           language the site is being viewed in — Japanese
-//                           visitors are charged in JPY, everyone else in USD.
-//    USD_JPY_RATE           unused for JPY unless set; yen is billed at the
-//                           book rate of ¥150 / $1 (see src/lib/fx-book.ts).
+//    STRIPE_WEBHOOK_SECRET  whsec_…  （作成した Webhook エンドポイントの署名鍵）
+//
+//  本サイトは日本国内向けの単一通貨（日本円）です。パック価格は USD 建てで
+//  管理し、請求は常に ¥150 / $1 の固定ブックレート（lib/fx-book.ts）で
+//  日本円に換算します。市場レートは参照しません。
 // =====================================================================
 
 import Stripe from "stripe";
-import { ZERO_DECIMAL } from "@/lib/fx";
-import type { Locale } from "@/lib/i18n/config";
+import { usdToJpy, formatJpy } from "@/lib/fx-book";
 
-// This Stripe account is shared with another product, and a webhook endpoint
-// receives EVERY event of its subscribed types from the whole account — not
-// just the ones this site created. Sessions are stamped with this marker so
-// our webhook can tell its own orders apart from the neighbour's.
+// この Stripe アカウントは他のサービスと共有されています。Webhook は購読中の
+// イベント種別をアカウント全体から受け取るため、自分の注文かどうかをこの
+// マーカーで判別します。管理画面の入金履歴も同じマーカーで絞り込みます。
 export const APP_TAG = "luckycoin";
+
+// 請求通貨。日本専用サイトなので日本円に固定です。
+export const CHARGE_CURRENCY = "jpy";
+
+// Stripe が「最小単位を持たない」通貨として扱うもの。¥100 は 10000 ではなく
+// 100 として送ります。https://docs.stripe.com/currencies#zero-decimal
+export const IS_ZERO_DECIMAL = true;
+
+// Stripe の最低請求額（日本円）。
+// https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts
+export const MIN_CHARGE_JPY = 50;
 
 let cached: Stripe | null = null;
 
@@ -31,67 +37,45 @@ export function isStripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
-// Throws when the key is missing so routes can answer with a friendly message
-// instead of a stack trace.
+// キーが無いときは例外を投げるので、ルート側はスタックトレースではなく
+// 分かりやすい日本語のメッセージで応答できます。
 export function getStripe(): Stripe {
   if (cached) return cached;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not set.");
   cached = new Stripe(key, {
-    // No apiVersion override — the SDK pins the version it was built against,
-    // which is the combination Stripe tests together.
+    // apiVersion は指定しません。SDK がビルド時に固定したバージョンが、
+    // Stripe 側でまとめてテストされている組み合わせです。
     typescript: true,
     appInfo: { name: "Lucky Coin", url: "https://luckybronzecoin.com" },
   });
   return cached;
 }
 
-// Pack prices are USD. The currency the card is actually charged in follows
-// the visitor's language, so a Japanese buyer sees and pays yen, while the
-// prices on the page stay dollar-denominated. STRIPE_CURRENCY overrides it.
-const LOCALE_CURRENCY: Record<Locale, string> = { ja: "jpy", en: "usd" };
-
-export function getStripeCurrency(locale: Locale = "en"): string {
-  const forced = process.env.STRIPE_CURRENCY?.trim().toLowerCase();
-  if (forced) return forced;
-  return LOCALE_CURRENCY[locale] ?? "usd";
+// USD 建ての表示価格を、実際に請求する日本円の金額に換算します。
+export function chargeFromUsd(usd: number): number {
+  return usdToJpy(usd);
 }
 
-// Stripe rejects a charge below a per-currency floor, in major units.
-// https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts
-const MIN_CHARGE: Record<string, number> = {
-  usd: 0.5, jpy: 50, eur: 0.5, gbp: 0.3, aud: 0.5, cad: 0.5,
-  chf: 0.5, dkk: 2.5, nok: 3, sek: 3, hkd: 4, sgd: 0.5, nzd: 0.5,
-  mxn: 10, brl: 0.5, inr: 0.5, krw: 100,
-};
-
-export function minChargeAmount(currency: string): number {
-  return MIN_CHARGE[currency.toLowerCase()] ?? 0.5;
+// 人に見せるための金額表記（日本円）。
+export function formatCharge(jpy: number): string {
+  return formatJpy(jpy);
 }
 
-export function isZeroDecimal(currency: string): boolean {
-  return ZERO_DECIMAL.has(currency.toLowerCase());
+// 日本円は最小単位を持たないので、Stripe にはそのままの整数を渡します。
+export function toStripeAmount(jpy: number): number {
+  return Math.round(jpy);
 }
 
-// Formats an amount for a human, in the currency it will be charged in.
-export function formatCharge(amount: number, currency: string, locale = "en"): string {
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: currency.toUpperCase(),
-      maximumFractionDigits: isZeroDecimal(currency) ? 0 : 2,
-    }).format(amount);
-  } catch {
-    return `${amount} ${currency.toUpperCase()}`;
-  }
+// その逆 — Stripe が返した金額を人が読む単位に戻します。管理画面の入金履歴で
+// 使うため、JPY 以外（過去の決済など）にも耐えるようにしてあります。
+export function fromStripeAmount(amount: number, currency = CHARGE_CURRENCY): number {
+  return ZERO_DECIMAL.has(currency.toLowerCase()) ? amount : amount / 100;
 }
 
-// Converts a decimal price into the smallest unit Stripe bills in.
-export function toStripeAmount(amount: number, currency: string): number {
-  return isZeroDecimal(currency) ? Math.round(amount) : Math.round(amount * 100);
-}
-
-// The inverse — used when reporting back what the customer actually paid.
-export function fromStripeAmount(amount: number, currency: string): number {
-  return isZeroDecimal(currency) ? amount : amount / 100;
-}
+// fromStripeAmount() 用。過去に別通貨で決済された履歴を正しく表示するために
+// 一覧を残しています。
+export const ZERO_DECIMAL = new Set([
+  "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
+  "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf",
+]);

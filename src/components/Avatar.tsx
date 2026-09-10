@@ -39,14 +39,14 @@ export default function Avatar({
         height={size}
         loading="lazy"
         onError={() => setFailed(true)}
-        className={`rounded-full bg-white/5 object-cover ring-2 ring-white/15 ${className}`}
+        className={`rounded-full bg-cream object-cover ring-2 ring-line ${className}`}
         style={{ width: size, height: size }}
       />
     );
   }
   return (
     <span
-      className={`grid place-items-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 font-bold text-slate-900 ring-2 ring-white/15 ${className}`}
+      className={`grid place-items-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 font-bold text-slate-900 ring-2 ring-line ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.42 }}
     >
       {initial}

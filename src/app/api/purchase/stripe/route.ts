@@ -3,30 +3,29 @@ import { requireProfile } from "@/lib/auth";
 import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX, customCost } from "@/lib/coins";
 import {
   APP_TAG,
+  CHARGE_CURRENCY,
+  MIN_CHARGE_JPY,
+  chargeFromUsd,
   formatCharge,
   getStripe,
-  getStripeCurrency,
   isStripeConfigured,
-  minChargeAmount,
   toStripeAmount,
 } from "@/lib/stripe";
-import { convertFromUsd } from "@/lib/fx";
+import { USD_JPY_BOOK_RATE } from "@/lib/fx-book";
 import { getSiteOrigin } from "@/lib/site-url";
-import { getLocale } from "@/lib/i18n/server";
-import { createTranslator, isMessageKey } from "@/lib/i18n";
+import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
 
-// Card checkout — create a Stripe Checkout Session for a silver pack.
+// カード決済 — シルバーパック用の Stripe Checkout セッションを作成します。
 //
-// Nothing is credited here. A *pending* order row is written first, its id is
-// attached to the session (client_reference_id + metadata), and coins are only
-// added once Stripe confirms the payment — either through the webhook
-// (/api/stripe/webhook) or when the buyer returns to /buy
-// (/api/purchase/stripe/status). Both paths credit at most once.
+// ここではコインを加算しません。まず「支払い待ち」の注文行を書き込み、その id を
+// セッションに紐づけ（client_reference_id + metadata）、Stripe が支払い完了を
+// 通知して初めてコインを加算します。加算経路は Webhook（/api/stripe/webhook）と、
+// 購入者が /buy に戻ったとき（/api/purchase/stripe/status）の 2 つで、
+// どちらを通っても加算は 1 回だけです。
 export async function POST(req: Request) {
-  const locale = await getLocale();
-  const t = createTranslator(locale);
+  const t = await getT();
 
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });
@@ -38,9 +37,8 @@ export async function POST(req: Request) {
   const { admin, profile } = ctx;
   const body = await req.json().catch(() => ({}));
 
-  // Accept either a fixed pack or a custom amount (1–100 silver) — the same
-  // rules the crypto checkout uses. The price is computed SERVER-SIDE so the
-  // browser can never choose what it pays.
+  // 固定パックか、自由入力（シルバー 1〜100 枚）を受け付けます。価格は必ず
+  // サーバー側で算出するので、ブラウザが支払額を選ぶことはできません。
   const reqSilver = Math.floor(Number(body.silver));
   const pack = COIN_PACKS.find((p) => p.silver === reqSilver);
   let silver: number;
@@ -62,31 +60,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // Prices above are USD. Stripe charges in ONE currency and wants the amount
-  // already expressed in it, so convert here: a Japanese visitor is billed the
-  // yen equivalent while the catalogue stays dollar-denominated.
-  const currency = getStripeCurrency(locale);
+  // カタログは USD 建てのまま、請求は固定ブックレートで日本円に換算します。
+  const charge = chargeFromUsd(usd);
 
-  let charge: number;
-  let rate: number;
-  try {
-    ({ amount: charge, rate } = await convertFromUsd(usd, currency));
-  } catch (e) {
-    // The message is a translation key (see lib/fx.ts).
-    const key = e instanceof Error ? e.message : "api.pricing.rateFetchFailed";
-    console.error("[stripe] no exchange rate for", currency, e);
+  // Stripe は通貨ごとの最低額（¥50）未満を受け付けません。汎用エラーを
+  // 購入者に見せるのではなく、はっきり理由を伝えます。
+  if (charge < MIN_CHARGE_JPY) {
     return NextResponse.json(
-      { error: isMessageKey(key) ? t(key) : t("api.pricing.rateFetchFailed") },
-      { status: 503 }
-    );
-  }
-
-  // Stripe rejects anything under a per-currency floor (¥50, $0.50, …). Say so
-  // plainly instead of letting the API throw a generic failure at the buyer.
-  const min = minChargeAmount(currency);
-  if (charge < min) {
-    return NextResponse.json(
-      { error: t("api.stripe.amountTooSmall", { min: formatCharge(min, currency, locale) }) },
+      { error: t("api.stripe.amountTooSmall", { min: formatCharge(MIN_CHARGE_JPY) }) },
       { status: 400 }
     );
   }
@@ -96,16 +77,14 @@ export async function POST(req: Request) {
     .insert({
       user_id: profile.id,
       silver,
-      // usd_amount stays the USD list price — it is what reporting and the
-      // admin dashboard compare across payment methods.
+      // usd_amount は USD 建ての定価のまま。集計や管理画面の比較軸です。
       usd_amount: usd,
-      currency: `Card · Stripe (${currency.toUpperCase()})`,
+      currency: "カード · Stripe（JPY）",
       method_id: "stripe-card",
       method: "stripe",
-      // …while pay_amount/pay_currency record what the card was actually
-      // charged, exactly as the crypto flow records the crypto amount.
+      // pay_amount / pay_currency には実際にカードへ請求した金額を記録します。
       pay_amount: charge,
-      pay_currency: currency.toUpperCase(),
+      pay_currency: "JPY",
       status: "awaiting_payment",
       credited: false,
     })
@@ -121,16 +100,15 @@ export async function POST(req: Request) {
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
-      // Stripe shows its own checkout page in this language.
-      locale: locale === "ja" ? "ja" : "en",
+      locale: "ja",
       client_reference_id: purchase.id,
       customer_email: profile.email || undefined,
       line_items: [
         {
           quantity: 1,
           price_data: {
-            currency,
-            unit_amount: toStripeAmount(charge, currency),
+            currency: CHARGE_CURRENCY,
+            unit_amount: toStripeAmount(charge),
             product_data: {
               name: t("api.stripe.productName", { silver: silver.toLocaleString() }),
               description: t("api.stripe.productDesc", { silver: silver.toLocaleString() }),
@@ -138,10 +116,11 @@ export async function POST(req: Request) {
           },
         },
       ],
-      // Copied onto the PaymentIntent too, so the order is traceable from
-      // either object in the Stripe dashboard.
-      // `app` marks the session as ours: the Stripe account is shared with
-      // another product, so the webhook uses this to ignore its events.
+      // PaymentIntent 側にも同じ metadata を写すので、Stripe ダッシュボードの
+      // どちらのオブジェクトからでも注文を追跡できます。
+      // `app` は「このサイトのセッションである」という目印です。Stripe
+      // アカウントは他サービスと共有しているため、Webhook と管理画面の
+      // 入金履歴はこの値で自分の決済だけを選び出します。
       metadata: { app: APP_TAG, order_id: purchase.id, user_id: profile.id, silver: String(silver) },
       payment_intent_data: {
         metadata: { app: APP_TAG, order_id: purchase.id, user_id: profile.id, silver: String(silver) },
@@ -162,10 +141,10 @@ export async function POST(req: Request) {
       url: session.url,
       silver,
       usd,
-      // What the card is actually charged, for the buyer's confirmation.
+      // 実際にカードへ請求される金額（購入者への確認表示用）。
       charge,
-      currency: currency.toUpperCase(),
-      rate,
+      currency: "JPY",
+      rate: USD_JPY_BOOK_RATE,
     });
   } catch (e) {
     await admin

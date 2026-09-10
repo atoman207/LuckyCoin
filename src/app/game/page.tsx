@@ -35,20 +35,20 @@ function JewelIcon({ className = "" }: { className?: string }) {
 // Revealed-board borders: gold → gold, silver → silver, bronze → none.
 const COIN_BORDER: Record<CoinType, { tile: string; tilePick: string; coin: string; coinPick: string }> = {
   gold: {
-    tile: "gold-card bg-black/25",
-    tilePick: "gold-card z-10 bg-amber-300/20 scale-[1.35]",
+    tile: "gold-card bg-cream",
+    tilePick: "gold-card z-10 bg-amber-100 scale-[1.35]",
     coin: "ring-2 ring-amber-400",
     coinPick: "tile-flip ring-4 ring-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.65)]",
   },
   silver: {
-    tile: "silver-card bg-black/25",
-    tilePick: "silver-card z-10 bg-white/15 scale-[1.35]",
+    tile: "silver-card bg-cream",
+    tilePick: "silver-card z-10 bg-sand scale-[1.35]",
     coin: "ring-2 ring-slate-300",
     coinPick: "tile-flip ring-4 ring-slate-200 shadow-[0_0_14px_rgba(226,232,240,0.55)]",
   },
   bronze: {
-    tile: "border-white/10 bg-black/25",
-    tilePick: "z-10 border-white/20 bg-white/10 scale-[1.35]",
+    tile: "border-line bg-cream",
+    tilePick: "z-10 border-line bg-sand scale-[1.35]",
     coin: "",
     coinPick: "tile-flip",
   },
@@ -364,7 +364,7 @@ export default function GamePage() {
   }
 
   if (loading || !profile || !sessionReady) {
-    return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+    return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
   }
 
   // A round can be paid with EITHER 1 silver OR 10 bronze. Admins play free.
@@ -400,7 +400,7 @@ export default function GamePage() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold sm:text-3xl">{t("game.title")}</h1>
-          <p className="hidden text-slate-400 sm:block">
+          <p className="hidden text-muted sm:block">
             {phase === "playing"
               ? t("game.subtitlePlaying")
               : t("game.subtitleIdle", {
@@ -416,7 +416,7 @@ export default function GamePage() {
         </div>
         <div className="flex items-center gap-3">
           {(profile.free_rounds ?? 0) > 0 && (
-            <span className="rounded-full bg-violet-500/20 px-3 py-1 text-sm font-bold text-violet-200 ring-1 ring-violet-300/40">
+            <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
               {t("game.freeRounds", { count: profile.free_rounds ?? 0 })}
             </span>
           )}
@@ -425,12 +425,12 @@ export default function GamePage() {
       </div>
 
       {toast && (
-        <div className="card animate-pop border-amber-300/40 bg-amber-300/10 px-4 py-3 text-center font-semibold text-amber-100">
+        <div className="card animate-pop border-amber-300 bg-amber-50 px-4 py-3 text-center font-semibold text-amber-800">
           {toast}
         </div>
       )}
       {error && (
-        <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>
       )}
 
       {/* Idle / start */}
@@ -438,7 +438,7 @@ export default function GamePage() {
         <div className="card flex flex-col items-center gap-4 p-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">{t("game.readyTitle")}</h2>
-          <p className="max-w-sm text-slate-300">
+          <p className="max-w-sm text-body">
             {profile.is_admin
               ? t("game.readyBodyAdmin", { size: BOARD_SIZE })
               : t("game.readyBody", {
@@ -454,11 +454,11 @@ export default function GamePage() {
             {hasSaved && (
               <button onClick={nextStage} disabled={busy} className="btn-ghost text-lg">
                 {t("game.continue")}{" "}
-                <span className="text-xs text-amber-200">(×{nextMultiplier(restarts + 1)})</span>
+                <span className="text-xs text-amber-700">(×{nextMultiplier(restarts + 1)})</span>
               </button>
             )}
           </div>
-          <p className="max-w-md text-xs text-slate-500">
+          <p className="max-w-md text-xs text-faint">
             <RichText k="game.startOverHint" />{" "}
             {hasSaved ? t("game.savedHint") : t("game.noSavedHint")}
           </p>
@@ -471,27 +471,27 @@ export default function GamePage() {
           {/* Restart / New Game toolbar */}
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-amber-300/15 px-2.5 py-1 text-sm font-bold text-amber-200">
+              <span className="rounded bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">
                 {t("game.stageBadge", { mult: multiplier, stage: restarts + 1, max: MAX_RESTARTS })}
               </span>
               {/* How many left? — hover for the current multiplier + coin counts */}
               <div className="group relative">
                 <button className="btn-ghost text-sm">{t("game.howManyLeft")}</button>
-                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-white/10 bg-[#121829] p-3 text-xs shadow-xl group-hover:block">
-                  <div className="font-semibold text-amber-200">{t("game.currentMultiplier", { mult: multiplier })}</div>
+                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-line bg-white p-3 text-xs shadow-xl group-hover:block">
+                  <div className="font-semibold text-amber-700">{t("game.currentMultiplier", { mult: multiplier })}</div>
                   <div className="mt-2 grid grid-cols-4 gap-2 text-center">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
-                      <div key={t} className="rounded bg-black/30 py-2">
+                      <div key={t} className="rounded bg-cream py-2">
                         <CoinIcon type={t} size={22} className="mx-auto" />
                         <div className="mt-1 font-bold">{composition ? composition[t] : "—"}</div>
                       </div>
                     ))}
-                    <div className="rounded bg-violet-500/15 py-2">
+                    <div className="rounded bg-violet-100 py-2">
                       <JewelIcon className="mx-auto h-6 w-6 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
-                      <div className="mt-1 font-bold text-violet-200">{composition?.gem ?? 0}</div>
+                      <div className="mt-1 font-bold text-violet-700">{composition?.gem ?? 0}</div>
                     </div>
                   </div>
-                  <div className="mt-2 text-slate-400">{t("game.boardContents")}</div>
+                  <div className="mt-2 text-muted">{t("game.boardContents")}</div>
                 </div>
               </div>
             </div>
@@ -517,8 +517,8 @@ export default function GamePage() {
           {/* Exact counts for this round (hidden on mobile to save space — the
               same info is in the "How many left?" tooltip). */}
           {composition && (
-            <div className="hidden shrink-0 flex-wrap items-center justify-center gap-4 rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm sm:flex">
-              <span className="text-slate-400">{t("game.thisRound")}</span>
+            <div className="hidden shrink-0 flex-wrap items-center justify-center gap-4 rounded-xl border border-line bg-cream px-4 py-2 text-sm sm:flex">
+              <span className="text-muted">{t("game.thisRound")}</span>
               <span className="flex items-center gap-1.5 font-semibold">
                 <CoinIcon type="gold" size={20} /> {composition.gold}
               </span>
@@ -529,11 +529,11 @@ export default function GamePage() {
                 <CoinIcon type="bronze" size={20} /> {composition.bronze}
               </span>
               {(composition.gem ?? 0) > 0 && (
-                <span className="flex items-center gap-1.5 font-semibold text-violet-300">
+                <span className="flex items-center gap-1.5 font-semibold text-violet-600">
                   <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" /> {composition.gem}
                 </span>
               )}
-              <span className="font-semibold text-slate-400">{t("game.blankCount", { count: composition.empty })}</span>
+              <span className="font-semibold text-muted">{t("game.blankCount", { count: composition.empty })}</span>
             </div>
           )}
 
@@ -577,20 +577,20 @@ export default function GamePage() {
                       revealed
                         ? isGem
                           ? isPick
-                            ? "z-10 border-violet-300/70 bg-violet-400/20 ring-2 ring-violet-300/70 scale-[1.35]"
-                            : "border-violet-300/40 bg-violet-500/10"
+                            ? "z-10 border-violet-300 bg-violet-100 ring-2 ring-violet-300 scale-[1.35]"
+                            : "border-violet-200 bg-violet-50"
                           : isPick && border
                             ? border.tilePick
                             : border
                               ? border.tile
-                              : "border-white/10 bg-black/20 opacity-50"
-                        : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50 hover:from-amber-300/15",
+                              : "border-line bg-cream opacity-50"
+                        : "border-line bg-gradient-to-b from-white to-white/50 hover:border-amber-400 hover:from-amber-100",
                     ].join(" ")}
                   >
                     {introType === "gem" ? (
                       <JewelIcon className="h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
                     ) : introType === "empty" ? (
-                      <span className="text-xs font-bold text-slate-400/70 sm:text-sm">{t("coin.no")}</span>
+                      <span className="text-xs font-bold text-muted/70 sm:text-sm">{t("coin.no")}</span>
                     ) : introType ? (
                       <span className="flex h-full w-full items-center justify-center p-[8%]">
                         <CoinIcon type={introType as CoinType} responsive className="rounded-full" />
@@ -609,7 +609,7 @@ export default function GamePage() {
                         />
                       </span>
                     ) : revealed && type === "empty" ? (
-                      <span className={`text-xs font-bold text-slate-500 sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>{t("coin.no")}</span>
+                      <span className={`text-xs font-bold text-faint sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>{t("coin.no")}</span>
                     ) : null}
                     {revealed && isPick && (
                       <span className="absolute -top-1.5 left-1/2 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-[10px] font-black text-slate-900 shadow sm:h-5 sm:w-5 sm:text-xs">
@@ -626,16 +626,16 @@ export default function GamePage() {
             <div className="card flex shrink-0 flex-wrap items-center justify-between gap-3 p-3">
               <div className="flex items-center gap-3">
                 {reward.type === "empty" ? (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-sm font-bold text-slate-400">{t("coin.no")}</span>
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-cream text-sm font-bold text-muted">{t("coin.no")}</span>
                 ) : reward.type === "gem" ? (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-500/20">
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-100">
                     <JewelIcon className="h-9 w-9 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
                   </span>
                 ) : (
                   <CoinIcon type={reward.type} size={40} className="animate-pop" />
                 )}
                 <div className="text-left">
-                  <div className="text-xs uppercase tracking-wide text-slate-400">
+                  <div className="text-xs uppercase tracking-wide text-muted">
                     {reward.type === "empty"
                       ? t("game.resultLabel")
                       : reward.type === "gem"
@@ -683,14 +683,14 @@ export default function GamePage() {
       {/* Start-option modal: select exactly one option, then see a message. */}
       {chooserOpen && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#4a3f31]/30 p-4"
           onClick={closeChooser}
         >
           <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             {choice === null ? (
               <>
                 <h2 className="text-xl font-bold">{t("game.chooseHowToPay")}</h2>
-                <p className="mt-1 text-sm text-slate-400">{t("game.chooseHowToPayHint")}</p>
+                <p className="mt-1 text-sm text-muted">{t("game.chooseHowToPayHint")}</p>
                 <div className="mt-4 grid gap-3">
                   {(["silver", "bronze"] as RoundCurrency[]).map((c) => {
                     const ok = canPay(c);
@@ -711,7 +711,7 @@ export default function GamePage() {
                             setChoice(c);
                           }
                         }}
-                        className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+                        className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
                       >
                         <span className="flex items-center gap-3">
                           <CoinIcon type={c} size={32} />
@@ -719,12 +719,12 @@ export default function GamePage() {
                             <span className="block font-bold">
                               {t("game.rewardCoin", { count: ROUND_COST[c], name: coinName(t, c) })}
                             </span>
-                            <span className="block text-xs text-slate-400">
+                            <span className="block text-xs text-muted">
                               {t("game.youHave", { amount: profile[c], name: coinName(t, c) })}
                             </span>
                           </span>
                         </span>
-                        <span className={`text-xs font-semibold ${ok ? "text-emerald-300" : "text-red-300"}`}>
+                        <span className={`text-xs font-semibold ${ok ? "text-emerald-600" : "text-red-600"}`}>
                           {profile.is_admin ? t("common.free") : ok ? t("common.available") : t("common.notEnough")}
                         </span>
                       </button>
@@ -738,7 +738,7 @@ export default function GamePage() {
             ) : canPay(choice) ? (
               <>
                 <h2 className="text-xl font-bold">{t("game.startRoundTitle")}</h2>
-                <p className="mt-2 text-slate-300">
+                <p className="mt-2 text-body">
                   {profile.is_admin
                     ? t("game.startRoundAdmin")
                     : t("game.startRoundBody", {
@@ -758,10 +758,10 @@ export default function GamePage() {
               </>
             ) : (
               <>
-                <h2 className="text-xl font-bold text-red-200">
+                <h2 className="text-xl font-bold text-red-700">
                   {t("game.notEnoughTitle", { name: coinName(t, choice) })}
                 </h2>
-                <p className="mt-2 text-slate-300">
+                <p className="mt-2 text-body">
                   {t("game.notEnoughBody", { name: coinName(t, choice) })}
                 </p>
                 <div className="mt-5 flex flex-col gap-3">
@@ -782,7 +782,7 @@ export default function GamePage() {
           modal emits light in the coin's own colour. */}
       {revealCoin && (
         <div
-          className="reveal-overlay fixed inset-0 z-50 grid place-items-center bg-black/85 p-4 backdrop-blur-sm"
+          className="reveal-overlay fixed inset-0 z-50 grid place-items-center bg-[#4a3f31]/45 p-4 backdrop-blur-sm"
           onClick={() => setRevealCoin(null)}
           style={{ "--glow": COIN_REVEAL[revealCoin].glow, "--ray": COIN_REVEAL[revealCoin].ray } as CSSProperties}
         >
@@ -792,7 +792,7 @@ export default function GamePage() {
               <div className="reveal-glow pointer-events-none absolute inset-0 rounded-full" />
               <div className="reveal-coin relative drop-shadow-2xl">
                 {revealCoin === "empty" ? (
-                  <span className="grid h-[172px] w-[172px] place-items-center rounded-full border border-white/10 bg-white/5 text-5xl font-extrabold text-slate-400">
+                  <span className="grid h-[172px] w-[172px] place-items-center rounded-full border border-line bg-cream text-5xl font-extrabold text-muted">
                     {t("coin.no")}
                   </span>
                 ) : revealCoin === "gem" ? (
@@ -805,8 +805,8 @@ export default function GamePage() {
               </div>
             </div>
             <div className="relative -mt-2 max-w-sm text-center">
-              <p className="text-2xl font-extrabold text-white drop-shadow">{t(COIN_REVEAL[revealCoin].title)}</p>
-              <p className="mt-1 text-slate-300">
+              <p className="text-2xl font-extrabold text-body drop-shadow">{t(COIN_REVEAL[revealCoin].title)}</p>
+              <p className="mt-1 text-body">
                 {revealCoin === "empty"
                   ? t("game.revealEmptyBody")
                   : revealCoin === "gem"
@@ -830,9 +830,9 @@ export default function GamePage() {
 
               {/* Next-stage prompt: cost + the NEXT round's board (to entice). */}
               {restartsLeft > 0 && (
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-sm">
-                  <p className="font-semibold text-amber-200">{t("game.nextStageTitle")}</p>
-                  <p className="mt-1 text-xs text-slate-400">
+                <div className="mt-4 rounded-xl border border-line bg-cream p-3 text-sm">
+                  <p className="font-semibold text-amber-700">{t("game.nextStageTitle")}</p>
+                  <p className="mt-1 text-xs text-muted">
                     {(profile.free_rounds ?? 0) > 0 ? (
                       <RichText
                         k="game.nextStageFree"
@@ -849,7 +849,7 @@ export default function GamePage() {
                       />
                     )}
                   </p>
-                  <p className="mt-2 text-xs uppercase tracking-wide text-amber-200/80">{t("game.nextBoard")}</p>
+                  <p className="mt-2 text-xs uppercase tracking-wide text-amber-700">{t("game.nextBoard")}</p>
                   <div className="mt-1 flex items-center justify-center gap-4">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
                       <span key={t} className="flex items-center gap-1 font-bold">
@@ -857,13 +857,13 @@ export default function GamePage() {
                       </span>
                     ))}
                     {(nextRoundComp.gem ?? 0) > 0 && (
-                      <span className="flex items-center gap-1 font-bold text-violet-200">
+                      <span className="flex items-center gap-1 font-bold text-violet-700">
                         <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.9)]" />
                         {nextRoundComp.gem}
                       </span>
                     )}
                     {nextRoundComp.empty > 0 && (
-                      <span className="text-slate-400">{t("game.blankCount", { count: nextRoundComp.empty })}</span>
+                      <span className="text-muted">{t("game.blankCount", { count: nextRoundComp.empty })}</span>
                     )}
                   </div>
                 </div>
@@ -893,12 +893,12 @@ export default function GamePage() {
       {/* Restart mode chooser — pick how the next round plays. */}
       {restartChooserOpen && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#4a3f31]/35 p-4"
           onClick={() => setRestartChooserOpen(false)}
         >
           <div className="card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold">{t("game.restartTitle")}</h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-muted">
               {t("game.restartLead", {
                 left: restartsLeft,
                 max: MAX_RESTARTS,
@@ -910,18 +910,18 @@ export default function GamePage() {
               <button
                 onClick={() => startRound(lastCurrency, "restart", "continuous")}
                 disabled={busy}
-                className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+                className="rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
               >
                 <div className="font-bold">{t("game.modeContinuous")}</div>
-                <div className="text-xs text-slate-400">{t("game.modeContinuousDesc")}</div>
+                <div className="text-xs text-muted">{t("game.modeContinuousDesc")}</div>
               </button>
               <button
                 onClick={() => startRound(lastCurrency, "restart", "multiplier")}
                 disabled={busy}
-                className="rounded-xl border border-white/10 px-4 py-3 text-left transition hover:border-amber-300/50 hover:bg-amber-300/5"
+                className="rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
               >
                 <div className="font-bold">{t("game.modeMultiplier")}</div>
-                <div className="text-xs text-slate-400">{t("game.modeMultiplierDesc", { max: MAX_RESTARTS })}</div>
+                <div className="text-xs text-muted">{t("game.modeMultiplierDesc", { max: MAX_RESTARTS })}</div>
               </button>
             </div>
             <button onClick={() => setRestartChooserOpen(false)} className="btn-ghost mt-4 w-full">
@@ -933,14 +933,14 @@ export default function GamePage() {
 
       {/* Multiplier-increase modal (shown briefly on each Start Again). */}
       {multModal !== null && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4">
-          <div className="card animate-pop border-amber-300/40 bg-amber-300/10 px-10 py-8 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-amber-200">{t("game.multIncreased")}</p>
-            <p className="mt-1 text-6xl font-black text-amber-300 drop-shadow">×{multModal}</p>
-            <p className="mt-2 text-slate-300">{t("game.multBody", { mult: multModal })}</p>
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-[#4a3f31]/35 p-4">
+          <div className="card animate-pop border-amber-300 bg-amber-50 px-10 py-8 text-center">
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-700">{t("game.multIncreased")}</p>
+            <p className="mt-1 text-6xl font-black text-amber-600 drop-shadow">×{multModal}</p>
+            <p className="mt-2 text-body">{t("game.multBody", { mult: multModal })}</p>
             {composition && (
               <>
-                <p className="mt-4 text-xs uppercase tracking-wide text-amber-200/80">{t("game.boardCoins")}</p>
+                <p className="mt-4 text-xs uppercase tracking-wide text-amber-700">{t("game.boardCoins")}</p>
                 <div className="mt-1 flex items-center justify-center gap-4">
                   {(["gold", "silver", "bronze"] as const).map((t) => (
                     <span key={t} className="flex items-center gap-1 font-bold">
@@ -948,7 +948,7 @@ export default function GamePage() {
                     </span>
                   ))}
                   {composition.empty > 0 && (
-                    <span className="text-sm text-slate-400">{t("game.blankCount", { count: composition.empty })}</span>
+                    <span className="text-sm text-muted">{t("game.blankCount", { count: composition.empty })}</span>
                   )}
                 </div>
               </>

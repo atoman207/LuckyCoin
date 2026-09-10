@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
 import { SELL_PRICE_USDT, SELL_HOURS_KEY, sellStatus } from "@/lib/selling";
-import { PAYMENT_METHODS, getPaymentMethod } from "@/lib/wallets";
+import { PAYOUT_METHODS, getPayoutMethod } from "@/lib/payout-methods";
 import { useI18n } from "@/lib/i18n/provider";
 
 export default function SellPage() {
@@ -17,7 +17,7 @@ export default function SellPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Payout wallet: the crypto/network and the address to receive funds.
-  const [method, setMethod] = useState<string>(PAYMENT_METHODS[0].id);
+  const [method, setMethod] = useState<string>(PAYOUT_METHODS[0].id);
   const [address, setAddress] = useState("");
   const [savingWallet, setSavingWallet] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function SellPage() {
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
   async function saveWallet() {
     if (!address.trim()) return;
@@ -93,15 +93,15 @@ export default function SellPage() {
   const registered = profile.payout_address || null;
   const hasAddress = !!address.trim();
   const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold && hasAddress;
-  const registeredMethodLabel = getPaymentMethod(profile.payout_method)?.label;
+  const registeredMethodLabel = getPayoutMethod(profile.payout_method)?.label;
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold">{t("sell.title")}</h1>
-        <p className="text-slate-400">
+        <p className="text-muted">
           {t("sell.subtitlePre")}
-          <span className="font-semibold text-amber-300">
+          <span className="font-semibold text-amber-600">
             {SELL_PRICE_USDT.toLocaleString()} USDT
           </span>
           {t("sell.subtitlePost")}
@@ -109,17 +109,17 @@ export default function SellPage() {
       </div>
 
       {/* Trading window banner */}
-      <div className="rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         <span className="font-semibold">{t("sell.openNow")}</span>{" "}
         {t("sell.openBody", { hours: t(SELL_HOURS_KEY) })}
       </div>
 
       {done && (
-        <div className="card animate-pop border-emerald-300/40 bg-emerald-300/10 px-4 py-3 text-center font-semibold text-emerald-100">
+        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
           ✓ {done}
         </div>
       )}
-      {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
 
       {/* Payout wallet — choose the crypto/network and address. Editable any time,
           even with no gold, so you can register it in advance. */}
@@ -129,7 +129,7 @@ export default function SellPage() {
         <div>
           <label className="label">{t("sell.receiveAs")}</label>
           <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
-            {PAYMENT_METHODS.map((m) => (
+            {PAYOUT_METHODS.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label} — {m.network}
               </option>
@@ -155,32 +155,32 @@ export default function SellPage() {
               {savingWallet ? t("common.saving") : t("common.save")}
             </button>
           </div>
-          {walletMsg && <p className="mt-1 text-xs text-emerald-300">{walletMsg}</p>}
+          {walletMsg && <p className="mt-1 text-xs text-emerald-600">{walletMsg}</p>}
 
           {/* Registered-wallet / prompt messaging */}
           {registered ? (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-muted">
               {t("sell.registeredWallet", {
                 method: registeredMethodLabel ? ` (${registeredMethodLabel})` : "",
               })}
-              <span className="font-mono text-slate-300 break-all">{registered}</span>
+              <span className="font-mono text-body break-all">{registered}</span>
               {t("sell.registeredWalletTail")}
             </p>
           ) : !hasAddress ? (
-            <p className="mt-2 text-xs text-amber-300">{t("sell.noWallet")}</p>
+            <p className="mt-2 text-xs text-amber-600">{t("sell.noWallet")}</p>
           ) : null}
 
-          <p className="mt-2 text-xs text-amber-200/90">{t("sell.warning")}</p>
+          <p className="mt-2 text-xs text-amber-700">{t("sell.warning")}</p>
         </div>
       </div>
 
       {/* Sell */}
       <div className="card p-6">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 text-slate-300">
+          <span className="flex items-center gap-2 text-body">
             <CoinIcon type="gold" size={28} /> {t("sell.yourGold")}
           </span>
-          <span className="text-xl font-bold text-amber-300">{gold}</span>
+          <span className="text-xl font-bold text-amber-600">{gold}</span>
         </div>
 
         <div className="mt-5">
@@ -205,9 +205,9 @@ export default function SellPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-black/30 px-4 py-3">
-          <span className="text-slate-300">{t("sell.youReceive")}</span>
-          <span className="text-xl font-extrabold text-emerald-300">
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-cream px-4 py-3">
+          <span className="text-body">{t("sell.youReceive")}</span>
+          <span className="text-xl font-extrabold text-emerald-600">
             {(Math.min(amount, gold || 0) * SELL_PRICE_USDT).toLocaleString()} USDT
           </span>
         </div>
@@ -222,7 +222,7 @@ export default function SellPage() {
                 : t("sell.sellAction", { count: Math.min(amount, gold) })}
         </button>
 
-        <p className="mt-3 text-center text-xs text-slate-500">{t("sell.payoutNote")}</p>
+        <p className="mt-3 text-center text-xs text-faint">{t("sell.payoutNote")}</p>
       </div>
     </div>
   );

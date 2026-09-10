@@ -31,14 +31,14 @@ import type { MessageKey } from "@/lib/i18n";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="card p-6">
-      <h2 className="text-xl font-bold text-amber-200">{title}</h2>
-      <div className="mt-3 space-y-2 text-slate-300">{children}</div>
+      <h2 className="text-xl font-bold text-amber-700">{title}</h2>
+      <div className="mt-3 space-y-2 text-body">{children}</div>
     </section>
   );
 }
 
 export default function HelpPage() {
-  const { t, locale, intlLocale } = useI18n();
+  const { t, intlLocale } = useI18n();
 
   // Wheel distribution, computed from the live config.
   const wheelCounts = WHEEL_VALUES.reduce<Record<number, number>>((acc, v) => {
@@ -59,9 +59,9 @@ export default function HelpPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold">{t("help.title")}</h1>
-        <p className="text-slate-400">
+        <p className="text-muted">
           <RichText k="help.leadPre" />
-          <Link href="/intro" className="text-amber-300 underline">
+          <Link href="/intro" className="text-amber-600 underline">
             {t("help.leadLink")}
           </Link>
           {t("help.leadPost")}
@@ -75,17 +75,17 @@ export default function HelpPage() {
           k="help.registerP2"
           vars={{ welcome: SIGNUP_WELCOME_BRONZE, day1: dailyReward(1) }}
         />
-        <RichText as="p" k="help.registerP3" vars={{ plays: FREE_PLAYS }} className="text-sm text-slate-400" />
+        <RichText as="p" k="help.registerP3" vars={{ plays: FREE_PLAYS }} className="text-sm text-muted" />
       </Section>
 
       <Section title={t("help.valuesTitle")}>
         <div className="grid gap-3 sm:grid-cols-3">
           {coinVals.map((c) => (
-            <div key={c.type} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-4">
+            <div key={c.type} className="flex items-center gap-3 rounded-xl border border-line bg-cream p-4">
               <CoinIcon type={c.type} size={36} />
               <div>
                 <div className="font-bold">{t(c.label)}</div>
-                <div className="text-sm text-amber-300">
+                <div className="text-sm text-amber-600">
                   {COIN_VALUE[c.type]} {c.type !== "bronze" ? t("help.valueUnit") : t("help.valueBase")}
                 </div>
               </div>
@@ -95,7 +95,7 @@ export default function HelpPage() {
         <RichText
           as="p"
           k="help.valuesNote"
-          className="text-sm text-slate-400"
+          className="text-sm text-muted"
           vars={{
             silver: COIN_VALUE.gold / COIN_VALUE.silver,
             bronze: COIN_VALUE.gold,
@@ -122,9 +122,9 @@ export default function HelpPage() {
           <RichText as="li" k="help.playModeContinuous" />
           <RichText as="li" k="help.playModeMultiplier" vars={{ max: MAX_RESTARTS }} />
         </ul>
-        <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-white/5 text-amber-200">
+            <thead className="bg-cream text-amber-700">
               <tr>
                 <th className="px-3 py-2">{t("help.tableTurn")}</th>
                 <th className="px-3 py-2">{t("help.tableGold")}</th>
@@ -134,18 +134,18 @@ export default function HelpPage() {
                 <th className="px-3 py-2">{t("help.tableBlank")}</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300">
+            <tbody className="text-body">
               {Array.from({ length: MAX_RESTARTS }, (_, i) => i + 1).map((r) => {
                 const c = compositionWithGems("multiplier", r);
                 const gem = c.gem ?? 0;
                 const blank = BOARD_SIZE - c.gold - c.silver - c.bronze - gem;
                 return (
-                  <tr key={r} className="border-t border-white/10">
-                    <td className="px-3 py-1.5 font-semibold text-amber-100">{r}</td>
+                  <tr key={r} className="border-t border-line">
+                    <td className="px-3 py-1.5 font-semibold text-amber-800">{r}</td>
                     <td className="px-3 py-1.5">{c.gold}</td>
                     <td className="px-3 py-1.5">{c.silver}</td>
                     <td className="px-3 py-1.5">{c.bronze}</td>
-                    <td className="px-3 py-1.5 text-violet-300">{gem}</td>
+                    <td className="px-3 py-1.5 text-violet-600">{gem}</td>
                     <td className="px-3 py-1.5">{blank}</td>
                   </tr>
                 );
@@ -159,8 +159,8 @@ export default function HelpPage() {
         <RichText as="p" k="help.gemsP1" />
         <RichText as="p" k="help.gemsP2" />
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-violet-300/30 bg-violet-500/10 p-4">
-            <div className="font-bold text-violet-200">{t("help.gemsFreeTurns")}</div>
+          <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+            <div className="font-bold text-violet-700">{t("help.gemsFreeTurns")}</div>
             <RichText
               as="div"
               className="mt-1 text-sm"
@@ -168,8 +168,8 @@ export default function HelpPage() {
               vars={{ options: GEM_TURN_OPTIONS.join(", +") }}
             />
           </div>
-          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <div className="font-bold text-slate-200">{t("help.gemsSilver")}</div>
+          <div className="rounded-xl border border-line bg-cream p-4">
+            <div className="font-bold text-body">{t("help.gemsSilver")}</div>
             <RichText
               as="div"
               className="mt-1 text-sm"
@@ -177,8 +177,8 @@ export default function HelpPage() {
               vars={{ options: GEM_SILVER_OPTIONS.join(", +") }}
             />
           </div>
-          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <div className="font-bold text-orange-200">{t("help.gemsBronze")}</div>
+          <div className="rounded-xl border border-line bg-cream p-4">
+            <div className="font-bold text-orange-700">{t("help.gemsBronze")}</div>
             <RichText
               as="div"
               className="mt-1 text-sm"
@@ -187,16 +187,16 @@ export default function HelpPage() {
             />
           </div>
         </div>
-        <RichText as="p" k="help.gemsExample" className="text-sm text-slate-400" />
+        <RichText as="p" k="help.gemsExample" className="text-sm text-muted" />
       </Section>
 
       <Section title={t("help.dailyTitle")}>
         <p>{t("help.dailyBody")}</p>
         <div className="flex flex-wrap gap-2 text-sm">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-            <span key={d} className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-1">
+            <span key={d} className="rounded-lg border border-line bg-cream px-2.5 py-1">
               {t("help.dailyDay", { day: d })}
-              <strong className="text-amber-300">{dailyReward(d)}</strong> {t("help.dailyBronze")}
+              <strong className="text-amber-600">{dailyReward(d)}</strong> {t("help.dailyBronze")}
             </span>
           ))}
         </div>
@@ -205,7 +205,7 @@ export default function HelpPage() {
       <Section title={t("help.wheelTitle")}>
         <p>
           {t("help.wheelBodyPre")}
-          <Link href="/draw" className="text-amber-300 underline">
+          <Link href="/draw" className="text-amber-600 underline">
             {t("help.wheelBodyLink")}
           </Link>
           <RichText
@@ -219,8 +219,8 @@ export default function HelpPage() {
               key={r.value}
               className={`rounded-lg border px-2.5 py-1 ${
                 WHEEL_BLOCKED.includes(r.value)
-                  ? "border-amber-300/30 bg-amber-300/10 text-amber-300"
-                  : "border-white/10 bg-black/20"
+                  ? "border-amber-300 bg-amber-50 text-amber-600"
+                  : "border-line bg-cream"
               }`}
             >
               {r.count}× <strong>{r.value}</strong>
@@ -235,11 +235,9 @@ export default function HelpPage() {
           as="p"
           k="help.tradeBuy"
           vars={{
-            packs: COIN_PACKS.map((p) =>
-              locale === "ja"
-                ? `${p.silver}/$${p.usd}（${formatUsdAsJpy(p.usd, intlLocale)}）`
-                : `${p.silver}/$${p.usd}`
-            ).join(", "),
+            packs: COIN_PACKS.map(
+              (p) => `シルバー ${p.silver} 枚 / ${formatUsdAsJpy(p.usd, intlLocale)}`
+            ).join("、"),
           }}
         />
         <RichText
@@ -250,7 +248,7 @@ export default function HelpPage() {
       </Section>
 
       <Section title={t("help.fairTitle")}>
-        <p className="text-sm text-slate-400">{t("help.fairBody")}</p>
+        <p className="text-sm text-muted">{t("help.fairBody")}</p>
       </Section>
     </div>
   );

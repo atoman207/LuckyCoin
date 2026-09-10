@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { creditPurchase } from "@/lib/purchase-credit";
-import { getLocale } from "@/lib/i18n/server";
-import { createTranslator } from "@/lib/i18n";
+import { getT } from "@/lib/i18n/server";
+
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 // two later — this route asks Stripe directly so the coins appear immediately.
 // Both paths funnel through creditPurchase(), which credits at most once.
 export async function POST(req: Request) {
-  const t = createTranslator(await getLocale());
+  const t = await getT();
 
   const ctx = await requireProfile();
   if (!ctx) return NextResponse.json({ error: t("api.notAuthenticated") }, { status: 401 });

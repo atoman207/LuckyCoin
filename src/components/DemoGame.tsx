@@ -81,7 +81,7 @@ export default function DemoGame() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold">{t("demo.title")}</h1>
-          <p className="text-slate-400">
+          <p className="text-muted">
             {left > 0 ? t("demo.left", { left, total: FREE_PLAYS }) : t("demo.used")} ·{" "}
             {t("demo.subtitle")}
           </p>
@@ -93,12 +93,12 @@ export default function DemoGame() {
         <div className="card flex flex-col items-center gap-4 p-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">{t("demo.pickTitle")}</h2>
-          <p className="max-w-sm text-slate-300">{t("demo.pickBody", { size: BOARD_SIZE })}</p>
+          <p className="max-w-sm text-body">{t("demo.pickBody", { size: BOARD_SIZE })}</p>
           <button onClick={start} disabled={plays >= FREE_PLAYS} className="btn-gold text-lg !px-7 !py-3">
             {plays >= FREE_PLAYS ? t("demo.loginToKeepPlaying") : t("demo.startRound")}
           </button>
           {plays >= FREE_PLAYS && (
-            <button onClick={() => setGateOpen(true)} className="text-sm text-amber-300 underline">
+            <button onClick={() => setGateOpen(true)} className="text-sm text-amber-600 underline">
               {t("demo.whyLogin")}
             </button>
           )}
@@ -121,9 +121,9 @@ export default function DemoGame() {
                     "coin-board-tile relative grid place-items-center border transition",
                     revealed
                       ? isPick
-                        ? "z-10 border-amber-300/70 bg-white/10 ring-2 ring-amber-300/70 scale-[1.35]"
-                        : "border-white/10 bg-black/20 opacity-50"
-                      : "border-white/10 bg-gradient-to-b from-white/10 to-black/30 hover:border-amber-300/50",
+                        ? "z-10 border-amber-400 bg-sand ring-2 ring-amber-300 scale-[1.35]"
+                        : "border-line bg-cream opacity-50"
+                      : "border-line bg-gradient-to-b from-white to-white/50 hover:border-amber-400",
                   ].join(" ")}
                 >
                   {revealed && shown !== "empty" && shown !== "gem" ? (
@@ -131,7 +131,7 @@ export default function DemoGame() {
                       <CoinIcon type={shown} responsive />
                     </span>
                   ) : revealed ? (
-                    <span className="text-xs font-bold text-slate-500 sm:text-sm">{t("coin.no")}</span>
+                    <span className="text-xs font-bold text-faint sm:text-sm">{t("coin.no")}</span>
                   ) : null}
                 </button>
               );
@@ -159,10 +159,10 @@ export default function DemoGame() {
 
       {/* Login gate after the free rounds */}
       {gateOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setGateOpen(false)}>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#4a3f31]/35 p-4" onClick={() => setGateOpen(false)}>
           <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-2xl font-bold">{t("demo.gateTitle")}</h2>
-            <div className="mt-3 space-y-2 text-sm text-slate-300">
+            <div className="mt-3 space-y-2 text-sm text-body">
               {INTRO_TEASER_KEYS.map((key) => (
                 <p key={key}>{t(key)}</p>
               ))}

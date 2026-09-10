@@ -9,14 +9,12 @@ import ContactWidget from "@/components/ContactWidget";
 import BackToTop from "@/components/BackToTop";
 import SiteFooter from "@/components/SiteFooter";
 import { LanguageProvider } from "@/lib/i18n/provider";
-import { getLocale } from "@/lib/i18n/server";
 import { createTranslator } from "@/lib/i18n";
 import { HTML_LANG } from "@/lib/i18n/config";
 
-// Metadata follows the visitor's language cookie (Japanese by default).
-export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getLocale();
-  const t = createTranslator(locale);
+// 日本語専用サイトなので、メタデータは常に日本語です。
+export function generateMetadata(): Metadata {
+  const t = createTranslator();
   const title = t("meta.title");
   const description = t("meta.description");
 
@@ -36,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "/",
       siteName: "Lucky Coin",
       type: "website",
-      locale: locale === "ja" ? "ja_JP" : "en_US",
+      locale: "ja_JP",
     },
     twitter: { card: "summary", title, description },
     robots: { index: true, follow: true },
@@ -44,17 +42,33 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await getLocale();
-
   return (
-    <html lang={HTML_LANG[locale]}>
+    <html lang={HTML_LANG}>
+      <head>
+        {/*
+          本文フォントは「M PLUS Rounded 1c」— 日本でいちばん定番の丸ゴシックで、
+          子供向け・親しみやすさを狙うサイトで広く使われている書体です。
+
+          next/font ではなく <link> で読み込んでいるのは、日本語フォントが
+          非常に大きいためです。Google Fonts の CSS は unicode-range で
+          細かく分割されており、ブラウザは実際に使う字だけを取得します。
+          next/font はビルド時に全サブセット（数百ファイル）を取得して
+          自前配信するため、ビルドが重く壊れやすくなります。
+        */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="min-h-screen">
-        <LanguageProvider initialLocale={locale}>
+        <LanguageProvider>
           <UserProvider>
             <VisitTracker />
             <Nav />

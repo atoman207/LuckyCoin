@@ -33,7 +33,7 @@ export default function CoinBalance({
             <CoinIcon type={it.type} size={size} />
             <span
               role="tooltip"
-              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#121829] px-2 py-1 text-xs font-semibold tabular-nums opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
+              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold tabular-nums opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
             >
               {it.value.toLocaleString()} {coinName(t, it.type)}
             </span>
@@ -48,7 +48,7 @@ export default function CoinBalance({
       {items.map((it) => (
         <span
           key={it.type}
-          className="flex items-center gap-1 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-sm font-semibold tabular-nums"
+          className="flex items-center gap-1 rounded-full border border-line bg-cream px-2.5 py-1 text-sm font-semibold tabular-nums"
           title={`${it.value} ${coinName(t, it.type)}`}
         >
           <CoinIcon type={it.type} size={size} />

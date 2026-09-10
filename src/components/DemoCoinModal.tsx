@@ -28,7 +28,7 @@ export default function DemoCoinModal({
   const cfg = GLOW[coin];
   return (
     <div
-      className="reveal-overlay fixed inset-0 z-[60] grid place-items-center bg-black/85 p-4 backdrop-blur-sm"
+      className="reveal-overlay fixed inset-0 z-[60] grid place-items-center bg-[#4a3f31]/45 p-4 backdrop-blur-sm"
       onClick={onClose}
       style={{ "--glow": cfg.glow, "--ray": cfg.ray } as CSSProperties}
     >
@@ -41,10 +41,10 @@ export default function DemoCoinModal({
           </div>
         </div>
         <div className="relative -mt-2 max-w-xs text-center">
-          <p className="text-2xl font-extrabold text-white drop-shadow">
+          <p className="text-2xl font-extrabold text-body drop-shadow">
             {t("demo.foundCoin", { name: coinName(t, coin) })}
           </p>
-          <RichText as="p" k="demo.notSaved" className="mt-2 text-slate-300" />
+          <RichText as="p" k="demo.notSaved" className="mt-2 text-body" />
           <div className="mt-5 flex flex-col gap-2">
             <button onClick={onLogin} className="btn-gold w-full">
               {t("common.loginRegister")}

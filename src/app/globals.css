@@ -1,12 +1,35 @@
 @import "tailwindcss";
 
+/* =====================================================================
+   配色 — 日本向けの明るいテーマ。ベースは白で、差し色にやわらかい
+   クリーム色とゴールドを使います。文字色は真っ黒ではなく温かみのある
+   こげ茶にして、子供向けのやさしい印象に揃えています。
+   ===================================================================== */
+@theme {
+  /* 面 */
+  --color-cream: #fff8ec; /* カードの内側・入力欄の背景 */
+  --color-sand: #fdf1dd; /* もう一段濃い面（見出し帯など） */
+  --color-line: #f2e6d2; /* 罫線・枠線 */
+
+  /* 文字 */
+  --color-body: #4a3f31; /* 本文 */
+  --color-muted: #8a7b66; /* 補助テキスト */
+  --color-faint: #ab9d89; /* さらに弱いテキスト */
+
+  /* 全体の書体 — 子供向けのやさしい丸ゴシック。Web フォントが届く前や
+     読み込みに失敗したときのために、OS 標準の丸ゴシックを順に並べています
+     （macOS/iOS のヒラギノ丸ゴ → Windows の游ゴシック → メイリオ）。 */
+  --font-sans: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4",
+    "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif;
+}
+
 :root {
-  color-scheme: dark;
-  --header-h: 64px; /* header height (mobile/tablet) */
+  color-scheme: light;
+  --header-h: 52px; /* ヘッダー高さ（モバイル／タブレット） */
 }
 @media (min-width: 1024px) {
   :root {
-    --header-h: 104px; /* taller header on PC */
+    --header-h: 68px;
   }
 }
 
@@ -17,21 +40,23 @@ body {
 
 body {
   background:
-    radial-gradient(1200px 600px at 50% -10%, #1b2440 0%, transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, #2a1b40 0%, transparent 55%),
-    #0b0f1a;
-  color: #e7ecf5;
+    radial-gradient(1200px 600px at 50% -10%, #fff3d9 0%, transparent 62%),
+    radial-gradient(900px 500px at 100% 0%, #ffeef2 0%, transparent 58%),
+    radial-gradient(800px 500px at 0% 12%, #eef7ff 0%, transparent 60%),
+    #ffffff;
+  color: var(--color-body);
   -webkit-font-smoothing: antialiased;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
 
-/* Thin, dim scrollbar */
+/* 細くて主張しないスクロールバー */
 *::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-thumb { background: #2a3350; border-radius: 999px; }
+*::-webkit-scrollbar-thumb { background: #e8dcc6; border-radius: 999px; }
+*::-webkit-scrollbar-track { background: transparent; }
 
-/* Action buttons are finished to look like struck coins/tokens (pill/disc with a
-   beveled, ridged rim). Other raw buttons — game tiles, segmented toggles, menu
-   rows — keep the small radius so layouts don't break. */
+/* 操作ボタンは「打刻されたコイン」に見えるよう仕上げます（縁に面取りと
+   ギザギザのある丸ボタン／円盤）。ゲームのマス目やセグメント切り替え、
+   メニュー行などの素のボタンは、レイアウトが崩れないよう小さな角丸のまま。 */
 .btn,
 .btn-gold,
 .btn-ghost,
@@ -41,36 +66,35 @@ body {
   border-radius: 9999px !important;
 }
 button:not(.btn):not(.btn-gold):not(.btn-ghost):not(.btn-silver):not(.btn-bronze):not(.btn-coin) {
-  border-radius: 4px !important;
+  border-radius: 6px !important;
 }
-table { border-radius: 4px; }
-.card:has(table) { border-radius: 4px; }
+table { border-radius: 6px; }
+.card:has(table) { border-radius: 6px; }
 
-/* Coin relief shared by the metallic buttons: a top highlight, a bottom shade,
-   and a double rim ring that reads as a milled coin edge. */
+/* 金属ボタン共通のコイン風レリーフ: 上面のハイライト、下面の影、
+   そして縁を刻んだように見せる二重のリング。 */
 .btn-gold,
 .btn-silver,
 .btn-bronze,
 .btn-coin {
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.55),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.22),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.22),
-    inset 0 0 0 4px rgba(0, 0, 0, 0.12),
-    0 8px 22px -8px rgba(0, 0, 0, 0.55);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    inset 0 -2px 3px rgba(120, 80, 10, 0.18),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.4),
+    inset 0 0 0 4px rgba(180, 130, 30, 0.12),
+    0 6px 16px -8px rgba(180, 130, 30, 0.5);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .btn-ghost {
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.12),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.1),
-    0 8px 20px -10px rgba(0, 0, 0, 0.6);
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    0 4px 12px -8px rgba(120, 90, 40, 0.35);
 }
 .btn-gold:hover,
 .btn-silver:hover,
-.btn-bronze:hover { filter: brightness(1.06); }
+.btn-bronze:hover { filter: brightness(1.04); }
 
-/* The hero "PLAY" button — a round struck coin. */
+/* トップの「PLAY」ボタン — 丸い打刻コイン。 */
 .btn-coin {
   display: inline-grid;
   place-items: center;
@@ -79,80 +103,82 @@ table { border-radius: 4px; }
   font-weight: 800;
   font-size: 1.4rem;
   letter-spacing: 0.08em;
-  color: #5a3a06;
-  background: radial-gradient(circle at 35% 30%, #fff3c4 0%, #ffd874 24%, #f5b73d 56%, #d9921c 100%);
+  color: #6b4508;
+  background: radial-gradient(circle at 35% 30%, #fff6d2 0%, #ffdd85 24%, #f7bd4a 56%, #dd971f 100%);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
-.btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.06); }
+.btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.05); }
 .btn-coin:active { transform: scale(0.97); }
 
-/* Modal panels (a card inside a full-screen overlay): solid black at 100%
-   opacity so the page behind never shows through, with a 2px corner radius. */
+/* モーダル本体（全画面オーバーレイの中のカード）: 背後のページが透けない
+   よう不透明な白にします。 */
 .fixed.inset-0 .card {
-  background-color: #000 !important;
-  border-radius: 2px !important;
+  background-color: #ffffff !important;
+  border-radius: 14px !important;
+  box-shadow: 0 24px 60px -24px rgba(90, 66, 30, 0.35);
 }
 
-/* Reusable bits ------------------------------------------------------- */
+/* 使い回すパーツ --------------------------------------------------- */
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-semibold transition active:scale-[.98] disabled:opacity-50
+           font-bold transition active:scale-[.98] disabled:opacity-50
            disabled:cursor-not-allowed;
   }
   .btn-gold {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-semibold text-slate-900 transition active:scale-[.98]
+           font-bold transition active:scale-[.98]
            disabled:opacity-50 disabled:cursor-not-allowed;
-    background: linear-gradient(180deg, #ffe08a 0%, #f5b73d 60%, #e09a1e 100%);
-    box-shadow: 0 8px 24px -8px rgba(245, 183, 61, 0.6);
+    color: #5a3a06;
+    background: linear-gradient(180deg, #ffe9a8 0%, #f7bd4a 60%, #e2a022 100%);
+    box-shadow: 0 8px 20px -10px rgba(226, 160, 34, 0.75);
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-semibold transition active:scale-[.98] disabled:opacity-50
-           disabled:cursor-not-allowed border border-white/15 bg-white/5
-           text-slate-100 hover:bg-white/10;
+           font-bold transition active:scale-[.98] disabled:opacity-50
+           disabled:cursor-not-allowed border border-line bg-white
+           text-body hover:bg-cream;
   }
-  /* Coin-colored attention buttons (first-login header) */
+  /* コイン色の注目ボタン（初回ログイン時のヘッダー） */
   .btn-silver {
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
-           font-semibold text-slate-900 transition active:scale-[.98];
-    background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 60%, #94a3b8 100%);
-    box-shadow: 0 8px 24px -8px rgba(203, 213, 225, 0.6);
+           font-bold text-slate-700 transition active:scale-[.98];
+    background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 60%, #b6c2d1 100%);
+    box-shadow: 0 8px 20px -10px rgba(148, 163, 184, 0.8);
   }
   .btn-bronze {
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
-           font-semibold text-amber-50 transition active:scale-[.98];
-    background: linear-gradient(180deg, #e6a86b 0%, #cd7f32 60%, #9c5a1e 100%);
-    box-shadow: 0 8px 24px -8px rgba(205, 127, 50, 0.6);
+           font-bold text-white transition active:scale-[.98];
+    background: linear-gradient(180deg, #eeb886 0%, #d78a3f 60%, #a86526 100%);
+    box-shadow: 0 8px 20px -10px rgba(205, 127, 50, 0.8);
   }
   .card {
-    /* Flat panels — no shadow, blur or other card effects. */
-    @apply rounded-2xl border border-white/10 bg-white/[0.04];
+    /* 白い面にやわらかい枠線。影は最小限で、ふんわりした印象に。 */
+    @apply rounded-2xl border border-line bg-white;
   }
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2.5
-           text-slate-100 placeholder:text-slate-500 outline-none
-           focus:border-amber-300/60 focus:ring-2 focus:ring-amber-300/20;
+    @apply w-full rounded-xl border border-line bg-cream px-4 py-2.5
+           text-body placeholder:text-faint outline-none
+           focus:border-amber-400 focus:ring-2 focus:ring-amber-200;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-300;
+    @apply mb-1 block text-sm font-bold text-muted;
   }
 }
 
-/* Header attention icons -------------------------------------------- */
-/* Gentle floating bob so the corner icons are easy to spot. */
+/* ヘッダーの注目アイコン -------------------------------------------- */
+/* 角のアイコンが目に留まるよう、ゆっくり上下に浮かせます。 */
 @keyframes floatBob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
 }
 .anim-bob { animation: floatBob 2s ease-in-out infinite; }
 
-/* The Daily Draw wheel spins continuously. */
+/* デイリー抽選のホイールは回り続けます。 */
 @keyframes coinSpin { to { transform: rotate(360deg); } }
 .anim-spin-slow { animation: coinSpin 8s linear infinite; }
 
-/* The question mark wiggles to draw the eye. */
+/* はてなマークを揺らして視線を誘導します。 */
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-12deg); }
@@ -160,7 +186,7 @@ table { border-radius: 4px; }
 }
 .anim-wiggle { animation: wiggle 1.6s ease-in-out infinite; }
 
-/* Coin flip + reveal animations -------------------------------------- */
+/* コインの反転・出現アニメーション ------------------------------------ */
 @keyframes pop {
   0% { transform: scale(0.6); opacity: 0; }
   70% { transform: scale(1.12); }
@@ -168,14 +194,14 @@ table { border-radius: 4px; }
 }
 .animate-pop { animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
 
-/* Attention pulse for the first-login reward buttons. */
+/* 初回ログイン報酬ボタンの注目パルス。 */
 @keyframes attnPulse {
   0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
-  50% { transform: translateY(-2px) scale(1.04); filter: brightness(1.12); }
+  50% { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
 }
 .btn-attn { animation: attnPulse 1.5s ease-in-out infinite; }
 
-/* Screen vibration on a multiplier increase. */
+/* 倍率が上がったときの画面振動。 */
 @keyframes screenShake {
   0%, 100% { transform: translate(0, 0); }
   10% { transform: translate(-7px, 3px) rotate(-0.5deg); }
@@ -202,21 +228,21 @@ table { border-radius: 4px; }
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 214, 133, 0.45), transparent);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
 
-/* Board deal-in — tiles fade/scale in; the delay is set per tile so the board
-   fills from the outermost ring clockwise. `backwards` keeps each tile hidden
-   until its turn, and releases the transform afterwards so the pick scale works. */
+/* 盤面の配り演出 — マスがフェード＆拡大で現れます。遅延はマスごとに設定され、
+   外周から時計回りに埋まります。`backwards` で出番までは隠しておき、その後は
+   transform を解放して選択時の拡大を効かせます。 */
 @keyframes tileDeal {
   0% { opacity: 0; transform: scale(0.55); }
   100% { opacity: 1; transform: scale(1); }
 }
 .tile-deal { animation: tileDeal 0.4s ease-out backwards; }
 
-/* Coin board — square tiles that fit one screen (5×10 / 8×7 / 10×5). */
+/* コイン盤面 — 1 画面に収まる正方形のマス（5×10 / 8×7 / 10×5）。 */
 .coin-board-shell {
   container-type: size;
   display: flex;
@@ -259,65 +285,65 @@ table { border-radius: 4px; }
   width: 100%;
   min-width: 0;
   min-height: 0;
-  border-radius: 5px !important;
+  border-radius: 8px !important;
 }
 
-/* Slightly irregular tile set to avoid repetitive, overly uniform board styling. */
-.coin-board-tile-v1 { border-radius: 7px 4px 6px 5px !important; }
-.coin-board-tile-v2 { border-radius: 4px 7px 5px 6px !important; }
-.coin-board-tile-v3 { border-radius: 6px 5px 7px 4px !important; }
-.coin-board-tile-v4 { border-radius: 5px 6px 4px 7px !important; }
-.coin-board-tile-v5 { border-radius: 7px 5px 4px 6px !important; }
-.coin-board-tile-v6 { border-radius: 4px 6px 7px 5px !important; }
+/* マスの形をわずかに不揃いにして、機械的な繰り返しに見えないようにします。 */
+.coin-board-tile-v1 { border-radius: 10px 7px 9px 8px !important; }
+.coin-board-tile-v2 { border-radius: 7px 10px 8px 9px !important; }
+.coin-board-tile-v3 { border-radius: 9px 8px 10px 7px !important; }
+.coin-board-tile-v4 { border-radius: 8px 9px 7px 10px !important; }
+.coin-board-tile-v5 { border-radius: 10px 8px 7px 9px !important; }
+.coin-board-tile-v6 { border-radius: 7px 9px 10px 8px !important; }
 .coin-board-tile-v1,
 .coin-board-tile-v3,
 .coin-board-tile-v5 {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(180, 140, 70, 0.1);
 }
 .coin-board-tile-v2,
 .coin-board-tile-v4,
 .coin-board-tile-v6 {
-  box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 -2px 5px rgba(180, 140, 70, 0.12);
 }
 
-/* ---- Board intro animation ------------------------------------------ */
-/* Phase 1 (0–1 s): all 50 tiles appear face-up with a warm golden shimmer  */
+/* ---- 盤面の導入アニメーション ---------------------------------------- */
+/* 第 1 段階（0〜1 秒）: 50 マスすべてが表を向いて現れ、金色にきらめきます。 */
 @keyframes tileIntroReveal {
   0%   { opacity: 0; transform: scale(0.45); }
   65%  { opacity: 1; transform: scale(1.06); }
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Phase 2 (1–3 s): each tile flips face-down; scaleX collapses then reopens
-   as the dark unselected style. A random translate (--fx / --fy) gives each
-   tile a slight scatter so the board looks like it was reshuffled. */
+/* 第 2 段階（1〜3 秒）: 各マスが裏返ります。scaleX がいったん潰れてから、
+   未選択の状態で開き直します。ランダムな移動量（--fx / --fy）で少しばらけさせ、
+   盤面が切り直されたように見せます。 */
 @keyframes tileIntroFlip {
   0%  {
     transform: scale(1) translateX(0) translateY(0);
-    background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98));
-    border-color: rgba(251,191,36,0.55);
+    background: linear-gradient(160deg, #fff2cf, #ffe4ad);
+    border-color: rgba(240, 170, 40, 0.7);
   }
   42% {
     transform: scaleX(0) translateX(var(--fx,0px)) translateY(var(--fy,0px));
-    background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98));
-    border-color: rgba(251,191,36,0.55);
+    background: linear-gradient(160deg, #fff2cf, #ffe4ad);
+    border-color: rgba(240, 170, 40, 0.7);
   }
   43% {
     transform: scaleX(0) translateX(var(--fx,0px)) translateY(var(--fy,0px));
-    background: rgba(255,255,255,0.05);
-    border-color: rgba(255,255,255,0.10);
+    background: #fffaf1;
+    border-color: var(--color-line);
   }
   100% {
     transform: scale(1) translateX(0) translateY(0);
-    background: rgba(255,255,255,0.05);
-    border-color: rgba(255,255,255,0.10);
+    background: #fffaf1;
+    border-color: var(--color-line);
   }
 }
 
 .tile-intro-faceup {
-  background: linear-gradient(160deg, rgba(30,20,6,0.95), rgba(20,14,30,0.98)) !important;
-  border-color: rgba(251,191,36,0.55) !important;
-  box-shadow: 0 0 0 1px rgba(251,191,36,0.18), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  background: linear-gradient(160deg, #fff2cf, #ffe4ad) !important;
+  border-color: rgba(240, 170, 40, 0.7) !important;
+  box-shadow: 0 0 0 1px rgba(240, 170, 40, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
   animation: tileIntroReveal 0.45s ease-out var(--intro-delay, 0ms) both;
 }
 
@@ -325,22 +351,22 @@ table { border-radius: 4px; }
   animation: tileIntroFlip 0.7s cubic-bezier(0.4,0,0.2,1) var(--flip-delay, 0ms) both;
 }
 
-/* Pulsing gold border so revealed gold-coin cards stand out. */
+/* 金コインが出たマスを目立たせる、脈打つ金の枠。 */
 @keyframes goldBorder {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.9), 0 0 12px 2px rgba(251, 191, 36, 0.45); }
-  50% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 1), 0 0 24px 7px rgba(251, 191, 36, 0.8); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(240, 170, 40, 0.9), 0 0 12px 2px rgba(240, 170, 40, 0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(240, 170, 40, 1), 0 0 22px 6px rgba(240, 170, 40, 0.6); }
 }
 .gold-card {
-  border-color: rgba(251, 191, 36, 0.95) !important;
+  border-color: rgba(240, 170, 40, 0.95) !important;
   animation: goldBorder 1s ease-in-out infinite;
 }
 
 .silver-card {
-  border-color: rgba(226, 232, 240, 0.9) !important;
-  box-shadow: 0 0 0 2px rgba(203, 213, 225, 0.55);
+  border-color: rgba(148, 163, 184, 0.9) !important;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.45);
 }
 
-/* Picked-tile flip — the chosen tile turns over to show its coin. */
+/* 選んだマスの反転 — 選択したマスが裏返ってコインを見せます。 */
 @keyframes tileFlip {
   0% { transform: rotateY(90deg) scale(0.85); opacity: 0; }
   60% { transform: rotateY(0deg) scale(1.12); opacity: 1; }
@@ -348,8 +374,8 @@ table { border-radius: 4px; }
 }
 .tile-flip { animation: tileFlip 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.25) both; }
 
-/* Coin reveal modal — dark backdrop, the won coin zooms in emitting light
-   whose colour matches the coin (set via the --glow / --ray CSS variables). */
+/* コイン獲得の演出 — 明るい幕の上で、当たったコインがその色の光を放ちながら
+   ズームインします（--glow / --ray で色を指定）。 */
 @keyframes revealFade { from { opacity: 0; } to { opacity: 1; } }
 .reveal-overlay { animation: revealFade 0.3s ease-out both; }
 
@@ -360,7 +386,7 @@ table { border-radius: 4px; }
 }
 .reveal-coin { animation: coinZoom 0.7s cubic-bezier(0.2, 0.9, 0.25, 1.25) both; }
 
-/* Soft pulsing halo behind the coin. */
+/* コインの背後でやわらかく脈打つ光輪。 */
 @keyframes glowPulse {
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 0.95; transform: scale(1.18); }
@@ -370,7 +396,7 @@ table { border-radius: 4px; }
   animation: glowPulse 2.2s ease-in-out infinite;
 }
 
-/* Rotating light rays in the coin's colour. */
+/* コインの色で回転する光の筋。 */
 @keyframes raySpin { to { transform: rotate(360deg); } }
 .reveal-rays {
   background: repeating-conic-gradient(var(--ray) 0deg 5deg, transparent 5deg 16deg);
@@ -379,7 +405,7 @@ table { border-radius: 4px; }
   animation: raySpin 14s linear infinite;
 }
 
-/* Landing hero — each heading stays on one line; body wraps at punctuation. */
+/* トップのヒーロー — 見出しは 1 行に収め、本文は句読点で折り返します。 */
 .hero-eyebrow {
   max-width: 100%;
   font-size: clamp(0.62rem, 1.7vw, 0.84rem);
@@ -387,8 +413,7 @@ table { border-radius: 4px; }
   letter-spacing: 0.08em;
   line-height: 1.6;
   word-break: keep-all;
-  color: rgba(251, 191, 36, 0.9);
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.75);
+  color: #d18b12;
 }
 
 .hero-title {
@@ -399,7 +424,6 @@ table { border-radius: 4px; }
   width: 100%;
   font-weight: 900;
   line-height: 1.15;
-  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.85);
 }
 
 .hero-title-line {
@@ -408,17 +432,15 @@ table { border-radius: 4px; }
   font-weight: 800;
   letter-spacing: 0.1em;
   white-space: nowrap;
-  color: #fff8eb;
-  text-shadow:
-    0 2px 18px rgba(0, 0, 0, 0.85),
-    0 0 36px rgba(251, 191, 36, 0.18);
+  color: #4a3f31;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.9);
 }
 
 .hero-title-accent {
   font-size: clamp(0.98rem, 2.5vw, 1.7rem);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.14em;
-  color: rgba(253, 230, 138, 0.96);
+  color: #c98a15;
 }
 
 .hero-luck-word {
@@ -428,29 +450,29 @@ table { border-radius: 4px; }
   line-height: 0.95;
   background: linear-gradient(
     165deg,
-    #fff9e6 0%,
-    #fde68a 18%,
-    #fbbf24 42%,
-    #f59e0b 68%,
-    #fcd34d 100%
+    #ffd875 0%,
+    #f7bd4a 22%,
+    #e79f1c 50%,
+    #f3b93f 74%,
+    #ffd875 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 28px rgba(251, 191, 36, 0.55)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 3px 6px rgba(226, 160, 34, 0.35));
   animation: luckShimmer 4.5s ease-in-out infinite;
 }
 
 @keyframes luckShimmer {
-  0%, 100% { filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.45)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8)); }
-  50% { filter: drop-shadow(0 0 38px rgba(251, 191, 36, 0.75)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8)); }
+  0%, 100% { filter: drop-shadow(0 3px 6px rgba(226, 160, 34, 0.3)); }
+  50% { filter: drop-shadow(0 4px 14px rgba(226, 160, 34, 0.55)); }
 }
 
 .hero-inline-luck {
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.06em;
-  background: linear-gradient(90deg, #fde68a, #fbbf24, #c4b5fd);
+  background: linear-gradient(90deg, #e79f1c, #f7bd4a, #a78bfa);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -464,13 +486,13 @@ table { border-radius: 4px; }
   letter-spacing: 0.02em;
   word-break: keep-all;
   overflow-wrap: normal;
-  color: rgba(241, 245, 249, 0.92);
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+  color: #5b4e3d;
 }
 
 .hero-subtitle strong {
   font-weight: 800;
   letter-spacing: 0.06em;
+  color: #4a3f31;
 }
 
 .hero-subtitle em {
@@ -482,12 +504,11 @@ table { border-radius: 4px; }
   max-width: min(42rem, 94vw);
   font-size: 0.875rem;
   word-break: keep-all;
-  color: rgba(254, 243, 199, 0.82);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  color: #8a7b66;
 }
 
 .hero-footnote strong {
-  color: #fcd34d;
+  color: #d18b12;
 }
 
 @media (min-width: 1024px) {
@@ -502,30 +523,53 @@ table { border-radius: 4px; }
   font-size: clamp(1.75rem, 4vw, 2.25rem);
   font-weight: 800;
   letter-spacing: 0.02em;
+  color: #4a3f31;
 }
 
 .landing-section-lead {
   margin-top: 0.75rem;
   text-align: center;
   font-size: 1.05rem;
-  color: rgba(203, 213, 225, 0.9);
+  color: #8a7b66;
 }
 
 .landing-card {
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--color-line);
+  background: linear-gradient(145deg, #ffffff, #fff8ec);
 }
 
 .landing-cta-title {
   font-size: clamp(2rem, 5vw, 2.75rem);
   font-weight: 800;
   letter-spacing: 0.01em;
+  color: #4a3f31;
 }
 
 .landing-cta {
   border-radius: 1.25rem;
-  border: 1px solid rgba(251, 191, 36, 0.2);
-  background: radial-gradient(ellipse at 50% 0%, rgba(251, 191, 36, 0.12), transparent 65%),
-    rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(240, 170, 40, 0.35);
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 216, 117, 0.35), transparent 68%), #fffdf8;
+}
+
+/* ヒーロー背景 — 画面幅いっぱいに合わせ、ヘッダー下から表示する。
+   縦横比は保ち、下部がビューポートをはみ出す分だけ切り取る。
+   背後に塗りつぶしは置かない。 */
+.hero-banner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hero-banner picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hero-banner-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
 }

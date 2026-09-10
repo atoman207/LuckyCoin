@@ -54,12 +54,12 @@ export default function DrawPage() {
     return (
       <div className="card mx-auto max-w-md p-8 text-center">
         <h1 className="text-2xl font-bold">{t("draw.loginTitle")}</h1>
-        <p className="mt-2 text-slate-300">{t("draw.loginBody")}</p>
+        <p className="mt-2 text-body">{t("draw.loginBody")}</p>
         <button onClick={openAuth} className="btn-gold mt-6">{t("common.loginRegister")}</button>
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
   async function spin() {
     if (spinning || !canSpinNow) return;
@@ -103,7 +103,7 @@ export default function DrawPage() {
     <div className="mx-auto max-w-xl space-y-6 text-center">
       <div>
         <h1 className="text-3xl font-extrabold">{t("draw.title")}</h1>
-        <p className="text-slate-400">{t("draw.subtitle")}</p>
+        <p className="text-muted">{t("draw.subtitle")}</p>
       </div>
 
       <PrizeWheel layout={layout} rotation={rotation} spinning={spinning} spinMs={WHEEL_SPIN_MS} />
@@ -119,12 +119,12 @@ export default function DrawPage() {
 
       </div>
 
-      <p className="text-xs text-slate-500">{t("draw.note")}</p>
+      <p className="text-xs text-faint">{t("draw.note")}</p>
 
       {/* All results shown in a modal. */}
       {(result !== null || message) && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#4a3f31]/35 p-4 backdrop-blur-sm"
           onClick={() => {
             setResult(null);
             setMessage(null);
@@ -135,25 +135,25 @@ export default function DrawPage() {
               result > 0 ? (
                 <>
                   <div className="text-6xl">🎉</div>
-                  <h2 className="mt-3 text-2xl font-extrabold text-amber-200">
+                  <h2 className="mt-3 text-2xl font-extrabold text-amber-700">
                     {t("draw.wonTitle", { value: result })}
                   </h2>
-                  <p className="mt-2 text-slate-300">
+                  <p className="mt-2 text-body">
                     {t("draw.wonBody", { time: formatDrawCountdown(msUntilNext) })}
                   </p>
                 </>
               ) : (
                 <>
                   <div className="text-5xl">🪙</div>
-                  <h2 className="mt-3 text-2xl font-extrabold text-slate-200">{t("draw.noCoinsTitle")}</h2>
-                  <p className="mt-2 text-slate-300">{t("draw.noCoinsBody")}</p>
+                  <h2 className="mt-3 text-2xl font-extrabold text-body">{t("draw.noCoinsTitle")}</h2>
+                  <p className="mt-2 text-body">{t("draw.noCoinsBody")}</p>
                 </>
               )
             ) : (
               <>
                 <div className="text-5xl">⏳</div>
-                <h2 className="mt-3 text-xl font-bold text-amber-200">{t("draw.notYetTitle")}</h2>
-                <p className="mt-2 font-mono text-slate-300">{message}</p>
+                <h2 className="mt-3 text-xl font-bold text-amber-700">{t("draw.notYetTitle")}</h2>
+                <p className="mt-2 font-mono text-body">{message}</p>
               </>
             )}
             <button

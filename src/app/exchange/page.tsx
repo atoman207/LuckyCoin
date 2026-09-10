@@ -28,7 +28,7 @@ export default function ExchangePage() {
       </div>
     );
   }
-  if (loading || !profile) return <div className="py-20 text-center text-slate-400">{t("common.loading")}</div>;
+  if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
   const to = EXCHANGE_NEXT[from] as CoinType; // gold→silver, silver→bronze
   const received = amount > 0 ? exchangeOutput(from, to, amount) : 0;
@@ -67,17 +67,17 @@ export default function ExchangePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">{t("exchange.title")}</h1>
-          <p className="text-slate-400">{t("exchange.subtitle")}</p>
+          <p className="text-muted">{t("exchange.subtitle")}</p>
         </div>
         <CoinBalance profile={profile} size={26} />
       </div>
 
       {msg && (
-        <div className="card animate-pop border-emerald-300/40 bg-emerald-300/10 px-4 py-3 text-center font-semibold text-emerald-100">
+        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
           ✓ {msg}
         </div>
       )}
-      {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         {/* Converter */}
@@ -87,13 +87,13 @@ export default function ExchangePage() {
               <label className="label">{t("exchange.from")}</label>
               <select className="input" value={from} onChange={(e) => setFrom(e.target.value as CoinType)}>
                 {FROM_TYPES.map((type) => (
-                  <option key={type} value={type} className="bg-slate-900">
+                  <option key={type} value={type} className="bg-white">
                     {t("exchange.fromOption", { name: coinName(t, type), count: profile[type] })}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="pb-2.5 text-2xl text-amber-300">→</div>
+            <div className="pb-2.5 text-2xl text-amber-600">→</div>
             <div>
               <label className="label">{t("exchange.to")}</label>
               <div className="input flex items-center gap-2">
@@ -113,12 +113,12 @@ export default function ExchangePage() {
             />
           </div>
 
-          <div className="mt-5 flex items-center justify-center gap-4 rounded-xl bg-black/30 p-5">
+          <div className="mt-5 flex items-center justify-center gap-4 rounded-xl bg-cream p-5">
             <div className="flex items-center gap-2">
               <CoinIcon type={from} size={40} />
               <span className="text-xl font-bold">{amount}</span>
             </div>
-            <span className="text-2xl text-amber-300">→</span>
+            <span className="text-2xl text-amber-600">→</span>
             <div className="flex items-center gap-2">
               <CoinIcon type={to} size={40} />
               <span className="text-xl font-bold">{received.toLocaleString()}</span>
@@ -126,7 +126,7 @@ export default function ExchangePage() {
           </div>
 
           {!enough && (
-            <p className="mt-3 text-center text-sm text-red-300">
+            <p className="mt-3 text-center text-sm text-red-600">
               {t("exchange.notEnough", { name: coinName(t, from) })}
             </p>
           )}
@@ -147,14 +147,14 @@ export default function ExchangePage() {
                   setFrom(p.from);
                   setAmount(p.amount);
                 }}
-                className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-left text-sm transition hover:border-amber-300/40 hover:bg-white/5"
+                className="flex w-full items-center justify-between rounded-xl border border-line bg-cream px-4 py-3 text-left text-sm transition hover:border-amber-400 hover:bg-cream"
               >
                 <span>{t(p.label)}</span>
-                <span className="text-amber-300">›</span>
+                <span className="text-amber-600">›</span>
               </button>
             ))}
           </div>
-          <p className="mt-4 text-xs text-slate-500">{t("exchange.upgradeDisabled")}</p>
+          <p className="mt-4 text-xs text-faint">{t("exchange.upgradeDisabled")}</p>
         </div>
       </div>
     </div>

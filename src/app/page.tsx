@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
-import SubscriberChart from "@/components/SubscriberChart";
-import RichText from "@/components/RichText";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -46,94 +44,71 @@ export default function Landing() {
 
   return (
     <>
-      {/* Mobile only: the banner is a fixed full-screen wallpaper that stays put
-          while all the page content scrolls over it. A dark scrim keeps the
-          content legible. Tablet/desktop keep the contained hero banner below. */}
-      <div aria-hidden className="fixed inset-0 -z-10 sm:hidden">
-        <picture>
-          <source srcSet="/bg-m.webp" type="image/webp" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bg-m.png" alt="" className="h-full w-full object-cover" />
-        </picture>
-        <div className="absolute inset-0 bg-black/55" />
-      </div>
-
       <div className="space-y-20">
-      {/* First screen — the banner is the background; the headline and the PLAY
-          coin sit on top. A different image is served per device (desktop /
-          tablet / mobile) so the differing aspect ratios never break the layout;
-          <picture> downloads only the matching source. */}
-      <section className="relative -mt-8 ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] w-screen overflow-hidden">
-        <picture>
-          <source media="(min-width: 1024px)" srcSet="/bg.webp" type="image/webp" />
-          <source media="(min-width: 1024px)" srcSet="/bg.png" />
-          <source media="(min-width: 640px)" srcSet="/bg-t.webp" type="image/webp" />
-          <source media="(min-width: 640px)" srcSet="/bg-t.png" />
-          <source srcSet="/bg-m.webp" type="image/webp" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/bg-m.png"
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 hidden h-full w-full object-cover sm:block"
-          />
-        </picture>
-        {/* Darkening overlay so the copy stays legible over the busy gold art.
-            (Mobile uses the fixed wallpaper's own scrim instead.) */}
-        <div className="absolute inset-0 hidden bg-gradient-to-b from-black/70 via-black/45 to-black/85 sm:block" />
+      {/* Hero starts just below the header, spans the full viewport width,
+          and fills the remaining screen. Overflow at the bottom is cropped. */}
+      <section className="relative -mt-8 ml-[calc(50%-50vw)] mr-[calc(50%-50vw)] h-[calc(100dvh-var(--header-h))] w-screen overflow-hidden">
+        <div className="hero-banner">
+          <picture>
+            <source media="(min-width: 1024px)" srcSet="/bg.png" />
+            <source media="(min-width: 640px)" srcSet="/bg-t.png" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/bg-m.png"
+              alt=""
+              aria-hidden="true"
+              className="hero-banner-img"
+            />
+          </picture>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/30 to-transparent lg:hidden" />
 
         {/* Daily Draw (top-left) and Help (top-right) icons, ~5vw inside the hero. */}
         <Link
           href="/draw"
           aria-label={t("home.dailyDraw")}
           title={t("home.dailyDraw")}
-          className="anim-bob absolute left-[5vw] top-[5vw] z-20"
+          className="anim-bob absolute left-[5vw] top-3 z-20 lg:top-4"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/wheel.webp" alt={t("home.dailyDraw")} className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
+          <img src="/wheel.webp" alt={t("home.dailyDraw")} className="h-24 w-auto drop-shadow-[0_4px_14px_rgba(120,90,40,0.35)] lg:h-32" />
         </Link>
         <Link
           href="/help"
           aria-label={t("home.help")}
           title={t("home.helpTitle")}
-          className="anim-bob absolute right-[5vw] top-[5vw] z-20"
+          className="anim-bob absolute right-[5vw] top-3 z-20 lg:top-4"
           style={{ animationDelay: "0.5s" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/help.webp" alt={t("home.help")} className="h-24 w-auto drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] lg:h-32" />
+          <img src="/help.webp" alt={t("home.help")} className="h-24 w-auto drop-shadow-[0_4px_14px_rgba(120,90,40,0.35)] lg:h-32" />
         </Link>
 
-        {/* Hero fills the viewport minus the header, so header + hero = 100vh. */}
-        <div className="relative flex min-h-[calc(100dvh-var(--header-h))] flex-col items-center justify-center gap-7 px-6 py-20 text-center">
+        {/* Hero fills the viewport minus the header, so header + hero = 100vh.
+            キャッチコピー・見出し・リード文はバナー画像そのものに焼き込まれて
+            いるため、画面には PLAY ボタンだけを重ねます。同じ文言を HTML でも
+            描くと文字が二重になってしまうからです。
+            見出しと本文は sr-only で残してあります（画像内の文字は検索エンジン
+            にもスクリーンリーダーにも読めないため、ページの見出し構造と説明文
+            としてマークアップ上は必要です）。 */}
+        <div className="relative flex h-full flex-col items-center justify-end gap-7 px-6 pb-[12vh] text-center">
 
-          <p className="hero-eyebrow">{t("home.eyebrow")}</p>
-
-          <h1 className="hero-title">
-            <span className="hero-title-line">{t("home.titleLine1")}</span>
-            <span className="hero-luck-word" aria-label={t("home.luckWord")}>
-              {t("home.luckWord")}
-            </span>
-            <span className="hero-title-line hero-title-accent">{t("home.titleLine2")}</span>
+          <h1 className="sr-only">
+            {t("home.titleLine1")} {t("home.luckWord")} {t("home.titleLine2")}
           </h1>
-
-          <p className="hero-subtitle">
+          <p className="sr-only">
             {t("home.subtitlePre")}
-            <strong className="text-amber-200">{t("home.subtitleStrong")}</strong>
+            {t("home.subtitleStrong")}
             {t("home.subtitleMid")}
-            <em className="not-italic text-violet-200">{t("home.subtitleEm")}</em>
+            {t("home.subtitleEm")}
             {t("home.subtitlePost")}
           </p>
 
           <button onClick={startGame} className="btn-coin mt-1">
             {t("home.play")}
           </button>
-
-          <RichText k="home.footnote" as="p" className="hero-footnote" />
         </div>
       </section>
-
-      {/* Live subscriber stats from the database */}
-      <SubscriberChart />
 
       {/* How it works */}
       <section className="landing-section">
@@ -142,8 +117,8 @@ export default function Landing() {
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           {steps.map((c) => (
             <div key={c.t} className="landing-card p-6">
-              <h3 className="text-lg font-semibold text-amber-200">{t(c.t)}</h3>
-              <p className="mt-2 text-slate-300">{t(c.d)}</p>
+              <h3 className="text-lg font-semibold text-amber-700">{t(c.t)}</h3>
+              <p className="mt-2 text-body">{t(c.d)}</p>
             </div>
           ))}
         </div>
@@ -158,8 +133,8 @@ export default function Landing() {
               <CoinIcon type={c.type} size={52} />
               <div>
                 <div className="font-bold">{t(c.title)}</div>
-                <div className="text-amber-300">{t(c.v)}</div>
-                <div className="text-sm text-slate-400">{t(c.d)}</div>
+                <div className="text-amber-600">{t(c.v)}</div>
+                <div className="text-sm text-muted">{t(c.d)}</div>
               </div>
             </div>
           ))}
@@ -173,7 +148,7 @@ export default function Landing() {
           <span className="hero-inline-luck">{t("home.ctaLuck")}</span>
           {t("home.ctaTitlePost")}
         </h2>
-        <p className="max-w-md text-slate-300">{t("home.ctaBody")}</p>
+        <p className="max-w-md text-body">{t("home.ctaBody")}</p>
         <button onClick={startGame} className="btn-gold text-lg !px-7 !py-3">
           {t("home.startGame")}
         </button>

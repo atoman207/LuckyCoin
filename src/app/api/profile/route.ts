@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { getPaymentMethod } from "@/lib/wallets";
+import { getPayoutMethod } from "@/lib/payout-methods";
 import { getT } from "@/lib/i18n/server";
 
 // Update the logged-in user's own personal info. Coins, admin flag and email
@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
   if (nickname !== undefined && nickname.length === 0) {
     return NextResponse.json({ error: t("api.profile.nicknameEmpty") }, { status: 400 });
   }
-  if (payout_method !== undefined && payout_method !== null && !getPaymentMethod(payout_method)) {
+  if (payout_method !== undefined && payout_method !== null && !getPayoutMethod(payout_method)) {
     return NextResponse.json({ error: t("api.profile.unknownPayout") }, { status: 400 });
   }
 

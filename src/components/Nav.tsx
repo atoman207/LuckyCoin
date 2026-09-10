@@ -8,7 +8,6 @@ import { useUser } from "@/components/UserProvider";
 import CoinBalance from "@/components/CoinBalance";
 import Avatar from "@/components/Avatar";
 import FirstLoginButtons from "@/components/FirstLoginButtons";
-import LanguageToggle from "@/components/LanguageToggle";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n";
 
@@ -26,33 +25,39 @@ export default function Nav() {
   const [menu, setMenu] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-black backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/40 bg-white/55 backdrop-blur-md">
       {/* Fixed-height bar (taller on PC). Full width with ~5vw side margins. */}
       <nav className="flex h-[var(--header-h)] items-center gap-3 px-[5vw]">
+        {/* ロゴ画像 (public/logo.png) は「黒背景に金文字」で、背景が透過して
+            いません。ヘッダーを白にしたため、そのまま置くと白地に黒い四角が
+            浮いて見えます。暫定として黒いプレートに載せ、ロゴの背景と地続きに
+            見えるようにしています。
+            背景透過（または明るい地）のロゴに差し替えたら、この <span> の
+            プレート指定を外して <Image> を直接置いてください。 */}
         <Link href="/" className="flex shrink-0 items-center">
-          <Image
-            src="/logo.png"
-            alt="Lucky Coin"
-            width={200}
-            height={56}
-            className="h-10 w-auto sm:h-11 lg:h-14"
-            priority
-          />
+          <span className="inline-flex items-center rounded-lg bg-black px-2 py-0.5 sm:px-2.5">
+            <Image
+              src="/logo.png"
+              alt="Lucky Coin"
+              width={200}
+              height={56}
+              className="h-7 w-auto sm:h-8 lg:h-9"
+              priority
+            />
+          </span>
         </Link>
 
         {/* Public rankings / notice board — visible to everyone. */}
         <Link
           href="/notice"
-          className={`ml-3 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition hover:bg-white/10 ${
-            pathname === "/notice" ? "bg-white/10 text-amber-300" : "text-slate-200"
+          className={`ml-3 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition hover:bg-sand ${
+            pathname === "/notice" ? "bg-sand text-amber-600" : "text-body"
           }`}
         >
           <span aria-hidden>🏆</span> <span className="hidden sm:inline">{t("nav.rankings")}</span>
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          {/* Language switch — Japanese ⇄ English, available to everyone. */}
-          <LanguageToggle />
 
           {loading ? null : profile ? (
             <>
@@ -72,16 +77,16 @@ export default function Nav() {
               >
                 <button
                   onClick={() => setMenu((m) => !m)}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-sm hover:bg-white/10"
+                  className="flex items-center gap-2 rounded-xl border border-line bg-cream px-2 py-1 text-sm hover:bg-sand"
                 >
                   <Avatar src={profile.avatar_url} name={profile.nickname} size={26} />
                   <span className="hidden max-w-[10ch] truncate sm:inline">{profile.nickname}</span>
                 </button>
                 {menu && (
                   <div className="absolute right-0 top-full w-48 pt-2">
-                    <div className="overflow-hidden rounded-xl border border-white/10 bg-[#121829] shadow-xl">
+                    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-xl">
                       {/* Mobile-only coin balance. */}
-                      <div className="border-b border-white/10 px-3 py-2 sm:hidden">
+                      <div className="border-b border-line px-3 py-2 sm:hidden">
                         <CoinBalance profile={profile} />
                       </div>
 
@@ -92,8 +97,8 @@ export default function Nav() {
                             key={l.href}
                             href={l.href}
                             onClick={() => setMenu(false)}
-                            className={`px-3 py-2 text-sm hover:bg-white/5 ${
-                              pathname === l.href ? "bg-white/10 text-white" : ""
+                            className={`px-3 py-2 text-sm hover:bg-cream ${
+                              pathname === l.href ? "bg-sand text-body" : ""
                             }`}
                           >
                             {t(l.label)}
@@ -105,7 +110,7 @@ export default function Nav() {
                         <Link
                           href="/admin"
                           onClick={() => setMenu(false)}
-                          className="block border-t border-white/10 px-3 py-2 text-sm text-amber-300 hover:bg-white/5"
+                          className="block border-t border-line px-3 py-2 text-sm text-amber-600 hover:bg-cream"
                         >
                           {t("nav.admin")}
                         </Link>
@@ -113,7 +118,7 @@ export default function Nav() {
                       <Link
                         href="/profile"
                         onClick={() => setMenu(false)}
-                        className="block border-t border-white/10 px-3 py-2 text-sm hover:bg-white/5"
+                        className="block border-t border-line px-3 py-2 text-sm hover:bg-cream"
                       >
                         {t("nav.profile")}
                       </Link>
@@ -122,7 +127,7 @@ export default function Nav() {
                           setMenu(false);
                           signOut();
                         }}
-                        className="w-full border-t border-white/10 px-3 py-2 text-left text-sm text-red-300 hover:bg-white/5"
+                        className="w-full border-t border-line px-3 py-2 text-left text-sm text-red-600 hover:bg-cream"
                       >
                         {t("nav.signOut")}
                       </button>

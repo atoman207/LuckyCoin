@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { isSellOpen, sellStatus, SELL_PRICE_USDT } from "@/lib/selling";
-import { getPaymentMethod } from "@/lib/wallets";
+import { getPayoutMethod } from "@/lib/payout-methods";
 import { getT } from "@/lib/i18n/server";
 
 export const runtime = "nodejs";
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
   // Resolve the payout crypto/network: the one chosen now, or the registered one.
   const methodId =
-    (typeof body.method_id === "string" && getPaymentMethod(body.method_id)?.id) ||
+    (typeof body.method_id === "string" && getPayoutMethod(body.method_id)?.id) ||
     profile.payout_method ||
     null;
 
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     status: "requested",
   });
 
-  const methodLabel = getPaymentMethod(methodId)?.label;
+  const methodLabel = getPayoutMethod(methodId)?.label;
   return NextResponse.json({
     ok: true,
     usdt,

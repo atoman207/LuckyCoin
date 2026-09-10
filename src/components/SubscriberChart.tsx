@@ -40,7 +40,8 @@ const GRANULARITY_LABEL: Record<Granularity, MessageKey> = {
   month: "chart.month",
   year: "chart.year",
 };
-const PIE_COLORS = ["#f5b73d", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb923c", "#22d3ee", "#facc15", "#4ade80", "#f87171", "#c084fc", "#2dd4bf"];
+// 白い面の上で読める検証済みパレット（dataviz の既定 8 スロット、明色モード）。
+const PIE_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 
 // Renders a single bar as a stack of golden coins instead of a flat column.
 function CoinStack(props: { x?: number; y?: number; width?: number; height?: number }) {
@@ -136,12 +137,12 @@ export default function SubscriberChart() {
     [stats, gran, intlLocale]
   );
 
-  const axis = { fill: "#94a3b8", fontSize: 12 };
+  const axis = { fill: "#8a7b66", fontSize: 12 };
   const tooltipStyle = {
-    background: "#121829",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "#ffffff",
+    border: "1px solid #f2e6d2",
     borderRadius: 12,
-    color: "#e7ecf5",
+    color: "#4a3f31",
   };
 
   return (
@@ -149,7 +150,7 @@ export default function SubscriberChart() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">{t("chart.title")}</h2>
-          <p className="text-slate-400">
+          <p className="text-muted">
             {t("chart.lead", {
               date: stats
                 ? new Date(stats.launch + "T00:00:00Z").toLocaleDateString(intlLocale, {
@@ -164,14 +165,14 @@ export default function SubscriberChart() {
         </div>
         <div className="flex gap-6">
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-slate-400">{t("chart.total")}</div>
-            <div className="text-3xl font-extrabold tabular-nums text-amber-300">
+            <div className="text-xs uppercase tracking-wide text-muted">{t("chart.total")}</div>
+            <div className="text-3xl font-extrabold tabular-nums text-amber-600">
               {stats ? stats.total.toLocaleString() : "—"}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-slate-400">{t("chart.today")}</div>
-            <div className="text-3xl font-extrabold tabular-nums text-emerald-300">
+            <div className="text-xs uppercase tracking-wide text-muted">{t("chart.today")}</div>
+            <div className="text-3xl font-extrabold tabular-nums text-emerald-600">
               {stats ? `+${stats.today.toLocaleString()}` : "—"}
             </div>
           </div>
@@ -180,26 +181,26 @@ export default function SubscriberChart() {
 
       {/* Controls */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+        <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
           {(["bar", "line", "pie"] as ChartType[]).map((c) => (
             <button
               key={c}
               onClick={() => setType(c)}
               className={`rounded-lg px-3 py-1.5 font-semibold transition ${
-                type === c ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                type === c ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
               }`}
             >
               {t(CHART_TYPE_LABEL[c])}
             </button>
           ))}
         </div>
-        <div className="flex gap-1 rounded-xl bg-black/30 p-1 text-sm">
+        <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
           {(["day", "month", "year"] as Granularity[]).map((g) => (
             <button
               key={g}
               onClick={() => setGran(g)}
               className={`rounded-lg px-3 py-1.5 font-semibold transition ${
-                gran === g ? "bg-amber-400 text-slate-900" : "text-slate-300 hover:text-white"
+                gran === g ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
               }`}
             >
               {t(GRANULARITY_LABEL[g])}
@@ -211,7 +212,7 @@ export default function SubscriberChart() {
       {/* Chart */}
       <div className="mt-6 h-72 w-full">
         {data.length === 0 ? (
-          <div className="grid h-full place-items-center text-sm text-slate-500">{t("common.loadingChart")}</div>
+          <div className="grid h-full place-items-center text-sm text-faint">{t("common.loadingChart")}</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {type === "bar" ? (
@@ -227,19 +228,19 @@ export default function SubscriberChart() {
                     <stop offset="100%" stopColor="#a96f17" />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#ece4d6" vertical={false} />
                 <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={tooltipStyle} />
+                <Tooltip cursor={{ fill: "rgba(180,140,70,0.08)" }} contentStyle={tooltipStyle} />
                 <Bar dataKey="value" name={t("chart.signups")} fill="#f5b73d" maxBarSize={46} shape={<CoinStack />} activeBar={<CoinStack />} />
               </BarChart>
             ) : type === "line" ? (
               <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: -16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#ece4d6" vertical={false} />
                 <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="value" name={t("chart.signups")} stroke="#f5b73d" strokeWidth={3} dot={{ r: 3, fill: "#f5b73d" }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="value" name={t("chart.signups")} stroke="#c98500" strokeWidth={2} dot={{ r: 3, fill: "#c98500" }} activeDot={{ r: 5 }} />
               </LineChart>
             ) : (
               <PieChart>
@@ -256,7 +257,7 @@ export default function SubscriberChart() {
                   label={(p: { label: string }) => p.label}
                 >
                   {data.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="#0b0f1a" />
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="#ffffff" />
                   ))}
                 </Pie>
               </PieChart>

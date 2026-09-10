@@ -1,23 +1,24 @@
 // =====================================================================
-//  Tiny translation runtime shared by the browser and the server.
-//  Usage:
-//    const t = createTranslator("ja");
+//  ごく小さな文言ランタイム（ブラウザ／サーバー共通）。
+//  使い方:
+//    const t = createTranslator();
 //    t("game.freeRounds", { count: 3 })  →  "💎 無料ラウンド 3 回"
-//  Placeholders are {name} and are replaced with the matching value.
+//  プレースホルダは {name} 形式で、対応する値に置き換えられます。
+//
+//  本サイトは日本語専用のため、辞書は ja.ts ひとつだけです。
 // =====================================================================
 
 import ja from "./messages/ja";
-import en from "./messages/en";
 import { DEFAULT_LOCALE, type Locale } from "./config";
 
 export type MessageKey = keyof typeof ja;
 export type Vars = Record<string, string | number>;
 export type TFunction = (key: MessageKey, vars?: Vars) => string;
 
-export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { ja, en };
+export const MESSAGES: Record<MessageKey, string> = ja;
 
-// True when a string is a known message key — used where a value may either be
-// a key (e.g. a failure code from the chain verifier) or already-final text.
+// 文字列が既知のメッセージキーかどうか。API から返る値が「キー」の場合と
+// 「確定済みの文章」の場合の両方がありうる箇所で使います。
 export function isMessageKey(v: unknown): v is MessageKey {
   return typeof v === "string" && Object.prototype.hasOwnProperty.call(ja, v);
 }
@@ -29,22 +30,19 @@ function interpolate(template: string, vars?: Vars): string {
   );
 }
 
-export function translate(locale: Locale, key: MessageKey, vars?: Vars): string {
-  const table = MESSAGES[locale] ?? MESSAGES[DEFAULT_LOCALE];
-  // Fall back to the default locale, then to the key itself, so a missing
-  // translation degrades to something readable instead of blank UI.
-  const template = table[key] ?? MESSAGES[DEFAULT_LOCALE][key] ?? String(key);
-  return interpolate(template, vars);
+export function translate(key: MessageKey, vars?: Vars): string {
+  // 未定義のキーはキー名そのものにフォールバックし、空欄の UI を避けます。
+  return interpolate(ja[key] ?? String(key), vars);
 }
 
-export function createTranslator(locale: Locale): TFunction {
-  return (key, vars) => translate(locale, key, vars);
+export function createTranslator(): TFunction {
+  return (key, vars) => translate(key, vars);
 }
 
-// Translates a value that MIGHT be a message key (server error payloads carry
-// keys; third-party errors carry plain text). Plain text passes through.
-export function translateMaybeKey(locale: Locale, value: string, vars?: Vars): string {
-  return isMessageKey(value) ? translate(locale, value, vars) : value;
+// 「メッセージキーかもしれない値」を訳します（サーバーのエラー応答はキー、
+// 外部サービスのエラーは素の文章）。素の文章はそのまま通します。
+export function translateMaybeKey(value: string, vars?: Vars): string {
+  return isMessageKey(value) ? translate(value, vars) : value;
 }
 
 export { DEFAULT_LOCALE };

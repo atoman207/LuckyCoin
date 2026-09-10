@@ -52,7 +52,7 @@ export default function ContactPage() {
       {/* Success toast */}
       {toast && (
         <div className="fixed left-1/2 top-6 z-[60] -translate-x-1/2">
-          <div className="card animate-pop flex items-center gap-2 border-emerald-300/40 bg-emerald-300/10 px-5 py-3 font-semibold text-emerald-100 shadow-2xl">
+          <div className="card animate-pop flex items-center gap-2 border-emerald-300 bg-emerald-50 px-5 py-3 font-semibold text-emerald-700 shadow-2xl">
             <span className="text-lg">✓</span> {toast}
           </div>
         </div>
@@ -60,10 +60,10 @@ export default function ContactPage() {
 
       <div>
         <h1 className="text-3xl font-extrabold">{t("contact.title")}</h1>
-        <p className="text-slate-400">{t("contact.subtitle")}</p>
+        <p className="text-muted">{t("contact.subtitle")}</p>
       </div>
 
-      {error && <div className="rounded-xl bg-red-500/15 px-4 py-3 text-center text-red-300">{error}</div>}
+      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
 
       <form onSubmit={submit} className="card space-y-4 p-6">
         <div className="grid gap-4 sm:grid-cols-2">
