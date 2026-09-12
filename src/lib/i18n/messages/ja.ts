@@ -117,9 +117,9 @@ const ja = {
   "intro.p1":
     "Lucky Coin は、一日のはじまりにちょっとした儀式と、ほんの少しの楽観を求める人のための、無料で試せる運試しゲームです。50 枚のタイルにはゴールド・シルバー・ブロンズ、2 ラウンド目以降はジュエル、そして自信を程よく引き締めてくれるハズレが隠れています。",
   "intro.p2":
-    "タイルをひとつ選んで割ると、中身がそのままゲーム内ウォレットに加算されます。ゴールドは主役、シルバーはゲームを回す原動力、ブロンズは毎日の相棒。ジュエルは運が着飾った日に、無料ターンや追加コインを届けてくれます。",
+    "タイルをひとつ選んで割ると、中身がそのままゲーム内残高に加算されます。ゴールドは主役、シルバーはゲームを回す原動力、ブロンズは毎日の相棒。ジュエルは運が着飾った日に、無料ターンや追加コインを届けてくれます。",
   "intro.p3":
-    "会員になるとさらに手厚く。ウェルカムボーナス、初日報酬、日ごとに増えるログイン報酬、そして毎日 1 回無料の抽選ホイールが加わります。コインは下位への両替（ゴールド → シルバー → ブロンズ）ができ、ゴールドはいつでも USDT に売却できます。",
+    "会員になるとさらに手厚く。ウェルカムボーナス、初日報酬、日ごとに増えるログイン報酬、そして毎日 1 回無料の抽選ホイールが加わります。コインは下位への両替（ゴールド → シルバー → ブロンズ）ができ、ゴールドはいつでも日本円で売却し、ご登録の銀行口座へ振り込みできます。",
   "intro.p4":
     "登録前に数ラウンド無料でお試しいただけます。運にも試食があってよいはずですから。獲得したコインを残し、毎日の報酬を受け取りたくなったら、ニックネーム・メールアドレス・パスワードでご登録ください。",
   "intro.p5":
@@ -163,7 +163,7 @@ const ja = {
 
   "help.playTitle": "遊び方",
   "help.playP1":
-    "1 ラウンドで <strong>{size} 枚のタイル</strong>が並びます。内訳はゴールド {gold} 枚、シルバー {silver} 枚、ブロンズ {bronze} 枚、そして<strong>「なし」</strong>と表示されるハズレが {empty} 枚。ひとつ選んで割れば、賞品はすぐにウォレットへ。",
+    "1 ラウンドで <strong>{size} 枚のタイル</strong>が並びます。内訳はゴールド {gold} 枚、シルバー {silver} 枚、ブロンズ {bronze} 枚、そして<strong>「なし」</strong>と表示されるハズレが {empty} 枚。ひとつ選んで割れば、賞品はすぐに残高へ。",
   "help.playP2":
     "1 ラウンドの参加費は<strong>シルバー {silver} 枚</strong>または<strong>ブロンズ {bronze} 枚</strong>。どちらを選んでも価値は同じです。",
   "help.playP3": "ラウンドを終えたら、次の 2 つのモードで<strong>継続</strong>できます（最大 {max} 回）:",
@@ -209,7 +209,7 @@ const ja = {
   "help.tradeBuy":
     "<strong>購入</strong>はクレジットカード（Stripe）でのお支払いです。カード情報が本サイトを通ることはありません。パック: {packs}。",
   "help.tradeSell":
-    "<strong>売却</strong>はゴールド 1 枚あたり <strong>{price} USDT</strong>。{hours}売却できます。",
+    "<strong>売却</strong>はゴールド 1 枚あたり <strong>{price}円</strong>。振込先の銀行口座をご登録のうえ、{hours}売却できます。振込は運営が手動で行います。",
 
   "help.fairTitle": "公正なプレイのために",
   "help.fairBody":
@@ -367,28 +367,40 @@ const ja = {
   "sell.loginTitle": "コインを売却するにはログインしてください",
   "sell.title": "ゴールドコインを売却",
   "sell.subtitlePre": "ゴールド 1 枚 = ",
-  "sell.subtitlePost": " です。運の成果をそのまま受け取れます。",
+  "sell.subtitlePost": " です。売却代金はご登録の銀行口座へお振り込みします。",
   "sell.openNow": "● 受付中",
   "sell.openBody": "— {hours}ゴールドを売却できます。",
-  "sell.walletTitle": "受取ウォレット",
-  "sell.receiveAs": "受け取る通貨 / ネットワーク",
-  "sell.walletAddress": "あなたのウォレットアドレス",
-  "sell.walletPlaceholder": "ウォレットアドレスを貼り付けてください",
-  "sell.walletSaved": "✓ ウォレットを保存しました。",
-  "sell.walletSaveFailed": "ウォレットを保存できませんでした。",
-  "sell.registeredWallet": "登録済みウォレット{method}: ",
-  "sell.registeredWalletTail": "。変更しない場合、この宛先に送金されます。",
-  "sell.noWallet": "受取ウォレットが未登録です。送金先のウォレットアドレスをご入力ください。",
-  "sell.warning": "⚠ ウォレットアドレスに誤りがないか必ずご確認ください。暗号資産の送金は取り消せません。",
+  "sell.bankTitle": "振込先口座情報",
+  "sell.bankLead": "日本国内の銀行口座をご入力ください。ゆうちょ銀行の場合も、銀行名・支店名・口座番号をご記入ください。",
+  "sell.required": "必須",
+  "sell.bankName": "銀行名",
+  "sell.bankNamePlaceholder": "例）みずほ銀行",
+  "sell.branchName": "支店名",
+  "sell.branchNamePlaceholder": "例）本店",
+  "sell.accountType": "口座種別",
+  "sell.accountNumber": "口座番号",
+  "sell.accountNumberPlaceholder": "半角数字（ハイフンなし）",
+  "sell.holderKana": "口座名義（カナ）",
+  "sell.holderKanaPlaceholder": "例）ヤマダ　タロウ",
+  "sell.holderKanaHint": "全角カタカナでご入力ください。姓名のあいだは全角スペースでも構いません。",
+  "sell.holderName": "口座名義（漢字）",
+  "sell.holderNamePlaceholder": "例）山田　太郎（任意）",
+  "sell.saveBank": "口座情報を保存",
+  "sell.bankSaved": "✓ 口座情報を保存しました。",
+  "sell.bankSaveFailed": "口座情報を保存できませんでした。",
+  "sell.bankIncomplete": "必須項目をすべて正しくご入力ください。",
+  "sell.registeredBank": "登録済みの振込先:",
+  "sell.noBank": "振込先口座が未登録です。下記の項目をご入力ください。",
+  "sell.warning": "⚠ 口座情報に誤りがないか必ずご確認ください。誤りがあると振込ができず、お手続きに遅れが生じる場合があります。",
   "sell.yourGold": "保有ゴールド",
   "sell.goldToSell": "売却するゴールド枚数",
   "sell.youReceive": "受取額",
   "sell.processing": "処理中…",
   "sell.noGold": "売却できるゴールドがありません",
-  "sell.enterWallet": "ウォレットアドレスを入力してください",
+  "sell.enterBank": "振込先口座を入力してください",
   "sell.sellAction": "ゴールド {count} 枚を売却",
   "sell.failed": "売却に失敗しました。",
-  "sell.payoutNote": "売却の登録後、運営がウォレットへ送金いたします。",
+  "sell.payoutNote": "売却の登録後、運営がご指定の銀行口座へ振り込みいたします。",
 
   // ---- コイン両替（/exchange） ------------------------------------------
   "exchange.loginTitle": "コインを両替するにはログインしてください",
@@ -682,9 +694,9 @@ const ja = {
   "admin.colStatus": "ステータス",
   "admin.noTransactions": "取引はまだありません。",
   "admin.colSeller": "売却者",
-  "admin.colPayoutUsdt": "支払額（USDT）",
-  "admin.colReceiveAs": "受取通貨",
-  "admin.colWallet": "ウォレットアドレス",
+  "admin.colPayoutJpy": "支払額（円）",
+  "admin.colReceiveAs": "振込方法",
+  "admin.colBankAccount": "振込先口座",
   "admin.colAction": "操作",
   "admin.noSells": "売却申請はまだありません。",
   "admin.markUnpaid": "未払いに戻す",
@@ -781,13 +793,14 @@ const ja = {
 
   "api.sell.enterAmount": "売却するゴールドの枚数を入力してください。",
   "api.sell.onlyHave": "保有しているゴールドは {count} 枚です。",
-  "api.sell.needWallet": "送金先のウォレットアドレスを入力してください。",
+  "api.sell.needBank": "振込先の銀行口座情報を入力してください。",
   "api.sell.failed": "売却を完了できませんでした。",
-  "api.sell.done": "ゴールド {gold} 枚を {usdt} USDT で売却しました。{method}{address} 宛に送金いたします。",
+  "api.sell.done": "ゴールド {gold} 枚を {jpy}円 で売却しました。{bank} 宛に振り込みいたします。",
   "api.sell.open": "現在、売却を受け付けています。",
 
   "api.profile.nicknameEmpty": "ニックネームは空にできません。",
   "api.profile.unknownPayout": "受取方法が不明です。",
+  "api.profile.invalidBank": "銀行口座の入力内容をご確認ください（銀行名・支店名・口座番号・口座名義カナは必須です）。",
   "api.profile.nothingToUpdate": "更新する項目がありません。",
   "api.profile.noFile": "ファイルがアップロードされていません。",
   "api.profile.imageSaveFailed": "画像をサーバーに保存できませんでした。",

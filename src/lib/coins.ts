@@ -268,7 +268,7 @@ export function dailyReward(streakDay: number): number {
   return DAILY_BASE_REWARD + 5 * Math.min(day - 1, 2); // 20, 25, 30, 30, 30, 30
 }
 
-// Purchase packs — buy silver coins (crypto checkout, verified on-chain).
+// Purchase packs — buy silver coins via Stripe card checkout.
 // Minimum purchase is 10 silver. Base rate is $0.25 / silver.
 export type CoinPack = { silver: number; usd: number; label: MessageKey; tag?: MessageKey };
 export const COIN_PACKS: CoinPack[] = [
@@ -309,8 +309,8 @@ export type Profile = {
   continue_until?: string | null;
   rewards_claimed?: boolean;
   first_login_done?: boolean;
-  payout_address?: string | null; // registered wallet for sell-back payouts
-  payout_method?: string | null; // chosen payout crypto/network (PaymentMethod id)
+  payout_address?: string | null; // registered bank account JSON for sell-back payouts
+  payout_method?: string | null; // payout method id (e.g. bank-jp)
 };
 
 // Build a freshly shuffled 50-tile board from a coin composition; any tiles

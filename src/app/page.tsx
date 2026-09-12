@@ -111,29 +111,32 @@ export default function Landing() {
       </section>
 
       {/* How it works */}
-      <section className="landing-section">
+      <section className="landing-section px-2">
         <h2 className="landing-section-title">{t("home.howTitle")}</h2>
         <p className="landing-section-lead">{t("home.howLead")}</p>
-        <div className="mt-8 grid gap-5 md:grid-cols-3">
-          {steps.map((c) => (
-            <div key={c.t} className="landing-card p-6">
-              <h3 className="text-lg font-semibold text-amber-700">{t(c.t)}</h3>
-              <p className="mt-2 text-body">{t(c.d)}</p>
+        <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
+          {steps.map((c, i) => (
+            <div key={c.t} className="landing-step text-center md:text-left">
+              <span className="landing-step-num" aria-hidden>
+                {i + 1}
+              </span>
+              <h3 className="text-lg font-semibold text-body">{t(c.t)}</h3>
+              <p className="mt-2 text-muted">{t(c.d)}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Coin values */}
-      <section className="p-8">
-        <h2 className="text-center text-2xl font-bold">{t("home.valuesTitle")}</h2>
-        <div className="mt-6 grid gap-5 sm:grid-cols-3">
+      <section className="px-2">
+        <h2 className="landing-section-title text-2xl">{t("home.valuesTitle")}</h2>
+        <div className="mt-8 grid gap-8 sm:grid-cols-3">
           {values.map((c) => (
-            <div key={c.type} className="flex items-center gap-4 p-5">
+            <div key={c.type} className="flex items-center gap-4">
               <CoinIcon type={c.type} size={52} />
               <div>
                 <div className="font-bold">{t(c.title)}</div>
-                <div className="text-amber-600">{t(c.v)}</div>
+                <div className="text-sm font-semibold text-gold-ink">{t(c.v)}</div>
                 <div className="text-sm text-muted">{t(c.d)}</div>
               </div>
             </div>
@@ -142,13 +145,13 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="landing-cta flex flex-col items-center gap-4 p-10 text-center">
+      <section className="landing-cta flex flex-col items-center gap-4 py-6 text-center">
         <h2 className="landing-cta-title">
           {t("home.ctaTitlePre")}
           <span className="hero-inline-luck">{t("home.ctaLuck")}</span>
           {t("home.ctaTitlePost")}
         </h2>
-        <p className="max-w-md text-body">{t("home.ctaBody")}</p>
+        <p className="max-w-md text-muted">{t("home.ctaBody")}</p>
         <button onClick={startGame} className="btn-gold text-lg !px-7 !py-3">
           {t("home.startGame")}
         </button>

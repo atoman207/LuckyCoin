@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import CoinIcon from "@/components/CoinIcon";
-import { SELL_PRICE_USDT, SELL_HOURS_KEY, sellStatus } from "@/lib/selling";
-import { PAYOUT_METHODS, getPayoutMethod } from "@/lib/payout-methods";
+import {
+  ACCOUNT_TYPES,
+  emptyBankAccount,
+  formatBankAccount,
+  isBankAccountComplete,
+  parseBankAccount,
+  type BankAccount,
+} from "@/lib/bank-account";
+import { formatYen, SELL_PRICE_JPY, SELL_HOURS_KEY, sellStatus } from "@/lib/selling";
 import { useI18n } from "@/lib/i18n/provider";
 
 export default function SellPage() {
@@ -16,23 +23,19 @@ export default function SellPage() {
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Payout wallet: the crypto/network and the address to receive funds.
-  const [method, setMethod] = useState<string>(PAYOUT_METHODS[0].id);
-  const [address, setAddress] = useState("");
-  const [savingWallet, setSavingWallet] = useState(false);
-  const [walletMsg, setWalletMsg] = useState<string | null>(null);
+  const [bank, setBank] = useState<BankAccount>(() => emptyBankAccount());
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankMsg, setBankMsg] = useState<string | null>(null);
 
-  // Prefill from the registered wallet once the profile loads.
   useEffect(() => {
     if (!profile) return;
-    if (profile.payout_method) setMethod(profile.payout_method);
-    setAddress((a) => a || profile.payout_address || "");
+    const saved = parseBankAccount(profile.payout_address);
+    if (saved) setBank(saved);
   }, [profile]);
 
-  // Re-check the trading window every 30s so the UI opens/closes on time.
   useEffect(() => {
-    const t = setInterval(() => setStatus(sellStatus()), 30_000);
-    return () => clearInterval(t);
+    const id = setInterval(() => setStatus(sellStatus()), 30_000);
+    return () => clearInterval(id);
   }, []);
 
   if (!loading && !profile) {
@@ -45,25 +48,33 @@ export default function SellPage() {
   }
   if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
-  async function saveWallet() {
-    if (!address.trim()) return;
-    setSavingWallet(true);
-    setWalletMsg(null);
+  function updateBank<K extends keyof BankAccount>(key: K, value: BankAccount[K]) {
+    setBank((prev) => ({ ...prev, [key]: value }));
+    setBankMsg(null);
+  }
+
+  async function saveBank() {
+    if (!isBankAccountComplete(bank)) {
+      setError(t("sell.bankIncomplete"));
+      return;
+    }
+    setSavingBank(true);
+    setBankMsg(null);
     setError(null);
     try {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payout_method: method, payout_address: address.trim() }),
+        body: JSON.stringify({ bank }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       if (data.profile) setProfile(data.profile);
-      setWalletMsg(t("sell.walletSaved"));
+      setBankMsg(t("sell.bankSaved"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("sell.walletSaveFailed"));
+      setError(e instanceof Error ? e.message : t("sell.bankSaveFailed"));
     } finally {
-      setSavingWallet(false);
+      setSavingBank(false);
     }
   }
 
@@ -75,7 +86,7 @@ export default function SellPage() {
       const res = await fetch("/api/sell", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gold: amount, method_id: method, payout_address: address.trim() }),
+        body: JSON.stringify({ gold: amount, bank }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -90,10 +101,10 @@ export default function SellPage() {
   }
 
   const gold = profile.gold;
-  const registered = profile.payout_address || null;
-  const hasAddress = !!address.trim();
-  const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold && hasAddress;
-  const registeredMethodLabel = getPayoutMethod(profile.payout_method)?.label;
+  const registered = parseBankAccount(profile.payout_address);
+  const bankReady = isBankAccountComplete(bank);
+  const canSell = status.open && gold >= 1 && amount >= 1 && amount <= gold && bankReady;
+  const receiveYen = Math.min(amount, gold || 0) * SELL_PRICE_JPY;
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -101,86 +112,157 @@ export default function SellPage() {
         <h1 className="text-3xl font-extrabold">{t("sell.title")}</h1>
         <p className="text-muted">
           {t("sell.subtitlePre")}
-          <span className="font-semibold text-amber-600">
-            {SELL_PRICE_USDT.toLocaleString()} USDT
-          </span>
+          <span className="font-semibold text-gold-ink">{formatYen(SELL_PRICE_JPY)}</span>
           {t("sell.subtitlePost")}
         </p>
       </div>
 
-      {/* Trading window banner */}
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        <span className="font-semibold">{t("sell.openNow")}</span>{" "}
+      <div className="text-sm text-muted">
+        <span className="font-semibold text-gold-ink">{t("sell.openNow")}</span>{" "}
         {t("sell.openBody", { hours: t(SELL_HOURS_KEY) })}
       </div>
 
       {done && (
-        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-3 text-center font-semibold text-emerald-700">
+        <div className="animate-pop py-2 text-center text-sm font-semibold text-emerald-700">
           ✓ {done}
         </div>
       )}
-      {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>}
+      {error && <div className="py-2 text-center text-sm text-red-600">{error}</div>}
 
-      {/* Payout wallet — choose the crypto/network and address. Editable any time,
-          even with no gold, so you can register it in advance. */}
-      <div className="card space-y-4 p-6">
-        <h2 className="text-lg font-bold">{t("sell.walletTitle")}</h2>
-
+      {/* 振込先口座 — 入力のまとまりなので枠付き */}
+      <section className="card space-y-4 p-6">
         <div>
-          <label className="label">{t("sell.receiveAs")}</label>
-          <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
-            {PAYOUT_METHODS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label} — {m.network}
-              </option>
-            ))}
-          </select>
+          <h2 className="text-lg font-bold">{t("sell.bankTitle")}</h2>
+          <p className="mt-1 text-xs text-muted">{t("sell.bankLead")}</p>
         </div>
 
-        <div>
-          <label className="label">{t("sell.walletAddress")}</label>
-          <div className="flex items-center gap-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="label">
+              {t("sell.bankName")}
+              <span className="ml-1 text-red-500">{t("sell.required")}</span>
+            </label>
             <input
-              className="input font-mono text-sm"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder={t("sell.walletPlaceholder")}
-              spellCheck={false}
+              className="input"
+              value={bank.bankName}
+              onChange={(e) => updateBank("bankName", e.target.value)}
+              placeholder={t("sell.bankNamePlaceholder")}
+              autoComplete="organization"
             />
-            <button
-              onClick={saveWallet}
-              disabled={savingWallet || !hasAddress}
-              className="btn-ghost shrink-0 text-sm"
-            >
-              {savingWallet ? t("common.saving") : t("common.save")}
-            </button>
           </div>
-          {walletMsg && <p className="mt-1 text-xs text-emerald-600">{walletMsg}</p>}
 
-          {/* Registered-wallet / prompt messaging */}
-          {registered ? (
-            <p className="mt-2 text-xs text-muted">
-              {t("sell.registeredWallet", {
-                method: registeredMethodLabel ? ` (${registeredMethodLabel})` : "",
-              })}
-              <span className="font-mono text-body break-all">{registered}</span>
-              {t("sell.registeredWalletTail")}
-            </p>
-          ) : !hasAddress ? (
-            <p className="mt-2 text-xs text-amber-600">{t("sell.noWallet")}</p>
-          ) : null}
+          <div className="sm:col-span-2">
+            <label className="label">
+              {t("sell.branchName")}
+              <span className="ml-1 text-red-500">{t("sell.required")}</span>
+            </label>
+            <input
+              className="input"
+              value={bank.branchName}
+              onChange={(e) => updateBank("branchName", e.target.value)}
+              placeholder={t("sell.branchNamePlaceholder")}
+            />
+          </div>
 
-          <p className="mt-2 text-xs text-amber-700">{t("sell.warning")}</p>
+          <div className="sm:col-span-2">
+            <span className="label">
+              {t("sell.accountType")}
+              <span className="ml-1 text-red-500">{t("sell.required")}</span>
+            </span>
+            <div className="mt-1 flex flex-wrap gap-4">
+              {ACCOUNT_TYPES.map((opt) => (
+                <label
+                  key={opt.id}
+                  className={`flex cursor-pointer items-center gap-2 text-sm ${
+                    bank.accountType === opt.id ? "font-semibold text-body" : "text-muted"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="accountType"
+                    className="accent-amber-700"
+                    checked={bank.accountType === opt.id}
+                    onChange={() => updateBank("accountType", opt.id)}
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="label">
+              {t("sell.accountNumber")}
+              <span className="ml-1 text-red-500">{t("sell.required")}</span>
+            </label>
+            <input
+              className="input tracking-wider"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={bank.accountNumber}
+              onChange={(e) => updateBank("accountNumber", e.target.value.replace(/\D/g, "").slice(0, 8))}
+              placeholder={t("sell.accountNumberPlaceholder")}
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="label">
+              {t("sell.holderKana")}
+              <span className="ml-1 text-red-500">{t("sell.required")}</span>
+            </label>
+            <input
+              className="input"
+              value={bank.holderKana}
+              onChange={(e) => updateBank("holderKana", e.target.value)}
+              placeholder={t("sell.holderKanaPlaceholder")}
+              autoComplete="off"
+            />
+            <p className="mt-1 text-xs text-faint">{t("sell.holderKanaHint")}</p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="label">{t("sell.holderName")}</label>
+            <input
+              className="input"
+              value={bank.holderName ?? ""}
+              onChange={(e) => updateBank("holderName", e.target.value)}
+              placeholder={t("sell.holderNamePlaceholder")}
+              autoComplete="name"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Sell */}
-      <div className="card p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={saveBank}
+            disabled={savingBank || !bankReady}
+            className="btn-ghost text-sm"
+          >
+            {savingBank ? t("common.saving") : t("sell.saveBank")}
+          </button>
+          {bankMsg && <p className="text-xs text-emerald-600">{bankMsg}</p>}
+        </div>
+
+        {registered ? (
+          <p className="text-xs text-muted">
+            {t("sell.registeredBank")}
+            <span className="mt-1 block break-all font-medium text-body">{formatBankAccount(registered)}</span>
+          </p>
+        ) : !bankReady ? (
+          <p className="text-xs text-amber-700">{t("sell.noBank")}</p>
+        ) : null}
+
+        <p className="text-xs text-muted">{t("sell.warning")}</p>
+      </section>
+
+      {/* 売却 */}
+      <section className="card p-6">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-body">
             <CoinIcon type="gold" size={28} /> {t("sell.yourGold")}
           </span>
-          <span className="text-xl font-bold text-amber-600">{gold}</span>
+          <span className="text-xl font-bold text-gold-ink">{gold.toLocaleString("ja-JP")}</span>
         </div>
 
         <div className="mt-5">
@@ -205,11 +287,9 @@ export default function SellPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-cream px-4 py-3">
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
           <span className="text-body">{t("sell.youReceive")}</span>
-          <span className="text-xl font-extrabold text-emerald-600">
-            {(Math.min(amount, gold || 0) * SELL_PRICE_USDT).toLocaleString()} USDT
-          </span>
+          <span className="text-xl font-extrabold text-gold-ink">{formatYen(receiveYen)}</span>
         </div>
 
         <button onClick={sell} disabled={busy || !canSell} className="btn-gold mt-5 w-full text-lg">
@@ -217,13 +297,13 @@ export default function SellPage() {
             ? t("sell.processing")
             : gold < 1
               ? t("sell.noGold")
-              : !hasAddress
-                ? t("sell.enterWallet")
+              : !bankReady
+                ? t("sell.enterBank")
                 : t("sell.sellAction", { count: Math.min(amount, gold) })}
         </button>
 
         <p className="mt-3 text-center text-xs text-faint">{t("sell.payoutNote")}</p>
-      </div>
+      </section>
     </div>
   );
 }

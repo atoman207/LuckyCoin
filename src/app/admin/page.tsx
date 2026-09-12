@@ -5,6 +5,7 @@ import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
 import CoinIcon from "@/components/CoinIcon";
 import { coinName } from "@/lib/coins";
+import { formatBankAccount, parseBankAccount } from "@/lib/bank-account";
 import { getPayoutMethod } from "@/lib/payout-methods";
 import RichText from "@/components/RichText";
 import StripePaymentsPanel from "@/components/StripePaymentsPanel";
@@ -76,8 +77,6 @@ type Txn = {
   silver: number;
   usd_amount: number;
   currency: string | null;
-  wallet_address: string | null;
-  to_address: string | null;
   method: string;
   status: string;
   created_at: string;
@@ -618,7 +617,7 @@ export default function AdminPage() {
 
       {tab === "transactions" && (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[700px] text-left text-sm">
             <thead className="border-b border-line text-muted">
               <tr>
                 <th className="px-4 py-3">{t("admin.colDate")}</th>
@@ -626,16 +625,14 @@ export default function AdminPage() {
                 <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
                 <th className="px-4 py-3 text-right">{t("admin.colPriceUsd")}</th>
                 <th className="px-4 py-3">{t("admin.colCurrency")}</th>
-                <th className="px-4 py-3">{t("admin.colPaidFrom")}</th>
-                <th className="px-4 py-3">{t("admin.colPaidTo")}</th>
                 <th className="px-4 py-3">{t("admin.colStatus")}</th>
               </tr>
             </thead>
             <tbody>
               {txns === null ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
               ) : txns.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-faint">{t("admin.noTransactions")}</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-faint">{t("admin.noTransactions")}</td></tr>
               ) : (
                 txns.map((txn) => (
                   <tr key={txn.id} className="border-b border-line hover:bg-cream">
@@ -644,11 +641,9 @@ export default function AdminPage() {
                       <div className="font-medium">{txn.profiles?.nickname ?? "—"}</div>
                       <div className="text-xs text-faint">{txn.profiles?.email ?? ""}</div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-body">{txn.silver.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-body">{txn.silver.toLocaleString("ja-JP")}</td>
                     <td className="px-4 py-3 text-right font-semibold text-emerald-600">${Number(txn.usd_amount).toFixed(2)}</td>
                     <td className="px-4 py-3 text-body">{txn.currency ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted break-all">{txn.wallet_address ?? "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-amber-700 break-all">{txn.to_address ?? "—"}</td>
                     <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">{statusLabel(t, txn.status)}</span></td>
                   </tr>
                 ))
@@ -666,9 +661,9 @@ export default function AdminPage() {
                 <th className="px-4 py-3">{t("admin.colDate")}</th>
                 <th className="px-4 py-3">{t("admin.colSeller")}</th>
                 <th className="px-4 py-3 text-right">{t("coin.gold")}</th>
-                <th className="px-4 py-3 text-right">{t("admin.colPayoutUsdt")}</th>
+                <th className="px-4 py-3 text-right">{t("admin.colPayoutJpy")}</th>
                 <th className="px-4 py-3">{t("admin.colReceiveAs")}</th>
-                <th className="px-4 py-3">{t("admin.colWallet")}</th>
+                <th className="px-4 py-3">{t("admin.colBankAccount")}</th>
                 <th className="px-4 py-3">{t("admin.colStatus")}</th>
                 <th className="px-4 py-3 text-right">{t("admin.colAction")}</th>
               </tr>
@@ -681,6 +676,7 @@ export default function AdminPage() {
               ) : (
                 sells.map((s) => {
                   const method = getPayoutMethod(s.method_id);
+                  const bank = parseBankAccount(s.payout_address);
                   const paid = s.status === "paid";
                   return (
                     <tr key={s.id} className="border-b border-line hover:bg-cream">
@@ -689,10 +685,14 @@ export default function AdminPage() {
                         <div className="font-medium">{s.profiles?.nickname ?? "—"}</div>
                         <div className="text-xs text-faint">{s.profiles?.email ?? ""}</div>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-amber-600">{s.gold.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-emerald-600">{Number(s.usdt_amount).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-amber-600">{s.gold.toLocaleString("ja-JP")}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                        {Number(s.usdt_amount).toLocaleString("ja-JP")}円
+                      </td>
                       <td className="px-4 py-3 text-body">{method?.label ?? s.method_id ?? "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted break-all">{s.payout_address ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs text-muted whitespace-pre-line">
+                        {bank ? formatBankAccount(bank) : (s.payout_address ?? "—")}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs ${paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                           {statusLabel(t, s.status)}

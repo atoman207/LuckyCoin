@@ -47,26 +47,24 @@ create table if not exists public.game_rounds (
 create index if not exists game_rounds_user_idx on public.game_rounds (user_id, created_at desc);
 
 -- ---------- purchases ---------------------------------------------------
--- Log of silver-coin purchases. Two payment methods share this table:
---   method = 'crypto-direct'  verified directly on-chain (tx_hash)
---   method = 'stripe'         card payment via Stripe Checkout
---                             (stripe_session_id / stripe_payment_intent)
+-- Log of silver-coin purchases via Stripe Checkout (card).
+-- Legacy crypto columns remain for historical rows but are unused by the app.
 -- `credited` is the single source of truth for "coins already granted".
 create table if not exists public.purchases (
   id          uuid primary key default gen_random_uuid(),
   user_id        uuid not null references public.profiles (id) on delete cascade,
   silver         integer not null,
-  usd_amount     numeric not null,                      -- price paid (USD)
-  currency       text,                                  -- "ASSET · NETWORK" label
-  wallet_address text,                                  -- payer's wallet address (legacy)
-  to_address     text,                                  -- admin address paid to
-  method_id      text,                                  -- payment method id (e.g. usdt-trc20)
-  pay_address    text,                                  -- admin address shown at checkout
-  pay_amount     numeric,                               -- crypto amount the buyer must send
-  pay_currency   text,                                  -- asset the buyer pays in
-  tx_hash        text,                                  -- buyer's on-chain transaction hash
+  usd_amount     numeric not null,                      -- price paid (USD book amount)
+  currency       text,                                  -- e.g. jpy
+  wallet_address text,                                  -- legacy (unused)
+  to_address     text,                                  -- legacy (unused)
+  method_id      text,                                  -- legacy (unused)
+  pay_address    text,                                  -- legacy (unused)
+  pay_amount     numeric,                               -- legacy (unused)
+  pay_currency   text,                                  -- legacy (unused)
+  tx_hash        text,                                  -- legacy (unused)
   credited       boolean not null default false,        -- coins granted for this order?
-  method         text not null default 'crypto-direct',
+  method         text not null default 'stripe',
   status         text not null default 'awaiting_payment',
   created_at     timestamptz not null default now()
 );
@@ -83,7 +81,7 @@ alter table public.profiles  add column if not exists last_draw_at timestamptz;
 alter table public.profiles  add column if not exists continue_until timestamptz;
 alter table public.profiles  add column if not exists rewards_claimed boolean not null default false;
 alter table public.profiles  add column if not exists first_login_done boolean not null default false;
--- Registered payout wallet for selling gold back.
+-- Registered payout bank account (JSON) for selling gold back.
 alter table public.profiles  add column if not exists payout_address text;
 alter table public.profiles  add column if not exists payout_method  text;
 -- Free rounds banked from picking "free turn" gems in Multiplier Play. While > 0,
@@ -135,15 +133,16 @@ create unique index if not exists purchases_stripe_session_key
 create index if not exists purchases_user_idx on public.purchases (user_id, created_at desc);
 
 -- ---------- sells -------------------------------------------------------
--- Coin sell-back requests (gold @ 1,000 USDT each), only during the Sunday
--- trading windows. USDT payout is fulfilled by the admin (no auto-send).
+-- Coin sell-back requests (gold @ 150,000 JPY each). Payout is fulfilled by
+-- the admin via domestic bank transfer (no auto-send).
+-- Note: column `usdt_amount` stores the JPY payout amount (legacy name).
 create table if not exists public.sells (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.profiles (id) on delete cascade,
   gold        integer not null,                          -- gold coins sold
-  usdt_amount numeric not null,                          -- gold * 1000
-  method_id      text,                                   -- payout crypto/network (PaymentMethod id)
-  payout_address text,                                   -- wallet the payout is sent to
+  usdt_amount numeric not null,                          -- gold * 150000 (JPY; legacy column name)
+  method_id      text,                                   -- payout method id (e.g. bank-jp)
+  payout_address text,                                   -- bank account JSON
   status      text not null default 'requested',         -- 'requested' | 'paid'
   created_at  timestamptz not null default now()
 );

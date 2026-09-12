@@ -23,7 +23,7 @@ import {
   dailyReward,
   type CoinType,
 } from "@/lib/coins";
-import { SELL_PRICE_USDT, SELL_HOURS_KEY } from "@/lib/selling";
+import { SELL_PRICE_JPY, SELL_HOURS_KEY } from "@/lib/selling";
 import { formatUsdAsJpy } from "@/lib/fx-book";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n";
@@ -243,7 +243,7 @@ export default function HelpPage() {
         <RichText
           as="p"
           k="help.tradeSell"
-          vars={{ price: SELL_PRICE_USDT.toLocaleString(), hours: t(SELL_HOURS_KEY) }}
+          vars={{ price: SELL_PRICE_JPY.toLocaleString("ja-JP"), hours: t(SELL_HOURS_KEY) }}
         />
       </Section>
 

@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
-import { getPayoutMethod } from "@/lib/payout-methods";
+import {
+  isBankAccountComplete,
+  normalizeBankAccount,
+  serializeBankAccount,
+  type BankAccount,
+} from "@/lib/bank-account";
+import { DEFAULT_PAYOUT_METHOD_ID, getPayoutMethod } from "@/lib/payout-methods";
 import { getT } from "@/lib/i18n/server";
 
 // Update the logged-in user's own personal info. Coins, admin flag and email
-// are intentionally NOT editable here — only profile details (and the payout
-// wallet used for selling gold back, which can be registered at any time).
+// are intentionally NOT editable here — only profile details (and the bank
+// account used for selling gold back, which can be registered at any time).
 export async function PATCH(req: Request) {
   const t = await getT();
   const ctx = await requireProfile();
@@ -17,10 +23,25 @@ export async function PATCH(req: Request) {
     typeof body.nationality === "string" ? body.nationality.trim() || null : undefined;
   const discord_id =
     typeof body.discord_id === "string" ? body.discord_id.trim() || null : undefined;
-  const payout_address =
-    typeof body.payout_address === "string" ? body.payout_address.trim() || null : undefined;
-  const payout_method =
-    typeof body.payout_method === "string" ? body.payout_method.trim() || null : undefined;
+
+  let payout_address: string | null | undefined = undefined;
+  let payout_method: string | null | undefined = undefined;
+
+  if (body.bank && typeof body.bank === "object" && body.bank !== null) {
+    const bank = normalizeBankAccount(body.bank as Partial<BankAccount>);
+    if (!isBankAccountComplete(bank)) {
+      return NextResponse.json({ error: t("api.profile.invalidBank") }, { status: 400 });
+    }
+    payout_address = serializeBankAccount(bank);
+    payout_method = DEFAULT_PAYOUT_METHOD_ID;
+  } else {
+    if (typeof body.payout_address === "string") {
+      payout_address = body.payout_address.trim() || null;
+    }
+    if (typeof body.payout_method === "string") {
+      payout_method = body.payout_method.trim() || null;
+    }
+  }
 
   if (nickname !== undefined && nickname.length === 0) {
     return NextResponse.json({ error: t("api.profile.nicknameEmpty") }, { status: 400 });

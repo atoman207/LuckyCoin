@@ -6,7 +6,7 @@ import { coinName } from "@/lib/coins";
 import type { Profile } from "@/lib/coins";
 
 // Balance display: gold / silver / bronze.
-//  • default — chips showing the icon + the number.
+//  • default — icon + number (no chip boxes; coins themselves carry the color).
 //  • compact — icons only (for the cramped mobile header); the quantity shows
 //    in a tooltip below the coin on hover/focus/tap.
 export default function CoinBalance({
@@ -27,13 +27,13 @@ export default function CoinBalance({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         {items.map((it) => (
           <span key={it.type} tabIndex={0} className="group relative flex items-center outline-none">
             <CoinIcon type={it.type} size={size} />
             <span
               role="tooltip"
-              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold tabular-nums opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
+              className="pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-white px-2 py-1 text-xs font-semibold tabular-nums opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100"
             >
               {it.value.toLocaleString()} {coinName(t, it.type)}
             </span>
@@ -44,11 +44,11 @@ export default function CoinBalance({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-3">
       {items.map((it) => (
         <span
           key={it.type}
-          className="flex items-center gap-1 rounded-full border border-line bg-cream px-2.5 py-1 text-sm font-semibold tabular-nums"
+          className="flex items-center gap-1 text-sm font-semibold tabular-nums text-body"
           title={`${it.value} ${coinName(t, it.type)}`}
         >
           <CoinIcon type={it.type} size={size} />

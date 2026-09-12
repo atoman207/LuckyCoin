@@ -90,15 +90,15 @@ export default function DemoGame() {
       </div>
 
       {!board ? (
-        <div className="card flex flex-col items-center gap-4 p-10 text-center">
+        <div className="flex flex-col items-center gap-4 py-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">{t("demo.pickTitle")}</h2>
-          <p className="max-w-sm text-body">{t("demo.pickBody", { size: BOARD_SIZE })}</p>
+          <p className="max-w-sm text-muted">{t("demo.pickBody", { size: BOARD_SIZE })}</p>
           <button onClick={start} disabled={plays >= FREE_PLAYS} className="btn-gold text-lg !px-7 !py-3">
             {plays >= FREE_PLAYS ? t("demo.loginToKeepPlaying") : t("demo.startRound")}
           </button>
           {plays >= FREE_PLAYS && (
-            <button onClick={() => setGateOpen(true)} className="text-sm text-amber-600 underline">
+            <button onClick={() => setGateOpen(true)} className="text-sm text-gold-ink underline">
               {t("demo.whyLogin")}
             </button>
           )}
@@ -123,7 +123,7 @@ export default function DemoGame() {
                       ? isPick
                         ? "z-10 border-amber-400 bg-sand ring-2 ring-amber-300 scale-[1.35]"
                         : "border-line bg-cream opacity-50"
-                      : "border-line bg-gradient-to-b from-white to-white/50 hover:border-amber-400",
+                      : "border-line bg-gradient-to-b from-white to-[#faf6ef] hover:border-amber-400/70",
                   ].join(" ")}
                 >
                   {revealed && shown !== "empty" && shown !== "gem" ? (
@@ -140,7 +140,7 @@ export default function DemoGame() {
           </div>
 
           {result !== null && !coinModal && (
-            <div className="card flex shrink-0 flex-col items-center gap-3 p-4 text-center sm:p-6">
+            <div className="flex shrink-0 flex-col items-center gap-3 border-t border-line py-4 text-center">
               <div className="text-xl font-bold">
                 {result === "empty"
                   ? t("demo.resultEmpty")

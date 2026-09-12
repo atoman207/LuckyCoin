@@ -109,8 +109,11 @@ The app uses a **server-side Google OAuth** route (`/api/auth/google`) so the us
 ### Card payments (Stripe)
 
 The `/buy` page offers **card only**. Payments run through Stripe Checkout — no
-card details ever reach this site. The crypto checkout (on-chain verification,
-receiving wallets, the LuckyCoinPayments contract) has been removed entirely.
+card details ever reach this site.
+
+Gold sell-backs pay out in **Japanese yen** (¥150,000 per gold) via **domestic
+bank transfer**. Users register their bank account on `/sell`; admins fulfil
+transfers manually.
 
 1. **Get your keys** — Stripe Dashboard → Developers → API keys. Set
    `STRIPE_SECRET_KEY` (server only; never expose it to the browser).

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getT } from "@/lib/i18n/server";
 
-// All gold sell-back requests with the seller, payout amount, chosen crypto and
-// wallet address, so the team can fulfil them.
+// All gold sell-back requests with the seller, payout amount (JPY), and
+// registered bank account, so the team can fulfil them.
 export async function GET() {
   const t = await getT();
   const ctx = await requireAdmin();

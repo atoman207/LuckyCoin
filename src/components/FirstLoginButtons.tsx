@@ -5,8 +5,7 @@ import { useUser } from "@/components/UserProvider";
 import { useI18n } from "@/lib/i18n/provider";
 
 // First-login reward shortcuts shown in the header until the member claims
-// their rewards. Three coin-coloured, animated buttons. Labels collapse to
-// icons on small screens so they sit neatly in the top-right on mobile.
+// their rewards. Labels collapse on small screens.
 export default function FirstLoginButtons() {
   const { profile } = useUser();
   const { t } = useI18n();
@@ -15,13 +14,22 @@ export default function FirstLoginButtons() {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
       <Link href="/claim" className="btn-gold btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.claimTitle")}>
-        🎁<span className="hidden md:inline">{t("firstLogin.claim")}</span>
+        <span className="md:hidden" aria-hidden>
+          +
+        </span>
+        <span className="hidden md:inline">{t("firstLogin.claim")}</span>
       </Link>
       <Link href="/draw" className="btn-silver btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.lotteryTitle")}>
-        🎰<span className="hidden md:inline">{t("firstLogin.lottery")}</span>
+        <span className="md:hidden" aria-hidden>
+          ◯
+        </span>
+        <span className="hidden md:inline">{t("firstLogin.lottery")}</span>
       </Link>
       <Link href="/help" className="btn-bronze btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.helpTitle")}>
-        ❓<span className="hidden md:inline">{t("firstLogin.help")}</span>
+        <span className="md:hidden" aria-hidden>
+          ?
+        </span>
+        <span className="hidden md:inline">{t("firstLogin.help")}</span>
       </Link>
     </div>
   );

@@ -416,7 +416,7 @@ export default function GamePage() {
         </div>
         <div className="flex items-center gap-3">
           {(profile.free_rounds ?? 0) > 0 && (
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-700 ring-1 ring-violet-200">
+            <span className="text-sm font-semibold text-gold-ink">
               {t("game.freeRounds", { count: profile.free_rounds ?? 0 })}
             </span>
           )}
@@ -425,20 +425,20 @@ export default function GamePage() {
       </div>
 
       {toast && (
-        <div className="card animate-pop border-amber-300 bg-amber-50 px-4 py-3 text-center font-semibold text-amber-800">
+        <div className="animate-pop px-1 py-2 text-center text-sm font-semibold text-gold-ink">
           {toast}
         </div>
       )}
       {error && (
-        <div className="rounded-xl bg-red-50 px-4 py-3 text-center text-red-600">{error}</div>
+        <div className="px-1 py-2 text-center text-sm text-red-600">{error}</div>
       )}
 
       {/* Idle / start */}
       {phase === "idle" && (
-        <div className="card flex flex-col items-center gap-4 p-10 text-center">
+        <div className="flex flex-col items-center gap-4 py-10 text-center">
           <CoinIcon type="gold" size={72} className="animate-pop" />
           <h2 className="text-2xl font-bold">{t("game.readyTitle")}</h2>
-          <p className="max-w-sm text-body">
+          <p className="max-w-sm text-muted">
             {profile.is_admin
               ? t("game.readyBodyAdmin", { size: BOARD_SIZE })
               : t("game.readyBody", {
@@ -454,7 +454,7 @@ export default function GamePage() {
             {hasSaved && (
               <button onClick={nextStage} disabled={busy} className="btn-ghost text-lg">
                 {t("game.continue")}{" "}
-                <span className="text-xs text-amber-700">(×{nextMultiplier(restarts + 1)})</span>
+                <span className="text-xs text-gold-ink">(×{nextMultiplier(restarts + 1)})</span>
               </button>
             )}
           </div>
@@ -471,24 +471,24 @@ export default function GamePage() {
           {/* Restart / New Game toolbar */}
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">
+              <span className="text-sm font-bold text-gold-ink">
                 {t("game.stageBadge", { mult: multiplier, stage: restarts + 1, max: MAX_RESTARTS })}
               </span>
               {/* How many left? — hover for the current multiplier + coin counts */}
               <div className="group relative">
                 <button className="btn-ghost text-sm">{t("game.howManyLeft")}</button>
-                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded border border-line bg-white p-3 text-xs shadow-xl group-hover:block">
-                  <div className="font-semibold text-amber-700">{t("game.currentMultiplier", { mult: multiplier })}</div>
+                <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-56 rounded-lg border border-line bg-white p-3 text-xs shadow-md group-hover:block">
+                  <div className="font-semibold text-gold-ink">{t("game.currentMultiplier", { mult: multiplier })}</div>
                   <div className="mt-2 grid grid-cols-4 gap-2 text-center">
                     {(["gold", "silver", "bronze"] as const).map((t) => (
-                      <div key={t} className="rounded bg-cream py-2">
+                      <div key={t} className="py-2">
                         <CoinIcon type={t} size={22} className="mx-auto" />
                         <div className="mt-1 font-bold">{composition ? composition[t] : "—"}</div>
                       </div>
                     ))}
-                    <div className="rounded bg-violet-100 py-2">
-                      <JewelIcon className="mx-auto h-6 w-6 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
-                      <div className="mt-1 font-bold text-violet-700">{composition?.gem ?? 0}</div>
+                    <div className="py-2">
+                      <JewelIcon className="mx-auto h-6 w-6" />
+                      <div className="mt-1 font-bold">{composition?.gem ?? 0}</div>
                     </div>
                   </div>
                   <div className="mt-2 text-muted">{t("game.boardContents")}</div>
@@ -517,7 +517,7 @@ export default function GamePage() {
           {/* Exact counts for this round (hidden on mobile to save space — the
               same info is in the "How many left?" tooltip). */}
           {composition && (
-            <div className="hidden shrink-0 flex-wrap items-center justify-center gap-4 rounded-xl border border-line bg-cream px-4 py-2 text-sm sm:flex">
+            <div className="hidden shrink-0 flex-wrap items-center justify-center gap-5 px-1 py-1 text-sm sm:flex">
               <span className="text-muted">{t("game.thisRound")}</span>
               <span className="flex items-center gap-1.5 font-semibold">
                 <CoinIcon type="gold" size={20} /> {composition.gold}
@@ -529,8 +529,8 @@ export default function GamePage() {
                 <CoinIcon type="bronze" size={20} /> {composition.bronze}
               </span>
               {(composition.gem ?? 0) > 0 && (
-                <span className="flex items-center gap-1.5 font-semibold text-violet-600">
-                  <JewelIcon className="h-5 w-5 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" /> {composition.gem}
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <JewelIcon className="h-5 w-5" /> {composition.gem}
                 </span>
               )}
               <span className="font-semibold text-muted">{t("game.blankCount", { count: composition.empty })}</span>
@@ -577,18 +577,18 @@ export default function GamePage() {
                       revealed
                         ? isGem
                           ? isPick
-                            ? "z-10 border-violet-300 bg-violet-100 ring-2 ring-violet-300 scale-[1.35]"
-                            : "border-violet-200 bg-violet-50"
+                            ? "z-10 border-violet-300/80 bg-violet-50/80 ring-1 ring-violet-300 scale-[1.35]"
+                            : "border-violet-200/70 bg-violet-50/50"
                           : isPick && border
                             ? border.tilePick
                             : border
                               ? border.tile
                               : "border-line bg-cream opacity-50"
-                        : "border-line bg-gradient-to-b from-white to-white/50 hover:border-amber-400 hover:from-amber-100",
+                        : "border-line bg-gradient-to-b from-white to-[#faf6ef] hover:border-amber-400/70 hover:from-amber-50/80",
                     ].join(" ")}
                   >
                     {introType === "gem" ? (
-                      <JewelIcon className="h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
+                      <JewelIcon className="h-[86%] w-[86%]" />
                     ) : introType === "empty" ? (
                       <span className="text-xs font-bold text-muted/70 sm:text-sm">{t("coin.no")}</span>
                     ) : introType ? (
@@ -596,7 +596,7 @@ export default function GamePage() {
                         <CoinIcon type={introType as CoinType} responsive className="rounded-full" />
                       </span>
                     ) : revealed && isGem ? (
-                      <JewelIcon className={`h-[86%] w-[86%] drop-shadow-[0_0_8px_rgba(167,139,250,0.9)] ${isPick ? "tile-flip" : "animate-pop"}`} />
+                      <JewelIcon className={`h-[86%] w-[86%] ${isPick ? "tile-flip" : "animate-pop"}`} />
                     ) : revealed && type && type !== "empty" && type !== "gem" ? (
                       <span className="flex h-full w-full items-center justify-center p-[8%]">
                         <CoinIcon
@@ -612,7 +612,7 @@ export default function GamePage() {
                       <span className={`text-xs font-bold text-faint sm:text-sm ${isPick ? "tile-flip" : "animate-pop"}`}>{t("coin.no")}</span>
                     ) : null}
                     {revealed && isPick && (
-                      <span className="absolute -top-1.5 left-1/2 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-emerald-400 text-[10px] font-black text-slate-900 shadow sm:h-5 sm:w-5 sm:text-xs">
+                      <span className="absolute -top-1.5 left-1/2 grid h-4 w-4 -translate-x-1/2 place-items-center rounded-full bg-gold-ink text-[10px] font-black text-white sm:h-5 sm:w-5 sm:text-xs">
                         ✓
                       </span>
                     )}
@@ -623,13 +623,13 @@ export default function GamePage() {
           </div>
 
           {phase === "revealed" && reward && (
-            <div className="card flex shrink-0 flex-wrap items-center justify-between gap-3 p-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line py-3">
               <div className="flex items-center gap-3">
                 {reward.type === "empty" ? (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-cream text-sm font-bold text-muted">{t("coin.no")}</span>
+                  <span className="grid h-10 w-10 place-items-center text-sm font-bold text-muted">{t("coin.no")}</span>
                 ) : reward.type === "gem" ? (
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-violet-100">
-                    <JewelIcon className="h-9 w-9 drop-shadow-[0_0_6px_rgba(167,139,250,0.8)]" />
+                  <span className="grid h-10 w-10 place-items-center">
+                    <JewelIcon className="h-9 w-9" />
                   </span>
                 ) : (
                   <CoinIcon type={reward.type} size={40} className="animate-pop" />

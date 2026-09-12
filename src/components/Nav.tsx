@@ -25,7 +25,7 @@ export default function Nav() {
   const [menu, setMenu] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/40 bg-white/55 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-[#fbfaf7]/90 backdrop-blur-md">
       {/* Fixed-height bar (taller on PC). Full width with ~5vw side margins. */}
       <nav className="flex h-[var(--header-h)] items-center gap-3 px-[5vw]">
         {/* ロゴ画像 (public/logo.png) は「黒背景に金文字」で、背景が透過して
@@ -35,7 +35,7 @@ export default function Nav() {
             背景透過（または明るい地）のロゴに差し替えたら、この <span> の
             プレート指定を外して <Image> を直接置いてください。 */}
         <Link href="/" className="flex shrink-0 items-center">
-          <span className="inline-flex items-center rounded-lg bg-black px-2 py-0.5 sm:px-2.5">
+          <span className="inline-flex items-center rounded-md bg-black px-2 py-0.5 sm:px-2.5">
             <Image
               src="/logo.png"
               alt="Lucky Coin"
@@ -45,16 +45,6 @@ export default function Nav() {
               priority
             />
           </span>
-        </Link>
-
-        {/* Public rankings / notice board — visible to everyone. */}
-        <Link
-          href="/notice"
-          className={`ml-3 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition hover:bg-sand ${
-            pathname === "/notice" ? "bg-sand text-amber-600" : "text-body"
-          }`}
-        >
-          <span aria-hidden>🏆</span> <span className="hidden sm:inline">{t("nav.rankings")}</span>
         </Link>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -77,14 +67,14 @@ export default function Nav() {
               >
                 <button
                   onClick={() => setMenu((m) => !m)}
-                  className="flex items-center gap-2 rounded-xl border border-line bg-cream px-2 py-1 text-sm hover:bg-sand"
+                  className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-sand/70"
                 >
                   <Avatar src={profile.avatar_url} name={profile.nickname} size={26} />
                   <span className="hidden max-w-[10ch] truncate sm:inline">{profile.nickname}</span>
                 </button>
                 {menu && (
                   <div className="absolute right-0 top-full w-48 pt-2">
-                    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-xl">
+                    <div className="overflow-hidden rounded-lg border border-line bg-white shadow-lg">
                       {/* Mobile-only coin balance. */}
                       <div className="border-b border-line px-3 py-2 sm:hidden">
                         <CoinBalance profile={profile} />
@@ -97,8 +87,8 @@ export default function Nav() {
                             key={l.href}
                             href={l.href}
                             onClick={() => setMenu(false)}
-                            className={`px-3 py-2 text-sm hover:bg-cream ${
-                              pathname === l.href ? "bg-sand text-body" : ""
+                            className={`px-3 py-2 text-sm hover:bg-sand/50 ${
+                              pathname === l.href ? "bg-sand/60 text-body" : ""
                             }`}
                           >
                             {t(l.label)}
@@ -110,7 +100,7 @@ export default function Nav() {
                         <Link
                           href="/admin"
                           onClick={() => setMenu(false)}
-                          className="block border-t border-line px-3 py-2 text-sm text-amber-600 hover:bg-cream"
+                          className="block border-t border-line px-3 py-2 text-sm text-gold-ink hover:bg-sand/50"
                         >
                           {t("nav.admin")}
                         </Link>
@@ -118,7 +108,7 @@ export default function Nav() {
                       <Link
                         href="/profile"
                         onClick={() => setMenu(false)}
-                        className="block border-t border-line px-3 py-2 text-sm hover:bg-cream"
+                        className="block border-t border-line px-3 py-2 text-sm hover:bg-sand/50"
                       >
                         {t("nav.profile")}
                       </Link>
@@ -127,7 +117,7 @@ export default function Nav() {
                           setMenu(false);
                           signOut();
                         }}
-                        className="w-full border-t border-line px-3 py-2 text-left text-sm text-red-600 hover:bg-cream"
+                        className="w-full border-t border-line px-3 py-2 text-left text-sm text-red-600 hover:bg-sand/50"
                       >
                         {t("nav.signOut")}
                       </button>

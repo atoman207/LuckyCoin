@@ -6,19 +6,23 @@
    こげ茶にして、子供向けのやさしい印象に揃えています。
    ===================================================================== */
 @theme {
-  /* 面 */
-  --color-cream: #fff8ec; /* カードの内側・入力欄の背景 */
-  --color-sand: #fdf1dd; /* もう一段濃い面（見出し帯など） */
-  --color-line: #f2e6d2; /* 罫線・枠線 */
+  /* 面 — サイトの枠は淡くし、ゲーム盤面の色が主役になるようにします。 */
+  --color-cream: #faf6ef; /* 入力欄・ごく弱い面 */
+  --color-sand: #f3ebe0; /* ホバー・見出し帯 */
+  /* 枠線は「あると分かる」程度。強い金枠でページ全体が段ボール箱に
+     ならないよう、以前より一段淡くしています。 */
+  --color-line: #e0d4c0; /* 通常の枠線 */
+  --color-line-strong: #c9b89a; /* 入力欄・表の区切り */
 
-  /* 文字 */
-  --color-body: #4a3f31; /* 本文 */
-  --color-muted: #8a7b66; /* 補助テキスト */
-  --color-faint: #ab9d89; /* さらに弱いテキスト */
+  /* 文字 — 白／クリーム背景で WCAG AA（4.5:1）以上。 */
+  --color-body: #3f372c; /* 本文 */
+  --color-muted: #6a5f50; /* 補助テキスト */
+  --color-faint: #857866; /* placeholder・注釈 */
 
-  /* 全体の書体 — 子供向けのやさしい丸ゴシック。Web フォントが届く前や
-     読み込みに失敗したときのために、OS 標準の丸ゴシックを順に並べています
-     （macOS/iOS のヒラギノ丸ゴ → Windows の游ゴシック → メイリオ）。 */
+  /* 差し色の文字（金）。 */
+  --color-gold-ink: #8f6209;
+
+  /* 全体の書体 — 子供向けのやさしい丸ゴシック。 */
   --font-sans: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4",
     "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif;
 }
@@ -39,11 +43,11 @@ body {
 }
 
 body {
+  /* ピンク／水色の差し色は外し、紙のような単色に近い背景へ。
+     色の主張はコインと盤面に任せます。 */
   background:
-    radial-gradient(1200px 600px at 50% -10%, #fff3d9 0%, transparent 62%),
-    radial-gradient(900px 500px at 100% 0%, #ffeef2 0%, transparent 58%),
-    radial-gradient(800px 500px at 0% 12%, #eef7ff 0%, transparent 60%),
-    #ffffff;
+    radial-gradient(900px 480px at 50% -8%, #f7f0e4 0%, transparent 70%),
+    #fbfaf7;
   color: var(--color-body);
   -webkit-font-smoothing: antialiased;
   font-family: var(--font-sans);
@@ -71,30 +75,25 @@ button:not(.btn):not(.btn-gold):not(.btn-ghost):not(.btn-silver):not(.btn-bronze
 table { border-radius: 6px; }
 .card:has(table) { border-radius: 6px; }
 
-/* 金属ボタン共通のコイン風レリーフ: 上面のハイライト、下面の影、
-   そして縁を刻んだように見せる二重のリング。 */
+/* 金属ボタン — コイン感は残しつつ、影とインセットを控えめに。 */
 .btn-gold,
 .btn-silver,
 .btn-bronze,
 .btn-coin {
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.7),
-    inset 0 -2px 3px rgba(120, 80, 10, 0.18),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.4),
-    inset 0 0 0 4px rgba(180, 130, 30, 0.12),
-    0 6px 16px -8px rgba(180, 130, 30, 0.5);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 2px rgba(120, 80, 10, 0.12),
+    0 4px 12px -8px rgba(140, 100, 30, 0.35);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 .btn-ghost {
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    0 4px 12px -8px rgba(120, 90, 40, 0.35);
+  box-shadow: none;
 }
 .btn-gold:hover,
 .btn-silver:hover,
-.btn-bronze:hover { filter: brightness(1.04); }
+.btn-bronze:hover { filter: brightness(1.03); }
 
-/* トップの「PLAY」ボタン — 丸い打刻コイン。 */
+/* トップの「PLAY」ボタン — 丸い打刻コイン（ヒーローの唯一の強いアクセント）。 */
 .btn-coin {
   display: inline-grid;
   place-items: center;
@@ -106,6 +105,10 @@ table { border-radius: 6px; }
   color: #6b4508;
   background: radial-gradient(circle at 35% 30%, #fff6d2 0%, #ffdd85 24%, #f7bd4a 56%, #dd971f 100%);
   transition: transform 0.15s ease, filter 0.15s ease;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.7),
+    inset 0 -2px 3px rgba(120, 80, 10, 0.18),
+    0 10px 28px -10px rgba(180, 120, 20, 0.45);
 }
 .btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.05); }
 .btn-coin:active { transform: scale(0.97); }
@@ -130,41 +133,58 @@ table { border-radius: 6px; }
            font-bold transition active:scale-[.98]
            disabled:opacity-50 disabled:cursor-not-allowed;
     color: #5a3a06;
-    background: linear-gradient(180deg, #ffe9a8 0%, #f7bd4a 60%, #e2a022 100%);
-    box-shadow: 0 8px 20px -10px rgba(226, 160, 34, 0.75);
+    background: linear-gradient(180deg, #f8e4a8 0%, #efc258 55%, #d9a328 100%);
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
            font-bold transition active:scale-[.98] disabled:opacity-50
-           disabled:cursor-not-allowed border border-line bg-white
-           text-body hover:bg-cream;
+           disabled:cursor-not-allowed border border-line bg-transparent
+           text-body hover:bg-sand/60;
   }
   /* コイン色の注目ボタン（初回ログイン時のヘッダー） */
   .btn-silver {
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
            font-bold text-slate-700 transition active:scale-[.98];
-    background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 60%, #b6c2d1 100%);
-    box-shadow: 0 8px 20px -10px rgba(148, 163, 184, 0.8);
+    background: linear-gradient(180deg, #ffffff 0%, #e8edf3 60%, #c5ced9 100%);
   }
   .btn-bronze {
     @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
            font-bold text-white transition active:scale-[.98];
-    background: linear-gradient(180deg, #eeb886 0%, #d78a3f 60%, #a86526 100%);
-    box-shadow: 0 8px 20px -10px rgba(205, 127, 50, 0.8);
+    background: linear-gradient(180deg, #e4b07e 0%, #c9843f 60%, #9a5f24 100%);
   }
   .card {
-    /* 白い面にやわらかい枠線。影は最小限で、ふんわりした印象に。 */
-    @apply rounded-2xl border border-line bg-white;
+    /* 枠付きの箱は「入力や操作のまとまり」だけに使う想定。
+       影はほぼ付けず、線も淡くしてページを細切れに見せません。 */
+    @apply rounded-xl border border-line bg-white/80;
   }
   .input {
-    @apply w-full rounded-xl border border-line bg-cream px-4 py-2.5
+    @apply w-full rounded-lg bg-white px-4 py-2.5
            text-body placeholder:text-faint outline-none
-           focus:border-amber-400 focus:ring-2 focus:ring-amber-200;
+           focus:border-amber-600/50 focus:ring-1 focus:ring-amber-500/30;
+    border: 1px solid var(--color-line-strong);
   }
   .label {
     @apply mb-1 block text-sm font-bold text-muted;
   }
 }
+
+.card {
+  box-shadow: none;
+}
+
+/* 表の罫線。行や thead には既に border-b が付いているので、線を足すと
+   二重線になります。ここでは既存の線を淡く揃えるだけに留めます。 */
+table tr {
+  border-color: var(--color-line);
+}
+
+/* 区切り線ユーティリティも同じ濃さに揃えます。 */
+hr {
+  border-color: var(--color-line);
+}
+
+/* スクロールバーのつまみも背景に埋もれない濃さに。 */
+*::-webkit-scrollbar-thumb { background: #d6c9b0; }
 
 /* ヘッダーの注目アイコン -------------------------------------------- */
 /* 角のアイコンが目に留まるよう、ゆっくり上下に浮かせます。 */
@@ -194,12 +214,12 @@ table { border-radius: 6px; }
 }
 .animate-pop { animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
 
-/* 初回ログイン報酬ボタンの注目パルス。 */
+/* 初回ログイン報酬ボタンの注目パルス（控えめ）。 */
 @keyframes attnPulse {
   0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
-  50% { transform: translateY(-2px) scale(1.04); filter: brightness(1.08); }
+  50% { transform: translateY(-1px) scale(1.02); filter: brightness(1.03); }
 }
-.btn-attn { animation: attnPulse 1.5s ease-in-out infinite; }
+.btn-attn { animation: attnPulse 2.2s ease-in-out infinite; }
 
 /* 倍率が上がったときの画面振動。 */
 @keyframes screenShake {
@@ -351,10 +371,10 @@ table { border-radius: 6px; }
   animation: tileIntroFlip 0.7s cubic-bezier(0.4,0,0.2,1) var(--flip-delay, 0ms) both;
 }
 
-/* 金コインが出たマスを目立たせる、脈打つ金の枠。 */
+/* 金コインが出たマスを目立たせる、脈打つ金の枠（盤面の主役演出）。 */
 @keyframes goldBorder {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(240, 170, 40, 0.9), 0 0 12px 2px rgba(240, 170, 40, 0.4); }
-  50% { box-shadow: 0 0 0 3px rgba(240, 170, 40, 1), 0 0 22px 6px rgba(240, 170, 40, 0.6); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(226, 160, 34, 0.75), 0 0 10px 1px rgba(226, 160, 34, 0.28); }
+  50% { box-shadow: 0 0 0 3px rgba(226, 160, 34, 0.95), 0 0 16px 3px rgba(226, 160, 34, 0.4); }
 }
 .gold-card {
   border-color: rgba(240, 170, 40, 0.95) !important;
@@ -413,7 +433,7 @@ table { border-radius: 6px; }
   letter-spacing: 0.08em;
   line-height: 1.6;
   word-break: keep-all;
-  color: #d18b12;
+  color: var(--color-gold-ink);
 }
 
 .hero-title {
@@ -440,7 +460,7 @@ table { border-radius: 6px; }
   font-size: clamp(0.98rem, 2.5vw, 1.7rem);
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #c98a15;
+  color: var(--color-gold-ink);
 }
 
 .hero-luck-word {
@@ -450,11 +470,11 @@ table { border-radius: 6px; }
   line-height: 0.95;
   background: linear-gradient(
     165deg,
-    #ffd875 0%,
-    #f7bd4a 22%,
-    #e79f1c 50%,
-    #f3b93f 74%,
-    #ffd875 100%
+    #f6c65c 0%,
+    #e5a52c 22%,
+    #c8830c 50%,
+    #dfa229 74%,
+    #f6c65c 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -464,18 +484,15 @@ table { border-radius: 6px; }
 }
 
 @keyframes luckShimmer {
-  0%, 100% { filter: drop-shadow(0 3px 6px rgba(226, 160, 34, 0.3)); }
-  50% { filter: drop-shadow(0 4px 14px rgba(226, 160, 34, 0.55)); }
+  0%, 100% { filter: drop-shadow(0 2px 4px rgba(226, 160, 34, 0.22)); }
+  50% { filter: drop-shadow(0 3px 8px rgba(226, 160, 34, 0.38)); }
 }
 
 .hero-inline-luck {
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.06em;
-  background: linear-gradient(90deg, #e79f1c, #f7bd4a, #a78bfa);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--color-gold-ink);
 }
 
 .hero-subtitle {
@@ -504,11 +521,11 @@ table { border-radius: 6px; }
   max-width: min(42rem, 94vw);
   font-size: 0.875rem;
   word-break: keep-all;
-  color: #8a7b66;
+  color: var(--color-muted);
 }
 
 .hero-footnote strong {
-  color: #d18b12;
+  color: var(--color-gold-ink);
 }
 
 @media (min-width: 1024px) {
@@ -523,33 +540,46 @@ table { border-radius: 6px; }
   font-size: clamp(1.75rem, 4vw, 2.25rem);
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #4a3f31;
+  color: #3f372c;
 }
 
 .landing-section-lead {
   margin-top: 0.75rem;
   text-align: center;
   font-size: 1.05rem;
-  color: #8a7b66;
+  color: var(--color-muted);
 }
 
-.landing-card {
-  border-radius: 1rem;
-  border: 1px solid var(--color-line);
-  background: linear-gradient(145deg, #ffffff, #fff8ec);
+/* ランディングの説明は枠なし。番号と余白だけで区切ります。 */
+.landing-step {
+  padding: 0.25rem 0.5rem;
+}
+
+.landing-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--color-gold-ink);
+  background: rgba(226, 160, 34, 0.12);
 }
 
 .landing-cta-title {
   font-size: clamp(2rem, 5vw, 2.75rem);
   font-weight: 800;
   letter-spacing: 0.01em;
-  color: #4a3f31;
+  color: #3f372c;
 }
 
 .landing-cta {
-  border-radius: 1.25rem;
-  border: 1px solid rgba(240, 170, 40, 0.35);
-  background: radial-gradient(ellipse at 50% 0%, rgba(255, 216, 117, 0.35), transparent 68%), #fffdf8;
+  /* 枠付きパネルではなく、余白だけの締めセクション。 */
+  border: none;
+  background: transparent;
 }
 
 /* ヒーロー背景 — 画面幅いっぱいに合わせ、ヘッダー下から表示する。

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getT } from "@/lib/i18n/server";
 
-// All purchase transactions with the buyer, wallet address, price and date.
+// All purchase transactions with the buyer, price and date.
 export async function GET() {
   const t = await getT();
   const ctx = await requireAdmin();
@@ -11,7 +11,7 @@ export async function GET() {
   const { data, error } = await ctx.admin
     .from("purchases")
     .select(
-      "id, silver, usd_amount, currency, wallet_address, to_address, method, status, created_at, profiles ( nickname, email )"
+      "id, silver, usd_amount, currency, method, status, created_at, profiles ( nickname, email )"
     )
     .order("created_at", { ascending: false })
     .limit(500);
