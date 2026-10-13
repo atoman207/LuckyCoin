@@ -17,9 +17,8 @@ export const dynamic = "force-dynamic";
 //    1. PaymentIntent の metadata.app が "luckycoin"（= APP_TAG）である。
 //       /api/purchase/stripe が作るセッションと PaymentIntent には必ず
 //       このマーカーを刻んでいます。
-//    2. その PaymentIntent の id が、自前の purchases テーブルに
-//       stripe_payment_intent として記録されている（マーカー導入前の
-//       古い注文を取りこぼさないための保険）。
+//    2. PaymentIntent の metadata.order_id が、自前の purchases テーブルに
+//       ある注文を指している（マーカーが欠けた決済を取りこぼさないための保険）。
 //
 //  Stripe の Search API（metadata 検索）は最大 1 分ほどの反映遅れがあるため、
 //  リアルタイム表示には使わず、list API を期間で引いて自前で絞り込みます。
@@ -57,8 +56,6 @@ type OrderRow = {
   id: string;
   silver: number;
   credited: boolean;
-  stripe_payment_intent: string | null;
-  stripe_session_id: string | null;
   profiles: { nickname: string; email: string } | null;
 };
 
@@ -79,21 +76,20 @@ export async function GET(req: Request) {
   const since = Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
 
   // --- 1. 自前 DB 側の Stripe 注文 -------------------------------------
-  // PaymentIntent id をキーに引けるようにしておきます。買い手名やシルバー数は
-  // Stripe 側には無いので、ここからしか出せません。
-  const { data: orders } = await ctx.admin
+  // 注文 id をキーに引けるようにしておきます（PaymentIntent の metadata.order_id
+  // と突き合わせます）。買い手名やシルバー数は Stripe 側には無いので、ここから
+  // しか出せません。注文は決済より先に作られるため、期間の端で取りこぼさない
+  // よう 1 日ぶん手前から引きます。
+  const { data: orders, error: ordersErr } = await ctx.admin
     .from("purchases")
-    .select(
-      "id, silver, credited, stripe_payment_intent, stripe_session_id, profiles ( nickname, email )"
-    )
+    .select("id, silver, credited, profiles ( nickname, email )")
     .eq("method", "stripe")
-    .gte("created_at", new Date(since * 1000).toISOString())
+    .gte("created_at", new Date((since - 24 * 60 * 60) * 1000).toISOString())
     .limit(2000);
+  if (ordersErr) console.error("[stripe] could not load orders:", ordersErr.message);
 
-  const byIntent = new Map<string, OrderRow>();
-  for (const o of (orders ?? []) as unknown as OrderRow[]) {
-    if (o.stripe_payment_intent) byIntent.set(o.stripe_payment_intent, o);
-  }
+  const byOrderId = new Map<string, OrderRow>();
+  for (const o of (orders ?? []) as unknown as OrderRow[]) byOrderId.set(o.id, o);
 
   // --- 2. Stripe 側の PaymentIntent を期間で走査 ------------------------
   const stripe = getStripe();
@@ -113,7 +109,7 @@ export async function GET(req: Request) {
       });
 
       for (const pi of res.data) {
-        const order = byIntent.get(pi.id) ?? null;
+        const order = byOrderId.get(pi.metadata?.order_id ?? "") ?? null;
 
         // 本システム経由の決済だけを残します（上のコメントの 1 と 2）。
         const isOurs = pi.metadata?.app === APP_TAG || order !== null;

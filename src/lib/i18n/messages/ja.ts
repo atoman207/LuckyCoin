@@ -693,6 +693,11 @@ const ja = {
   "admin.colPaidTo": "支払先",
   "admin.colStatus": "ステータス",
   "admin.noTransactions": "取引はまだありません。",
+  "admin.noPaidTransactions": "支払い済みの取引はまだありません。",
+  "admin.txnLead":
+    "コインが付与されるのは、Stripe で支払いが完了した取引だけです。「入金待ち」「キャンセル」は決済ページを開いただけの注文で、請求もコインの付与も発生していません。",
+  "admin.txnPaidOnly": "支払い済みのみ",
+  "admin.txnAll": "未決済も含む",
   "admin.colSeller": "売却者",
   "admin.colPayoutJpy": "支払額（円）",
   "admin.colReceiveAs": "振込方法",

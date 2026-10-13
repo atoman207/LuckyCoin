@@ -65,7 +65,11 @@ export async function POST(req: Request) {
   }
 
   if (session.status === "expired") {
-    await admin.from("purchases").update({ status: "canceled" }).eq("id", order.id);
+    await admin
+      .from("purchases")
+      .update({ status: "canceled" })
+      .eq("id", order.id)
+      .eq("credited", false);
     return NextResponse.json({ ok: false, status: "canceled", message: t("api.stripe.canceled") });
   }
 

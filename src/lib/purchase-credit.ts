@@ -11,6 +11,9 @@
 //  by the atomic `credited = false` claim below (a single UPDATE that only
 //  matches while the order is still uncredited), so one payment can never
 //  credit twice even if both run at the same moment.
+//
+//  Neither entry point may call this before Stripe reports the session as
+//  paid — creating an order, or opening the Checkout page, credits nothing.
 // =====================================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -21,12 +24,44 @@ export type CreditResult =
   | { ok: true; credited: boolean; silver: number; profile: unknown }
   | { ok: false; reason: "not_found" | "error" };
 
+// Order ids are Postgres UUIDs. Anything else cannot be one of ours, and
+// querying with it would only produce an invalid-uuid error.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isOrderId(id: unknown): id is string {
+  return typeof id === "string" && UUID_RE.test(id);
+}
+
+// Purchased silver is NOT capped — SILVER_CAP only limits coins the game
+// itself hands out; a buyer must always receive everything they paid for.
+// Returns the updated profile, or null when the balance could not be written.
+async function addSilver(admin: Admin, userId: string, silver: number): Promise<unknown | null> {
+  const { data: current, error: readErr } = await admin
+    .from("profiles")
+    .select("silver")
+    .eq("id", userId)
+    .maybeSingle();
+
+  // Never fall back to 0 here: writing "0 + silver" after a failed read would
+  // replace the buyer's existing balance instead of adding to it.
+  if (readErr || !current) return null;
+
+  const { data: updated, error } = await admin
+    .from("profiles")
+    .update({ silver: Number(current.silver) + silver })
+    .eq("id", userId)
+    .select("*")
+    .maybeSingle();
+
+  return error ? null : updated;
+}
+
 /**
  * Marks an order paid and adds its silver to the buyer's balance, exactly once.
  *
  * @param admin      service-role Supabase client
  * @param orderId    purchases.id
- * @param patch      extra columns to store alongside (Stripe ids, status, …)
+ * @param patch      extra columns to store alongside (Stripe ids, …)
  * @returns          `credited: false` when the order had already been credited
  */
 export async function creditPurchase(
@@ -44,16 +79,21 @@ export async function creditPurchase(
 
   const silver = Number(order.silver);
 
-  // Atomic claim — only the first writer sees credited = false.
+  // Atomic claim — only the first writer sees credited = false. It writes the
+  // claim and nothing else: `patch` is stored separately at the end, so a
+  // problem with those bookkeeping columns can never block a paid order.
   const { data: claimed, error: claimErr } = await admin
     .from("purchases")
-    .update({ ...patch, credited: true, status: "completed" })
+    .update({ credited: true, status: "completed" })
     .eq("id", order.id)
     .eq("credited", false)
     .select("id")
     .maybeSingle();
 
-  if (claimErr) return { ok: false, reason: "error" };
+  if (claimErr) {
+    console.error("[purchase] could not claim order", order.id, claimErr.message);
+    return { ok: false, reason: "error" };
+  }
 
   if (!claimed) {
     // Someone else already credited it. Return the current profile so the
@@ -66,22 +106,25 @@ export async function creditPurchase(
     return { ok: true, credited: false, silver, profile };
   }
 
-  const { data: current } = await admin
-    .from("profiles")
-    .select("silver")
-    .eq("id", order.user_id)
-    .single();
+  const profile = await addSilver(admin, order.user_id, silver);
 
-  // Purchased silver is NOT capped — SILVER_CAP only limits coins the game
-  // itself hands out; a buyer must always receive everything they paid for.
-  const { data: updated, error: creditErr } = await admin
-    .from("profiles")
-    .update({ silver: (current?.silver ?? 0) + silver })
-    .eq("id", order.user_id)
-    .select("*")
-    .single();
+  if (!profile) {
+    // The coins did not land. Hand the claim back so the next attempt (Stripe
+    // retries the webhook) credits the order instead of finding it "done".
+    await admin
+      .from("purchases")
+      .update({ credited: false, status: "awaiting_payment" })
+      .eq("id", order.id);
+    console.error("[purchase] could not add silver for order", order.id);
+    return { ok: false, reason: "error" };
+  }
 
-  if (creditErr) return { ok: false, reason: "error" };
+  if (Object.keys(patch).length > 0) {
+    const { error: patchErr } = await admin.from("purchases").update(patch).eq("id", order.id);
+    if (patchErr) {
+      console.warn("[purchase] order", order.id, "credited, but its payment reference was not stored:", patchErr.message);
+    }
+  }
 
-  return { ok: true, credited: true, silver, profile: updated };
+  return { ok: true, credited: true, silver, profile };
 }

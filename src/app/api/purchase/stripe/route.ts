@@ -131,10 +131,13 @@ export async function POST(req: Request) {
 
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
 
-    await admin
+    // 記録用です。注文とセッションは client_reference_id で結び付いているので、
+    // ここで保存に失敗しても決済とコインの加算には影響しません。
+    const { error: refErr } = await admin
       .from("purchases")
       .update({ stripe_session_id: session.id })
       .eq("id", purchase.id);
+    if (refErr) console.warn("[stripe] could not store the session id:", refErr.message);
 
     return NextResponse.json({
       order_id: purchase.id,

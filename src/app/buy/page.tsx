@@ -11,6 +11,10 @@ import { useI18n } from "@/lib/i18n/provider";
 
 type Selection = { silver: number; jpy: number; label: string };
 
+// Stripe から戻った直後に決済が未確定だった場合の再確認（回数と間隔）。
+const CONFIRM_RETRIES = 5;
+const CONFIRM_RETRY_MS = 2000;
+
 // カードの輪郭。Stripe の選択肢が「ただのラジオボタン」ではなく支払い方法
 // として一目で伝わるようにするための小さなアイコンです。
 function CardIcon({ size = 26 }: { size?: number }) {
@@ -46,29 +50,43 @@ export default function BuyPage() {
   // Stripe は購入者を /buy?stripe=success&session_id=… に返します。確定情報は
   // Webhook ですが、ここで Stripe に直接問い合わせることでコインが即座に
   // 反映されます。どちらの経路を通っても加算は 1 回だけです。
+  //
+  // 支払いがまだ確定していない（処理中）場合や、確認が一時的に失敗した場合は
+  // 少し待って問い合わせ直します。それでも確定しなければ Webhook に任せます。
   const stripeHandled = useRef(false);
   const confirmStripe = useCallback(
     async (sessionId: string) => {
       setBusy(true);
       try {
-        const res = await fetch("/api/purchase/stripe/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        if (data.profile) setProfile(data.profile);
-        if (data.status === "paid") {
-          setDone(t("buy.stripeSuccess", { silver: Number(data.silver ?? 0).toLocaleString() }));
-          setTimeout(() => router.push("/game"), 1600);
-        } else if (data.status === "canceled") {
-          setError(t("buy.stripeCanceled"));
-        } else {
-          setDone(t("buy.stripeProcessing"));
+        for (let attempt = 0; ; attempt++) {
+          const last = attempt >= CONFIRM_RETRIES;
+          const res = await fetch("/api/purchase/stripe/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            if (res.status < 500 || last) throw new Error(data.error || t("buy.stripeCheckFailed"));
+          } else {
+            if (data.profile) setProfile(data.profile);
+            if (data.status === "paid") {
+              setDone(t("buy.stripeSuccess", { silver: Number(data.silver ?? 0).toLocaleString() }));
+              setTimeout(() => router.push("/game"), 1600);
+              return;
+            }
+            if (data.status === "canceled") {
+              setError(t("buy.stripeCanceled"));
+              return;
+            }
+            setDone(t("buy.stripeProcessing"));
+            if (last) return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, CONFIRM_RETRY_MS));
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : t("buy.stripeCheckFailed"));
+        setDone(null);
+        setError(e instanceof Error && e.message ? e.message : t("buy.stripeCheckFailed"));
       } finally {
         setBusy(false);
       }
@@ -86,11 +104,31 @@ export default function BuyPage() {
 
     if (outcome === "cancel") {
       setError(t("buy.stripeCanceled"));
+      // 注文を「キャンセル」として記録します。請求もコインの加算も発生して
+      // いないので、失敗しても購入者には影響しません。
+      const orderId = params.get("order_id");
+      if (orderId) {
+        fetch("/api/purchase/stripe/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ order_id: orderId }),
+        }).catch(() => {});
+      }
       return;
     }
     const sessionId = params.get("session_id");
     if (outcome === "success" && sessionId) confirmStripe(sessionId);
   }, [confirmStripe, t]);
+
+  // Stripe のページからブラウザの「戻る」で戻ると、遷移直前の画面（ボタンが
+  // 「移動しています…」で無効のまま）が復元されます。もう一度押せるように戻します。
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setBusy(false);
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   if (!loading && !profile) {
     return (
@@ -115,11 +153,11 @@ export default function BuyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ silver: selected.silver }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || t("buy.couldNotStart"));
       window.location.href = data.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("buy.couldNotStart"));
+      setError(e instanceof Error && e.message ? e.message : t("buy.couldNotStart"));
       setBusy(false);
     }
   }

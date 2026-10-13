@@ -123,6 +123,10 @@ alter table public.purchases add column if not exists credited       boolean not
 -- Stripe card checkout: the Checkout Session and the PaymentIntent behind it.
 alter table public.purchases add column if not exists stripe_session_id    text;
 alter table public.purchases add column if not exists stripe_payment_intent text;
+-- Projects created before card checkout still default a new order to
+-- 'completed' / 'crypto-sim'. An order must never start out looking paid.
+alter table public.purchases alter column status set default 'awaiting_payment';
+alter table public.purchases alter column method set default 'stripe';
 
 -- Indexes (after the columns above are guaranteed to exist).
 -- One payment can only ever credit one order.

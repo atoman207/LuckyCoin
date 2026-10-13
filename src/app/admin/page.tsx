@@ -79,6 +79,7 @@ type Txn = {
   currency: string | null;
   method: string;
   status: string;
+  credited: boolean; // paid and coins granted — false for an order that was only opened
   created_at: string;
   profiles: { nickname: string; email: string } | null;
 };
@@ -131,6 +132,19 @@ const STATUS_LABEL: Record<string, MessageKey> = {
 const statusLabel = (t: TFunction, status: string) =>
   STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status;
 
+// Purchase orders: green is reserved for orders that were actually paid, so an
+// order that only reached the Stripe page can't be mistaken for a sale.
+const TXN_STATUS_TONE: Record<string, string> = {
+  completed: "bg-emerald-50 text-emerald-700",
+  awaiting_payment: "bg-amber-50 text-amber-800",
+  failed: "bg-red-50 text-red-700",
+  verification_failed: "bg-red-50 text-red-700",
+};
+const TXN_SCOPE_LABEL: Record<"paid" | "all", MessageKey> = {
+  paid: "admin.txnPaidOnly",
+  all: "admin.txnAll",
+};
+
 type Tab = "users" | "transactions" | "sells" | "messages" | "bots" | "payments";
 
 export default function AdminPage() {
@@ -141,6 +155,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("users");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
+  const [txnScope, setTxnScope] = useState<"paid" | "all">("paid");
   const [sells, setSells] = useState<Sell[] | null>(null);
   const [contacts, setContacts] = useState<Contact[] | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -260,6 +275,10 @@ export default function AdminPage() {
   const botCount = (rows ?? []).filter((r) => r.kind === "bot").length;
   const realCount = (rows ?? []).filter((r) => r.kind === "real").length;
 
+  // Only paid orders are purchases. The rest were opened and never paid.
+  const paidTxns = (txns ?? []).filter((x) => x.credited);
+  const shownTxns = txnScope === "paid" ? paidTxns : txns ?? [];
+
   const totals = (rows ?? []).reduce(
     (a, r) => ({ gold: a.gold + r.gold, silver: a.silver + r.silver, bronze: a.bronze + r.bronze }),
     { gold: 0, silver: 0, bronze: 0 }
@@ -342,7 +361,7 @@ export default function AdminPage() {
               players: rows?.length ?? 0,
               real: realCount,
               bots: botCount,
-              txns: txns?.length ?? 0,
+              txns: paidTxns.length,
               sells: sells?.length ?? 0,
             })}
           </p>
@@ -616,41 +635,72 @@ export default function AdminPage() {
       )}
 
       {tab === "transactions" && (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="border-b border-line text-muted">
-              <tr>
-                <th className="px-4 py-3">{t("admin.colDate")}</th>
-                <th className="px-4 py-3">{t("admin.colBuyer")}</th>
-                <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
-                <th className="px-4 py-3 text-right">{t("admin.colPriceUsd")}</th>
-                <th className="px-4 py-3">{t("admin.colCurrency")}</th>
-                <th className="px-4 py-3">{t("admin.colStatus")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txns === null ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
-              ) : txns.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-faint">{t("admin.noTransactions")}</td></tr>
-              ) : (
-                txns.map((txn) => (
-                  <tr key={txn.id} className="border-b border-line hover:bg-cream">
-                    <td className="px-4 py-3 text-muted">{fmt(txn.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{txn.profiles?.nickname ?? "—"}</div>
-                      <div className="text-xs text-faint">{txn.profiles?.email ?? ""}</div>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-[16rem] flex-1 text-sm text-muted">{t("admin.txnLead")}</p>
+            <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
+              {(["paid", "all"] as const).map((scope) => (
+                <button
+                  key={scope}
+                  onClick={() => setTxnScope(scope)}
+                  aria-pressed={txnScope === scope}
+                  className={`rounded-lg px-3 py-1.5 font-semibold transition ${
+                    txnScope === scope ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
+                  }`}
+                >
+                  {t(TXN_SCOPE_LABEL[scope])}
+                  {txns && ` (${scope === "paid" ? paidTxns.length : txns.length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left text-sm">
+              <thead className="border-b border-line text-muted">
+                <tr>
+                  <th className="px-4 py-3">{t("admin.colDate")}</th>
+                  <th className="px-4 py-3">{t("admin.colBuyer")}</th>
+                  <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
+                  <th className="px-4 py-3 text-right">{t("admin.colPriceUsd")}</th>
+                  <th className="px-4 py-3">{t("admin.colCurrency")}</th>
+                  <th className="px-4 py-3">{t("admin.colStatus")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txns === null ? (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
+                ) : shownTxns.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-faint">
+                      {t(txnScope === "paid" ? "admin.noPaidTransactions" : "admin.noTransactions")}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-body">{txn.silver.toLocaleString("ja-JP")}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-600">${Number(txn.usd_amount).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-body">{txn.currency ?? "—"}</td>
-                    <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">{statusLabel(t, txn.status)}</span></td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  shownTxns.map((txn) => (
+                    <tr key={txn.id} className="border-b border-line hover:bg-cream">
+                      <td className="px-4 py-3 text-muted">{fmt(txn.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{txn.profiles?.nickname ?? "—"}</div>
+                        <div className="text-xs text-faint">{txn.profiles?.email ?? ""}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-body">{txn.silver.toLocaleString("ja-JP")}</td>
+                      <td className={`px-4 py-3 text-right font-semibold ${txn.credited ? "text-emerald-600" : "text-faint"}`}>
+                        ${Number(txn.usd_amount).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-body">{txn.currency ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${TXN_STATUS_TONE[txn.status] ?? "bg-cream text-muted"}`}>
+                          {statusLabel(t, txn.status)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {tab === "sells" && (

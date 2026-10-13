@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { APP_TAG, getStripe, isStripeConfigured } from "@/lib/stripe";
-import { creditPurchase } from "@/lib/purchase-credit";
+import { creditPurchase, isOrderId } from "@/lib/purchase-credit";
 
 export const runtime = "nodejs";
 // The signature is computed over the RAW body, so this route must never be
@@ -25,9 +25,6 @@ export const dynamic = "force-dynamic";
 //  Every request is signature-verified before it is trusted — an unsigned or
 //  mis-signed body is rejected with 400 and nothing is credited.
 // =====================================================================
-// Order ids are Postgres UUIDs. Anything else cannot be one of ours, and
-// querying with it would only produce an invalid-uuid error.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The order id a Checkout Session refers to, or null when the session belongs
@@ -47,7 +44,7 @@ function ourOrderId(session: Stripe.Checkout.Session): string | null {
   // still checked against the database below.
   if (app && app !== APP_TAG) return null;
   const id = session.client_reference_id || session.metadata?.order_id;
-  return typeof id === "string" && UUID_RE.test(id) ? id : null;
+  return isOrderId(id) ? id : null;
 }
 
 async function orderExists(admin: SupabaseClient, orderId: string): Promise<boolean> {
