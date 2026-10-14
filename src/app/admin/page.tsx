@@ -14,6 +14,7 @@ import DashboardPanel from "@/components/admin/DashboardPanel";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey, TFunction } from "@/lib/i18n";
 import Link from "next/link";
+import { formatUsdAsJpy } from "@/lib/fx-book";
 
 type Row = {
   id: string;
@@ -33,7 +34,10 @@ type Row = {
   last_bonus_at: string | null;
   created_at: string;
   last_sign_in_at: string | null;
-  draws: number; // daily prize-wheel spins
+  draws: number; // game rotations (started boards)
+  paid_count: number;
+  paid_silver: number;
+  paid_usd: number;
 };
 
 type Stats = {
@@ -78,6 +82,7 @@ function SelectAllCheckbox({
 
 type Txn = {
   id: string;
+  user_id: string;
   silver: number;
   usd_amount: number;
   currency: string | null;
@@ -160,6 +165,7 @@ export default function AdminPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc"); // newest signups first
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Row | "new" | null>(null);
+  const [detail, setDetail] = useState<Row | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
 
@@ -486,7 +492,7 @@ export default function AdminPage() {
           </div>
 
           <div className="card overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1100px] text-left text-sm">
               <thead className="border-b border-line text-muted">
                 <tr>
                   <th className="w-10 px-4 py-3">
@@ -506,18 +512,20 @@ export default function AdminPage() {
                   <th className="px-4 py-3">{t("admin.colLastLogin")}</th>
                   <th className="px-4 py-3">{t("admin.colJoined")}</th>
                   <th className="px-4 py-3 text-right">{t("admin.colDraws")}</th>
-                  <th className="px-4 py-3 text-right">{t("coin.gold")}</th>
-                  <th className="px-4 py-3 text-right">{t("coin.silver")}</th>
-                  <th className="px-4 py-3 text-right">{t("coin.bronze")}</th>
+                  <th className="px-4 py-3 text-right tabular-nums">{t("coin.gold")}</th>
+                  <th className="px-4 py-3 text-right tabular-nums">{t("coin.silver")}</th>
+                  <th className="px-4 py-3 text-right tabular-nums">{t("coin.bronze")}</th>
+                  <th className="px-4 py-3 text-right">{t("admin.colPaidOrders")}</th>
+                  <th className="px-4 py-3 text-right tabular-nums">{t("admin.colPaidSilver")}</th>
                   <th className="px-4 py-3 text-center">{t("admin.colAdmin")}</th>
                   <th className="px-4 py-3 text-right">{t("admin.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows === null ? (
-                  <tr><td colSpan={14} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
+                  <tr><td colSpan={16} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
                 ) : sorted.length === 0 ? (
-                  <tr><td colSpan={14} className="px-4 py-8 text-center text-faint">{t("admin.noPlayers")}</td></tr>
+                  <tr><td colSpan={16} className="px-4 py-8 text-center text-faint">{t("admin.noPlayers")}</td></tr>
                 ) : (
                   pageRows.map((r) => (
                     <tr key={r.id} className="border-b border-line hover:bg-cream">
@@ -556,13 +564,28 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-body">{r.discord_id ?? "—"}</td>
                       <td className="px-4 py-3 text-muted">{fmt(r.last_sign_in_at)}</td>
                       <td className="px-4 py-3 text-muted">{fmtDate(r.created_at)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-sky-600">{r.draws}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-amber-600">{r.gold}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-body">{r.silver}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-orange-600">{r.bronze}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-sky-600">
+                        {r.draws.toLocaleString(intlLocale)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-600">
+                        {r.gold.toLocaleString(intlLocale)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-body">
+                        {r.silver.toLocaleString(intlLocale)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-orange-600">
+                        {r.bronze.toLocaleString(intlLocale)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-body">
+                        {(r.paid_count ?? 0).toLocaleString(intlLocale)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums text-body">
+                        {(r.paid_silver ?? 0).toLocaleString(intlLocale)}
+                      </td>
                       <td className="px-4 py-3 text-center">{r.is_admin ? "✅" : "—"}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button onClick={() => setEditing(r)} className="btn-mini px-2.5 py-1 text-xs">{t("common.edit")}</button>
+                        <button onClick={() => setDetail(r)} className="btn-mini px-2.5 py-1 text-xs">{t("admin.details")}</button>
+                        <button onClick={() => setEditing(r)} className="btn-mini ml-2 px-2.5 py-1 text-xs">{t("common.edit")}</button>
                         <button onClick={() => remove(r)} className="btn-mini btn-mini-danger ml-2 px-2.5 py-1 text-xs">{t("common.delete")}</button>
                       </td>
                     </tr>
@@ -782,6 +805,14 @@ export default function AdminPage() {
 
       {tab === "bots" && <BotsPanel onError={setError} />}
 
+      {detail && (
+        <UserDetailModal
+          row={detail}
+          payments={(txns ?? []).filter((x) => x.user_id === detail.id)}
+          onClose={() => setDetail(null)}
+        />
+      )}
+
       {editing && (
         <UserModal
           row={editing === "new" ? null : editing}
@@ -988,6 +1019,129 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
           </div>
         </div>
         <button onClick={load} className="btn-ghost text-sm">{t("common.refresh")}</button>
+      </div>
+    </div>
+  );
+}
+
+// -------- Per-user holdings + payment history ---------------------------
+function UserDetailModal({
+  row,
+  payments,
+  onClose,
+}: {
+  row: Row;
+  payments: Txn[];
+  onClose: () => void;
+}) {
+  const { t, intlLocale } = useI18n();
+  const fmt = (d: string | null) => (d ? new Date(d).toLocaleString(intlLocale) : "—");
+  const paid = payments.filter((p) => p.credited);
+  const paidSilver = paid.reduce((n, p) => n + (Number(p.silver) || 0), 0);
+  const paidUsd = paid.reduce((n, p) => n + (Number(p.usd_amount) || 0), 0);
+  const holdings = [
+    { type: "gold" as const, value: row.gold, tone: "text-amber-600" },
+    { type: "silver" as const, value: row.silver, tone: "text-neutral-800" },
+    { type: "bronze" as const, value: row.bronze, tone: "text-orange-600" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
+      <div
+        className="card relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden p-6 animate-pop"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="btn-close absolute right-3 top-3">
+          ✕
+        </button>
+        <div className="flex items-center gap-3 pr-8">
+          <Avatar src={row.avatar_url} name={row.nickname} size={44} />
+          <div>
+            <h2 className="text-xl font-bold">{t("admin.userDetailTitle", { nickname: row.nickname })}</h2>
+            <div className="text-sm text-faint">{row.email}</div>
+          </div>
+        </div>
+
+        <div className="mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto">
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-muted">{t("admin.userHoldings")}</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {holdings.map((h) => (
+                <div key={h.type} className="flex items-center gap-3 rounded border border-neutral-200 px-3 py-3">
+                  <CoinIcon type={h.type} size={32} />
+                  <div>
+                    <div className="text-xs text-muted">{coinName(t, h.type)}</div>
+                    <div className={`text-2xl font-extrabold tabular-nums ${h.tone}`}>
+                      {h.value.toLocaleString(intlLocale)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold text-muted">{t("admin.userPayments")}</h3>
+              <p className="text-xs text-muted">
+                {t("admin.userPaidSummary", {
+                  count: paid.length.toLocaleString(intlLocale),
+                  silver: paidSilver.toLocaleString(intlLocale),
+                  amount: formatUsdAsJpy(paidUsd, intlLocale),
+                })}
+              </p>
+            </div>
+            <div className="overflow-x-auto rounded border border-neutral-200">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="border-b border-line bg-neutral-50 text-muted">
+                  <tr>
+                    <th className="px-3 py-2">{t("admin.colDate")}</th>
+                    <th className="px-3 py-2 text-right">{t("coin.silver")}</th>
+                    <th className="px-3 py-2 text-right">{t("admin.colPriceUsd")}</th>
+                    <th className="px-3 py-2">{t("admin.colCurrency")}</th>
+                    <th className="px-3 py-2">{t("admin.colStatus")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-8 text-center text-faint">
+                        {t("admin.userNoPayments")}
+                      </td>
+                    </tr>
+                  ) : (
+                    payments.map((p) => (
+                      <tr key={p.id} className="border-b border-line last:border-0">
+                        <td className="px-3 py-2 text-muted">{fmt(p.created_at)}</td>
+                        <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                          {p.silver.toLocaleString(intlLocale)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                            p.credited ? "text-emerald-600" : "text-faint"
+                          }`}
+                        >
+                          ${Number(p.usd_amount).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">{p.currency ?? "—"}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${
+                              TXN_STATUS_TONE[p.status] ?? "bg-cream text-muted"
+                            }`}
+                          >
+                            {statusLabel(t, p.status)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

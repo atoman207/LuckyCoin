@@ -7,22 +7,38 @@ import CoinIcon from "@/components/CoinIcon";
 import CoinBalance from "@/components/CoinBalance";
 import { COIN_PACKS, CUSTOM_SILVER_MIN, CUSTOM_SILVER_MAX, customCost } from "@/lib/coins";
 import { formatUsdAsJpy, usdToJpy, USD_JPY_BOOK_RATE } from "@/lib/fx-book";
+import { PURCHASE_BANK } from "@/lib/purchase-bank";
 import { useI18n } from "@/lib/i18n/provider";
 
 type Selection = { silver: number; jpy: number; label: string };
+type PayStep = "choose" | "stripe" | "bank";
 
 // Stripe から戻った直後に決済が未確定だった場合の再確認（回数と間隔）。
 const CONFIRM_RETRIES = 5;
 const CONFIRM_RETRY_MS = 2000;
 
-// カードの輪郭。Stripe の選択肢が「ただのラジオボタン」ではなく支払い方法
-// として一目で伝わるようにするための小さなアイコンです。
-function CardIcon({ size = 26 }: { size?: number }) {
+/** Official-style Stripe mark (purple). */
+function StripeIcon({ size = 28 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <rect x="2" y="5" width="20" height="14" rx="2.5" />
-      <path d="M2 10h20" />
-      <path d="M6 15h4" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#635BFF" />
+      <path
+        fill="#fff"
+        d="M13.5 10.3c0-.7.57-1 1.5-1 1.33 0 3 .4 4.3 1.12V7.3A11.3 11.3 0 0 0 15 6.4c-3.2 0-5.35 1.67-5.35 4.45 0 4.34 5.98 3.64 5.98 5.5 0 .83-.72 1.1-1.72 1.1-1.48 0-3.38-.61-4.88-1.42v3.2A12.1 12.1 0 0 0 14.9 20c3.35 0 5.5-1.65 5.5-4.5-.02-4.68-6-3.85-6-5.2z"
+      />
+    </svg>
+  );
+}
+
+/** Bank / transfer building icon. */
+function BankIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#0F766E" />
+      <path
+        fill="#fff"
+        d="M12 4.5 4.5 8v1.5h15V8L12 4.5zm-6 6v5H7.2v-5H6zm3.3 0v5h1.2v-5H9.3zm3.3 0v5h1.2v-5H12.6zm3.3 0v5H17.1v-5H15.9zM5 17.2V19h14v-1.8H5z"
+      />
     </svg>
   );
 }
@@ -34,25 +50,25 @@ export default function BuyPage() {
   const [selected, setSelected] = useState<Selection | null>(null);
   const [customSilver, setCustomSilver] = useState(10);
   const [usingCustom, setUsingCustom] = useState(false);
+  const [payStep, setPayStep] = useState<PayStep | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function selectCustom(n: number) {
+  function customSelection(n: number): Selection {
     const v = Math.max(CUSTOM_SILVER_MIN, Math.min(CUSTOM_SILVER_MAX, Math.floor(n) || CUSTOM_SILVER_MIN));
-    setCustomSilver(v);
-    setUsingCustom(true);
-    setSelected({ silver: v, jpy: usdToJpy(customCost(v)), label: t("buy.customSilver", { count: v }) });
+    return { silver: v, jpy: usdToJpy(customCost(v)), label: t("buy.customSilver", { count: v }) };
   }
 
-  // ---- Stripe Checkout から戻ってきたとき ------------------------------
-  // Stripe は購入者を /buy?stripe=success&session_id=… に返します。確定情報は
-  // Webhook ですが、ここで Stripe に直接問い合わせることでコインが即座に
-  // 反映されます。どちらの経路を通っても加算は 1 回だけです。
-  //
-  // 支払いがまだ確定していない（処理中）場合や、確認が一時的に失敗した場合は
-  // 少し待って問い合わせ直します。それでも確定しなければ Webhook に任せます。
+  function openCheckout(sel: Selection, custom: boolean) {
+    setUsingCustom(custom);
+    setSelected(sel);
+    setCopied(false);
+    setPayStep("choose");
+  }
+
   const stripeHandled = useRef(false);
   const confirmStripe = useCallback(
     async (sessionId: string) => {
@@ -100,12 +116,10 @@ export default function BuyPage() {
     const outcome = params.get("stripe");
     if (!outcome) return;
     stripeHandled.current = true;
-    window.history.replaceState({}, "", "/buy"); // 再読み込みで再実行しない
+    window.history.replaceState({}, "", "/buy");
 
     if (outcome === "cancel") {
       setError(t("buy.stripeCanceled"));
-      // 注文を「キャンセル」として記録します。請求もコインの加算も発生して
-      // いないので、失敗しても購入者には影響しません。
       const orderId = params.get("order_id");
       if (orderId) {
         fetch("/api/purchase/stripe/cancel", {
@@ -120,8 +134,6 @@ export default function BuyPage() {
     if (outcome === "success" && sessionId) confirmStripe(sessionId);
   }, [confirmStripe, t]);
 
-  // Stripe のページからブラウザの「戻る」で戻ると、遷移直前の画面（ボタンが
-  // 「移動しています…」で無効のまま）が復元されます。もう一度押せるように戻します。
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
       if (e.persisted) setBusy(false);
@@ -140,8 +152,6 @@ export default function BuyPage() {
   }
   if (loading || !profile) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
 
-  // カード決済: Stripe セッションを作成し、ブラウザを Stripe のホスト型ページへ
-  // 渡します。カード情報が本サイトを通ることはありません。
   async function payByCard() {
     if (!selected) return;
     setBusy(true);
@@ -162,38 +172,74 @@ export default function BuyPage() {
     }
   }
 
+  const amountLabel = selected
+    ? formatUsdAsJpy(selected.jpy / USD_JPY_BOOK_RATE, intlLocale)
+    : "";
+
+  const bankRows = [
+    { label: t("buy.bankName"), value: PURCHASE_BANK.bankName },
+    { label: t("buy.bankCode"), value: PURCHASE_BANK.bankCode },
+    { label: t("buy.branchNumber"), value: PURCHASE_BANK.branchNumber },
+    { label: t("buy.branchName"), value: PURCHASE_BANK.branchName },
+    { label: t("buy.accountType"), value: t("buy.accountTypeChecking") },
+    { label: t("buy.accountNumber"), value: PURCHASE_BANK.accountNumber },
+    { label: t("buy.accountHolder"), value: PURCHASE_BANK.accountHolder },
+  ];
+
+  async function copyBankInfo() {
+    const text = [
+      ...bankRows.map((r) => `${r.label}: ${r.value}`),
+      selected ? `${t("buy.bankAmountLabel")}: ${amountLabel}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function closePayModal() {
+    if (busy) return;
+    setPayStep(null);
+    setCopied(false);
+  }
+
   return (
-    // 1 画面完結: ヘッダー + 内容がビューポート内に収まります（ページスクロールなし）。
-    <div className="flex h-[calc(100dvh-var(--header-h)-4rem)] flex-col gap-3 overflow-hidden">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold sm:text-3xl">{t("buy.title")}</h1>
-          <p className="hidden text-sm text-muted sm:block">{t("buy.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted">{t("buy.subtitle")}</p>
         </div>
         <CoinBalance profile={profile} size={26} />
       </div>
 
       {done && (
-        <div className="card animate-pop shrink-0 border-emerald-300 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-700">
+        <div className="card animate-pop border-emerald-300 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-700">
           {done}
         </div>
       )}
       {error && (
-        <div className="shrink-0 rounded-xl bg-red-50 px-4 py-2 text-center text-sm text-red-600">{error}</div>
+        <div className="rounded-xl bg-red-50 px-4 py-2 text-center text-sm text-red-600">{error}</div>
       )}
 
-      {/* パック — デスクトップでは 1 行に収まります。 */}
-      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {COIN_PACKS.map((pack) => {
           const perJpy = usdToJpy(pack.usd) / pack.silver;
-          const active = !usingCustom && selected?.silver === pack.silver;
+          const active = payStep !== null && !usingCustom && selected?.silver === pack.silver;
           return (
             <button
               key={pack.silver}
-              onClick={() => {
-                setUsingCustom(false);
-                setSelected({ silver: pack.silver, jpy: usdToJpy(pack.usd), label: t(pack.label) });
-              }}
+              onClick={() =>
+                openCheckout(
+                  { silver: pack.silver, jpy: usdToJpy(pack.usd), label: t(pack.label) },
+                  false
+                )
+              }
               className={`btn-option relative flex flex-col items-center gap-1 rounded-xl p-3 text-center ${
                 active ? "btn-option-on" : ""
               }`}
@@ -215,11 +261,17 @@ export default function BuyPage() {
           );
         })}
 
-        {/* 自由入力: シルバー 1〜100 枚 */}
         <div
-          onClick={() => selectCustom(customSilver)}
+          onClick={() => {
+            const v = Math.max(
+              CUSTOM_SILVER_MIN,
+              Math.min(CUSTOM_SILVER_MAX, Math.floor(customSilver) || CUSTOM_SILVER_MIN)
+            );
+            setCustomSilver(v);
+            openCheckout(customSelection(v), true);
+          }}
           className={`btn-option relative flex cursor-pointer flex-col items-center gap-1 rounded-xl p-3 text-center ${
-            usingCustom ? "btn-option-on" : ""
+            payStep !== null && usingCustom ? "btn-option-on" : ""
           }`}
         >
           <CoinIcon type="silver" size={32} />
@@ -230,7 +282,14 @@ export default function BuyPage() {
             max={CUSTOM_SILVER_MAX}
             value={customSilver}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => selectCustom(Number(e.target.value))}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setCustomSilver(v);
+              setUsingCustom(true);
+              const sel = customSelection(v);
+              setSelected(sel);
+              if (payStep) setPayStep("choose");
+            }}
             className="input w-20 py-1 text-center text-base font-bold"
           />
           <div className="text-base font-extrabold text-amber-600">
@@ -239,50 +298,126 @@ export default function BuyPage() {
         </div>
       </div>
 
-      {/* お支払い — 残りの高さを埋めます。 */}
-      <div className="card flex min-h-0 flex-1 flex-col p-4">
-        <h2 className="shrink-0 text-lg font-bold">{t("buy.checkout")}</h2>
-
-        {!selected ? (
-          <p className="mt-2 text-muted">{t("buy.selectPack")}</p>
-        ) : (
-          <div className="mt-3 flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex shrink-0 items-center justify-between rounded-xl bg-cream px-4 py-2">
-              <span className="text-body">{selected.label}</span>
-              <span className="text-xl font-bold text-amber-600">
-                {formatUsdAsJpy(selected.jpy / USD_JPY_BOOK_RATE, intlLocale)}
-              </span>
-            </div>
-
-            {/* 決済手段はカード（Stripe）のみです。 */}
-            <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-amber-400 bg-amber-50 px-3 py-2">
-              <CardIcon />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{t("buy.methodCard")}</span>
-                <span className="block truncate text-xs text-muted">{t("buy.methodCardSub")}</span>
-              </span>
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 rounded-xl border border-line bg-cream p-4 text-sm">
-              <div className="font-semibold text-body">{t("buy.cardTitle")}</div>
-              <p className="text-muted">{t("buy.cardBody")}</p>
-              <p className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800">
-                {t("buy.cardChargedIn", {
-                  amount: formatUsdAsJpy(selected.jpy / USD_JPY_BOOK_RATE, intlLocale),
-                  rate: String(USD_JPY_BOOK_RATE),
-                })}
-              </p>
-              <p className="text-xs text-faint">{t("buy.cardBrands")}</p>
-            </div>
-
-            <button onClick={payByCard} disabled={busy} className="btn-gold w-full shrink-0">
-              {busy
-                ? t("buy.redirecting")
-                : t("buy.payCardLocal", { amount: formatUsdAsJpy(selected.jpy / USD_JPY_BOOK_RATE, intlLocale) })}
+      {payStep && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closePayModal}>
+          <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
+          <div
+            className="card relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden p-5 animate-pop sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closePayModal}
+              className="btn-close absolute right-3 top-3"
+              aria-label={t("common.close")}
+              disabled={busy}
+            >
+              ✕
             </button>
+
+            <h2 className="pr-8 text-lg font-bold">{t("buy.checkout")}</h2>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-cream px-4 py-2">
+              <span className="text-body">{selected.label}</span>
+              <span className="text-xl font-bold text-amber-600">{amountLabel}</span>
+            </div>
+
+            {payStep === "choose" && (
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCopied(false);
+                    setPayStep("stripe");
+                  }}
+                  className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-left transition hover:border-amber-300 hover:bg-amber-50"
+                >
+                  <StripeIcon />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{t("buy.methodStripe")}</span>
+                    <span className="block truncate text-xs text-muted">{t("buy.methodStripeSub")}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCopied(false);
+                    setPayStep("bank");
+                  }}
+                  className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-3 text-left transition hover:border-amber-300 hover:bg-amber-50"
+                >
+                  <BankIcon />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{t("buy.methodBank")}</span>
+                    <span className="block truncate text-xs text-muted">{t("buy.methodBankSub")}</span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {payStep === "stripe" && (
+              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => setPayStep("choose")}
+                  className="self-start text-xs text-muted hover:underline"
+                >
+                  ← {t("buy.checkout")}
+                </button>
+                <div className="flex items-center gap-2 text-lg font-bold text-body">
+                  <StripeIcon size={26} />
+                  {t("buy.cardTitle")}
+                </div>
+                <p className="text-sm text-muted">{t("buy.cardBody")}</p>
+                <p className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800">
+                  {t("buy.cardChargedIn", {
+                    amount: amountLabel,
+                    rate: String(USD_JPY_BOOK_RATE),
+                  })}
+                </p>
+                <p className="text-xs text-faint">{t("buy.cardBrands")}</p>
+                <button onClick={payByCard} disabled={busy} className="btn-gold mt-1 w-full shrink-0">
+                  {busy ? t("buy.redirecting") : t("buy.payCardLocal", { amount: amountLabel })}
+                </button>
+              </div>
+            )}
+
+            {payStep === "bank" && (
+              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => setPayStep("choose")}
+                  className="self-start text-xs text-muted hover:underline"
+                >
+                  ← {t("buy.checkout")}
+                </button>
+                <div className="flex items-center gap-2 text-lg font-bold text-body">
+                  <BankIcon size={26} />
+                  {t("buy.bankTitle")}
+                </div>
+                <p className="text-sm text-muted">{t("buy.bankBody")}</p>
+                <p className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-800">
+                  {t("buy.bankAmountLabel")}: {amountLabel}
+                </p>
+                <dl className="grid gap-1.5 rounded-lg border border-line bg-cream px-3 py-3 text-sm">
+                  {bankRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="grid grid-cols-[7.5rem_1fr] items-baseline gap-2 sm:grid-cols-[9rem_1fr]"
+                    >
+                      <dt className="text-xs text-muted">{row.label}</dt>
+                      <dd className="font-semibold tabular-nums text-body">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="text-xs text-faint">{t("buy.bankNote")}</p>
+                <button type="button" onClick={copyBankInfo} className="btn-gold mt-1 w-full shrink-0">
+                  {copied ? t("buy.bankCopied") : t("buy.bankCopy")}
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

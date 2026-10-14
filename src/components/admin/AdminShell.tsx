@@ -39,7 +39,7 @@ export default function AdminShell({ tab, onTabChange, children }: Props) {
   }
 
   return (
-    <div className="admin-simple flex min-h-[calc(100dvh-var(--header-h))] bg-white text-neutral-800">
+    <div className="admin-simple flex h-full min-h-0 bg-white text-neutral-800">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 lg:flex">
         <div className="border-b border-neutral-200 px-4 py-4">
           <div className="text-sm font-bold">Lucky Coin</div>

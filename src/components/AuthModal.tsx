@@ -21,7 +21,7 @@ const TAB_LABEL: Record<"login" | "register", MessageKey> = {
 };
 
 export default function AuthModal() {
-  const { authOpen, closeAuth, refresh } = useUser();
+  const { authOpen, closeAuth, refresh, openWelcome } = useUser();
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
@@ -111,16 +111,6 @@ export default function AuthModal() {
     const supabase = createClient();
     const email = form.email.trim().toLowerCase();
 
-    // Send the login email via our SMTP-backed route (not Supabase email).
-    async function sendMagicLink() {
-      const res = await fetch("/api/auth/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? t("auth.magicLinkFailed"));
-    }
-
     try {
       if (mode === "forgot") {
         await fetch("/api/auth/forgot-password", {
@@ -152,27 +142,26 @@ export default function AuthModal() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? t("auth.registerFailed"));
 
-        // First login is confirmed by an email magic link (sent via SMTP).
-        await sendMagicLink();
+        // Sign in immediately with the password just registered — no email link.
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email,
+          password: form.password,
+        });
+        if (signInErr) throw new Error(authErrorMessage(t, signInErr.message));
+
         clearAvatar();
-        setNotice(t("auth.accountCreated", { email }));
+        await refresh();
+        closeAuth();
+        openWelcome();
         return;
       }
 
-      // Login with password.
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: form.password });
-      // Supabase reports auth failures in English — show our own wording.
+      // Login with registered email + password.
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.password,
+      });
       if (signInErr) throw new Error(authErrorMessage(t, signInErr.message));
-
-      // First login still needs email confirmation — send the link and sign out.
-      const meRes = await fetch("/api/me", { cache: "no-store" });
-      const me = meRes.ok ? await meRes.json() : null;
-      if (me?.profile && me.profile.first_login_done === false) {
-        await supabase.auth.signOut();
-        await sendMagicLink();
-        setNotice(t("auth.firstLoginEmail", { email }));
-        return;
-      }
 
       await refresh();
       closeAuth();

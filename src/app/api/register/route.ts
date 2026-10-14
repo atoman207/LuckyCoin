@@ -33,8 +33,8 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient();
 
-    // Create the auth user with email pre-confirmed so the magic link can log
-    // them in. (First-login verification is handled by the app-level flag.)
+    // Pre-confirm email so the user can sign in with password immediately
+    // after registration (no magic-link / Gmail verification step).
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       password,
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       bronze: 0,
       streak: 0,
       rewards_claimed: false,
-      first_login_done: false, // first login is confirmed via an email magic link
+      first_login_done: true, // registration itself completes the first login
       kind: "real", // self-service signup
     });
 

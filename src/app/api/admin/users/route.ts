@@ -118,19 +118,44 @@ export async function GET() {
     }
   }
 
-  // Per-player draw tally (consolidated view of daily prize-wheel spins).
-  const drawCount = new Map<string, number>();
-  const { data: draws } = await ctx.admin.from("draws").select("user_id");
-  for (const d of draws ?? []) drawCount.set(d.user_id, (drawCount.get(d.user_id) ?? 0) + 1);
+  // Per-player game rotations (each started board in game_rounds).
+  const roundCount = new Map<string, number>();
+  const { data: rounds } = await ctx.admin.from("game_rounds").select("user_id");
+  for (const r of rounds ?? []) roundCount.set(r.user_id, (roundCount.get(r.user_id) ?? 0) + 1);
+
+  // Paid purchase totals per user (credited = coins actually granted).
+  type PayAgg = { paid_count: number; paid_silver: number; paid_usd: number };
+  const payAgg = new Map<string, PayAgg>();
+  const { data: purchases } = await ctx.admin
+    .from("purchases")
+    .select("user_id, silver, usd_amount, credited");
+  for (const p of purchases ?? []) {
+    if (!p.credited) continue;
+    const cur = payAgg.get(p.user_id) ?? { paid_count: 0, paid_silver: 0, paid_usd: 0 };
+    cur.paid_count += 1;
+    cur.paid_silver += Number(p.silver) || 0;
+    cur.paid_usd += Number(p.usd_amount) || 0;
+    payAgg.set(p.user_id, cur);
+  }
 
   const dates = new Map(authUsers.map((u) => [u.id, u]));
 
   const users = profiles
-    .map((u) => ({
-      ...u,
-      last_sign_in_at: dates.get(u.id)?.last_sign_in_at ?? null,
-      draws: drawCount.get(u.id) ?? 0,
-    }))
+    .map((u) => {
+      const pay = payAgg.get(u.id) ?? { paid_count: 0, paid_silver: 0, paid_usd: 0 };
+      return {
+        ...u,
+        // Exact integer balances (never float-truncated in the admin list).
+        gold: Math.max(0, Math.floor(Number(u.gold) || 0)),
+        silver: Math.max(0, Math.floor(Number(u.silver) || 0)),
+        bronze: Math.max(0, Math.floor(Number(u.bronze) || 0)),
+        last_sign_in_at: dates.get(u.id)?.last_sign_in_at ?? null,
+        draws: roundCount.get(u.id) ?? 0, // rotations played (game_rounds)
+        paid_count: pay.paid_count,
+        paid_silver: pay.paid_silver,
+        paid_usd: pay.paid_usd,
+      };
+    })
     .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
 
   return NextResponse.json({ users });

@@ -16,7 +16,7 @@ export async function GET() {
   const { data, error } = await ctx.admin
     .from("purchases")
     .select(
-      "id, silver, usd_amount, currency, method, status, credited, created_at, profiles ( nickname, email )"
+      "id, user_id, silver, usd_amount, currency, method, status, credited, created_at, profiles ( nickname, email )"
     )
     .order("created_at", { ascending: false })
     .limit(500);
