@@ -68,7 +68,7 @@ export default function PrizeWheel({
               <text
                 x={lx}
                 y={ly}
-                fill={blocked ? "#8a5f08" : "#4a3f31"}
+                fill={blocked ? "#7a4a00" : "#2a2018"}
                 fontSize="13"
                 fontWeight="bold"
                 textAnchor="middle"

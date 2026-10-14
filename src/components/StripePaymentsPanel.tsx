@@ -35,11 +35,15 @@ const POLL_MS = 5_000;
 // 白い面の上で使う前提で採用しています（validate_palette.js で全項目 PASS:
 // 隣接 CVD ΔE 24.7 / 通常視 ΔE 33.6 / コントラスト 3:1 以上）。
 // 系列はグラフごとに 1 本なので凡例は置かず、見出しがその系列を名指しします。
-const SERIES_REVENUE = "#2a78d6";
-const SERIES_COUNT = "#eb6834";
+const SERIES_REVENUE_LIGHT = "#2a78d6";
+const SERIES_COUNT_LIGHT = "#eb6834";
+const SERIES_REVENUE_DARK = "#e0b35a";
+const SERIES_COUNT_DARK = "#4a8dff";
 // 目盛りや罫線は控えめに。データより前に出ないようにします。
-const GRID = "#ece4d6";
-const AXIS_INK = "#8a7b66";
+const GRID_LIGHT = "#ece4d6";
+const AXIS_INK_LIGHT = "#8a7b66";
+const GRID_DARK = "rgba(255,255,255,0.06)";
+const AXIS_INK_DARK = "#8b95a8";
 
 type Row = {
   id: string;
@@ -101,7 +105,18 @@ const STATUS: Record<string, { label: MessageKey; tone: string; dot: string }> =
 
 const TABLE_PAGE = 50;
 
-export default function StripePaymentsPanel({ onError }: { onError: (m: string) => void }) {
+export default function StripePaymentsPanel({
+  onError,
+  variant = "light",
+}: {
+  onError: (m: string) => void;
+  variant?: "light" | "admin";
+}) {
+  const dark = variant === "admin";
+  const SERIES_REVENUE = dark ? SERIES_REVENUE_DARK : SERIES_REVENUE_LIGHT;
+  const SERIES_COUNT = dark ? SERIES_COUNT_DARK : SERIES_COUNT_LIGHT;
+  const GRID = dark ? GRID_DARK : GRID_LIGHT;
+  const AXIS_INK = dark ? AXIS_INK_DARK : AXIS_INK_LIGHT;
   const { t, intlLocale } = useI18n();
   const [days, setDays] = useState(30);
   const [data, setData] = useState<Payload | null>(null);
@@ -206,8 +221,8 @@ export default function StripePaymentsPanel({ onError }: { onError: (m: string) 
                 key={r.days}
                 onClick={() => setDays(r.days)}
                 aria-pressed={days === r.days}
-                className={`rounded-lg px-3 py-1.5 font-bold transition ${
-                  days === r.days ? "bg-amber-400 text-slate-900" : "text-muted hover:text-body"
+                className={`btn-tab rounded-lg px-3 py-1.5 ${
+                  days === r.days ? "btn-tab-on" : ""
                 }`}
               >
                 {t(r.label)}

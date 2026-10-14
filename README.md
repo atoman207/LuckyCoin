@@ -15,7 +15,7 @@ bronze straight to your account.
 - **Admin** — `/admin`: full CRUD over all users (create/edit/delete, coins by type, role, login dates), a **Transactions** tab, and a **Payments** tab that reads the live Stripe income for **this site only** (see [Admin payment history](#admin-payment-history)) with real-time charts.
 - **Avatars** — uploaded files are stored in the **Supabase Storage** `avatar` bucket (must be public); only the URL is saved in the database. Works on read-only serverless hosts like Vercel.
 - **Language** — the site is **Japanese only**. There is no language switch. See [Copy and wording](#copy-and-wording).
-- Fully responsive, bright UI on a white base, set in the rounded Japanese typeface *M PLUS Rounded 1c*.
+- Fully responsive, bright UI on a white base, set in the rounded Japanese typeface *Zen Maru Gothic*.
 
 ## Economy
 

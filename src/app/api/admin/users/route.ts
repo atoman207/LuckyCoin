@@ -48,7 +48,7 @@ async function listAuthUsers(): Promise<AuthUser[]> {
 }
 
 const PROFILE_COLUMNS =
-  "id, nickname, email, nationality, discord_id, avatar_url, gold, silver, bronze, is_admin, kind, streak, last_bonus_at, created_at";
+  "id, nickname, email, nationality, discord_id, chatwork_id, phone, avatar_url, gold, silver, bronze, is_admin, kind, streak, last_bonus_at, created_at";
 
 // ---- READ: list every user with balances + login dates --------------------
 export async function GET() {
@@ -105,6 +105,8 @@ export async function GET() {
           ...r,
           nationality: null,
           discord_id: null,
+          chatwork_id: null,
+          phone: null,
           avatar_url: null,
           is_admin: false,
           last_bonus_at: null,
@@ -166,7 +168,8 @@ export async function POST(req: Request) {
     id: created.user.id,
     nickname,
     email,
-    nationality: (b.nationality ?? "").trim() || null,
+    chatwork_id: (b.chatwork_id ?? "").trim() || null,
+    phone: (b.phone ?? "").trim() || null,
     discord_id: (b.discord_id ?? "").trim() || null,
     gold: Math.max(0, Math.floor(Number(b.gold) || 0)),
     silver: Math.max(0, Math.floor(Number(b.silver) || 0)),
@@ -196,7 +199,8 @@ export async function PATCH(req: Request) {
 
   const patch: Record<string, unknown> = {};
   if (typeof b.nickname === "string") patch.nickname = b.nickname.trim();
-  if (typeof b.nationality === "string") patch.nationality = b.nationality.trim() || null;
+  if (typeof b.chatwork_id === "string") patch.chatwork_id = b.chatwork_id.trim() || null;
+  if (typeof b.phone === "string") patch.phone = b.phone.trim() || null;
   if (typeof b.discord_id === "string") patch.discord_id = b.discord_id.trim() || null;
   if (b.gold !== undefined) patch.gold = Math.max(0, Math.floor(Number(b.gold) || 0));
   if (b.silver !== undefined) patch.silver = Math.max(0, Math.floor(Number(b.silver) || 0));

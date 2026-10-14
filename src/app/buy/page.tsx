@@ -194,8 +194,8 @@ export default function BuyPage() {
                 setUsingCustom(false);
                 setSelected({ silver: pack.silver, jpy: usdToJpy(pack.usd), label: t(pack.label) });
               }}
-              className={`card relative flex flex-col items-center gap-1 p-3 text-center transition ${
-                active ? "border-amber-400 ring-2 ring-amber-300" : "hover:border-amber-200"
+              className={`btn-option relative flex flex-col items-center gap-1 rounded-xl p-3 text-center ${
+                active ? "btn-option-on" : ""
               }`}
             >
               {pack.tag && (
@@ -218,8 +218,8 @@ export default function BuyPage() {
         {/* 自由入力: シルバー 1〜100 枚 */}
         <div
           onClick={() => selectCustom(customSilver)}
-          className={`card relative flex cursor-pointer flex-col items-center gap-1 p-3 text-center transition ${
-            usingCustom ? "border-amber-400 ring-2 ring-amber-300" : "hover:border-amber-200"
+          className={`btn-option relative flex cursor-pointer flex-col items-center gap-1 rounded-xl p-3 text-center ${
+            usingCustom ? "btn-option-on" : ""
           }`}
         >
           <CoinIcon type="silver" size={32} />

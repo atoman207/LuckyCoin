@@ -13,7 +13,8 @@ export async function POST(req: Request) {
     const nickname = String(form.get("nickname") ?? "").trim();
     const email = String(form.get("email") ?? "").trim().toLowerCase();
     const password = String(form.get("password") ?? "");
-    const nationality = String(form.get("nationality") ?? "").trim() || null;
+    const chatwork_id = String(form.get("chatwork_id") ?? "").trim() || null;
+    const phone = String(form.get("phone") ?? "").trim() || null;
     const discord_id = String(form.get("discord_id") ?? "").trim() || null;
     const avatar = form.get("avatar");
 
@@ -67,7 +68,8 @@ export async function POST(req: Request) {
       id: created.user.id,
       nickname,
       email,
-      nationality,
+      chatwork_id,
+      phone,
       discord_id,
       avatar_url,
       gold: 0,

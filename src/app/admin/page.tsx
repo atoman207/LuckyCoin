@@ -7,11 +7,13 @@ import CoinIcon from "@/components/CoinIcon";
 import { coinName } from "@/lib/coins";
 import { formatBankAccount, parseBankAccount } from "@/lib/bank-account";
 import { getPayoutMethod } from "@/lib/payout-methods";
-import RichText from "@/components/RichText";
 import StripePaymentsPanel from "@/components/StripePaymentsPanel";
 import SubscriberChart from "@/components/SubscriberChart";
+import AdminShell, { type AdminTab } from "@/components/admin/AdminShell";
+import DashboardPanel from "@/components/admin/DashboardPanel";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey, TFunction } from "@/lib/i18n";
+import Link from "next/link";
 
 type Row = {
   id: string;
@@ -19,6 +21,8 @@ type Row = {
   email: string;
   nationality: string | null;
   discord_id: string | null;
+  chatwork_id: string | null;
+  phone: string | null;
   avatar_url: string | null;
   gold: number;
   silver: number;
@@ -105,14 +109,6 @@ type Sell = {
 };
 
 // Tab + column labels live in the message catalogue.
-const TAB_LABEL: Record<Tab, MessageKey> = {
-  users: "admin.tabUsers",
-  transactions: "admin.tabTransactions",
-  sells: "admin.tabSells",
-  messages: "admin.tabMessages",
-  bots: "admin.tabBots",
-  payments: "admin.tabPayments",
-};
 const KIND_LABEL: Record<"all" | "real" | "bot", MessageKey> = {
   all: "admin.filterAll",
   real: "admin.filterReal",
@@ -145,14 +141,12 @@ const TXN_SCOPE_LABEL: Record<"paid" | "all", MessageKey> = {
   all: "admin.txnAll",
 };
 
-type Tab = "users" | "transactions" | "sells" | "messages" | "bots" | "payments";
-
 export default function AdminPage() {
   const { profile, loading } = useUser();
   const { t, intlLocale } = useI18n();
   const fmt = (d: string | null) => (d ? new Date(d).toLocaleString(intlLocale) : "—");
   const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString(intlLocale) : "—");
-  const [tab, setTab] = useState<Tab>("users");
+  const [tab, setTab] = useState<AdminTab>("dashboard");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [txns, setTxns] = useState<Txn[] | null>(null);
   const [txnScope, setTxnScope] = useState<"paid" | "all">("paid");
@@ -223,12 +217,17 @@ export default function AdminPage() {
     loadSells();
   }
 
-  if (loading) return <div className="py-20 text-center text-muted">{t("common.loading")}</div>;
+  if (loading) {
+    return <div className="admin-simple grid min-h-dvh place-items-center text-sm text-neutral-500">{t("common.loading")}</div>;
+  }
   if (!profile?.is_admin) {
     return (
-      <div className="card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-2xl font-bold">{t("admin.onlyTitle")}</h1>
-        <p className="mt-2 text-muted">{t("admin.onlyBody")}</p>
+      <div className="admin-simple grid min-h-dvh place-items-center bg-white px-4">
+        <div className="max-w-md rounded border border-neutral-200 p-8 text-center">
+          <h1 className="text-xl font-bold">{t("admin.onlyTitle")}</h1>
+          <p className="mt-2 text-sm text-neutral-600">{t("admin.onlyBody")}</p>
+          <Link href="/" className="mt-4 inline-block text-sm underline">{t("admin.homeLink")}</Link>
+        </div>
       </div>
     );
   }
@@ -242,7 +241,8 @@ export default function AdminPage() {
       const hay = [
         r.nickname,
         r.email,
-        r.nationality,
+        r.chatwork_id,
+        r.phone,
         r.discord_id,
         r.kind,
         r.is_admin ? "admin" : "",
@@ -350,13 +350,41 @@ export default function AdminPage() {
   }
 
   return (
-    // Break out of the layout's centered max-w container to full width, with
-    // 3vw left/right margins instead.
-    <div className="space-y-6 mx-[calc(50%-50vw)] w-screen px-[3vw]">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold">{t("admin.title")}</h1>
-          <p className="text-muted">
+    <AdminShell tab={tab} onTabChange={setTab}>
+      <div className="space-y-5">
+      {error && (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}{" "}
+          <button type="button" onClick={() => setError(null)} className="ml-2 underline">
+            {t("common.dismiss")}
+          </button>
+        </div>
+      )}
+
+      {tab === "dashboard" && <DashboardPanel />}
+
+      {tab !== "dashboard" && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "admin.visitorsTotal" as const, value: stats?.visitorsTotal, hint: "admin.visitorsTotalHint" as const },
+            { label: "admin.visitorsToday" as const, value: stats?.visitorsToday, hint: "admin.visitorsTodayHint" as const },
+            { label: "admin.membersTotal" as const, value: stats?.membersTotal, hint: "admin.membersTotalHint" as const },
+            { label: "admin.membersToday" as const, value: stats?.membersToday, hint: "admin.membersTodayHint" as const },
+          ].map((s) => (
+            <div key={s.label} className="rounded border border-neutral-200 p-4">
+              <div className="text-xs text-neutral-500">{t(s.label)}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums">
+                {s.value === undefined ? "…" : s.value.toLocaleString()}
+              </div>
+              <div className="text-xs text-neutral-500">{t(s.hint)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "users" && (
+        <>
+          <p className="text-sm text-neutral-600">
             {t("admin.summary", {
               players: rows?.length ?? 0,
               real: realCount,
@@ -365,70 +393,24 @@ export default function AdminPage() {
               sells: sells?.length ?? 0,
             })}
           </p>
-        </div>
-        <div className="flex gap-2 rounded-xl bg-cream p-1">
-          {(["users", "payments", "transactions", "sells", "messages", "bots"] as const).map((name) => (
-            <button
-              key={name}
-              onClick={() => setTab(name)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
-                tab === name ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
-              }`}
-            >
-              {t(TAB_LABEL[name])}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {error && (
-        <div className="rounded-xl bg-red-50 px-4 py-3 text-red-600">
-          {error}{" "}
-          <button onClick={() => setError(null)} className="ml-2 underline">
-            {t("common.dismiss")}
-          </button>
-        </div>
-      )}
-
-      {/* Visitor / member stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "admin.visitorsTotal" as const, value: stats?.visitorsTotal, hint: "admin.visitorsTotalHint" as const, tone: "text-sky-600" },
-          { label: "admin.visitorsToday" as const, value: stats?.visitorsToday, hint: "admin.visitorsTodayHint" as const, tone: "text-sky-600" },
-          { label: "admin.membersTotal" as const, value: stats?.membersTotal, hint: "admin.membersTotalHint" as const, tone: "text-emerald-600" },
-          { label: "admin.membersToday" as const, value: stats?.membersToday, hint: "admin.membersTodayHint" as const, tone: "text-emerald-600" },
-        ].map((s) => (
-          <div key={s.label} className="card p-5">
-            <div className="text-sm text-muted">{t(s.label)}</div>
-            <div className={`mt-1 text-3xl font-extrabold tabular-nums ${s.tone}`}>
-              {s.value === undefined ? "…" : s.value.toLocaleString()}
-            </div>
-            <div className="text-xs text-faint">{t(s.hint)}</div>
-          </div>
-        ))}
-      </div>
-
-      {tab === "users" && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {(["gold", "silver", "bronze"] as const).map((type) => (
-              <div key={type} className="card flex items-center gap-3 p-5">
-                <CoinIcon type={type} size={44} />
+              <div key={type} className="flex items-center gap-3 rounded border border-neutral-200 p-4">
+                <CoinIcon type={type} size={36} />
                 <div>
-                  <div className="text-sm text-muted">{t("admin.totalCoin", { name: coinName(t, type) })}</div>
-                  <div className="text-2xl font-extrabold">{totals[type].toLocaleString()}</div>
+                  <div className="text-xs text-neutral-500">{t("admin.totalCoin", { name: coinName(t, type) })}</div>
+                  <div className="text-xl font-bold">{totals[type].toLocaleString()}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* 新規登録者数の推移。以前はトップページに出していましたが、
-              運営用の指標なので管理画面に移しました（API 側も管理者限定）。 */}
-          <div className="card">
+          <div className="rounded border border-neutral-200">
             <SubscriberChart />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               className="input max-w-xs flex-1"
               placeholder={t("admin.searchPlaceholder")}
@@ -439,17 +421,19 @@ export default function AdminPage() {
               }}
             />
 
-            {/* Kind filter */}
-            <div className="flex gap-1 rounded-xl bg-cream p-1 text-sm">
+            <div className="flex flex-wrap gap-1 text-sm">
               {(["all", "real", "bot"] as const).map((k) => (
                 <button
                   key={k}
+                  type="button"
                   onClick={() => {
                     setKindFilter(k);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3 py-1.5 font-semibold transition ${
-                    kindFilter === k ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
+                  className={`rounded border px-3 py-1.5 ${
+                    kindFilter === k
+                      ? "border-neutral-800 bg-neutral-800 text-white"
+                      : "border-neutral-300 bg-white"
                   }`}
                 >
                   {t(KIND_LABEL[k])}
@@ -474,7 +458,7 @@ export default function AdminPage() {
             </select>
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
+              className="btn-mini px-3 py-2 text-sm"
               title={sortDir === "asc" ? t("admin.ascending") : t("admin.descending")}
             >
               {sortDir === "asc" ? t("admin.asc") : t("admin.desc")}
@@ -485,7 +469,7 @@ export default function AdminPage() {
               type="button"
               onClick={toggleSelectAll}
               disabled={selectableIds.length === 0}
-              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand disabled:opacity-40"
+              className="btn-mini px-3 py-2 text-sm"
             >
               {allFilteredSelected ? t("admin.deselectAll") : t("admin.selectAll")}
             </button>
@@ -493,7 +477,7 @@ export default function AdminPage() {
               type="button"
               onClick={removeSelected}
               disabled={selectedCount === 0 || deletingSelected}
-              className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
+              className="btn-mini btn-mini-danger px-3 py-2 text-sm"
             >
               {deletingSelected
                 ? t("common.loading")
@@ -516,7 +500,8 @@ export default function AdminPage() {
                   </th>
                   <th className="px-4 py-3">{t("admin.colPlayer")}</th>
                   <th className="px-4 py-3">{t("admin.colType")}</th>
-                  <th className="px-4 py-3">{t("admin.colCountry")}</th>
+                  <th className="px-4 py-3">{t("admin.colChatwork")}</th>
+                  <th className="px-4 py-3">{t("admin.colPhone")}</th>
                   <th className="px-4 py-3">{t("admin.colDiscord")}</th>
                   <th className="px-4 py-3">{t("admin.colLastLogin")}</th>
                   <th className="px-4 py-3">{t("admin.colJoined")}</th>
@@ -530,9 +515,9 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {rows === null ? (
-                  <tr><td colSpan={13} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
+                  <tr><td colSpan={14} className="px-4 py-8 text-center text-faint">{t("common.loading")}</td></tr>
                 ) : sorted.length === 0 ? (
-                  <tr><td colSpan={13} className="px-4 py-8 text-center text-faint">{t("admin.noPlayers")}</td></tr>
+                  <tr><td colSpan={14} className="px-4 py-8 text-center text-faint">{t("admin.noPlayers")}</td></tr>
                 ) : (
                   pageRows.map((r) => (
                     <tr key={r.id} className="border-b border-line hover:bg-cream">
@@ -566,7 +551,8 @@ export default function AdminPage() {
                           {r.kind === "bot" ? t("admin.typeBot") : t("admin.typeReal")}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-body">{r.nationality ?? "—"}</td>
+                      <td className="px-4 py-3 text-body">{r.chatwork_id ?? "—"}</td>
+                      <td className="px-4 py-3 text-body">{r.phone ?? "—"}</td>
                       <td className="px-4 py-3 text-body">{r.discord_id ?? "—"}</td>
                       <td className="px-4 py-3 text-muted">{fmt(r.last_sign_in_at)}</td>
                       <td className="px-4 py-3 text-muted">{fmtDate(r.created_at)}</td>
@@ -576,8 +562,8 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-right font-semibold text-orange-600">{r.bronze}</td>
                       <td className="px-4 py-3 text-center">{r.is_admin ? "✅" : "—"}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button onClick={() => setEditing(r)} className="rounded-lg border border-line px-2.5 py-1 text-xs hover:bg-sand">{t("common.edit")}</button>
-                        <button onClick={() => remove(r)} className="ml-2 rounded-lg border border-red-300 px-2.5 py-1 text-xs text-red-600 hover:bg-red-100">{t("common.delete")}</button>
+                        <button onClick={() => setEditing(r)} className="btn-mini px-2.5 py-1 text-xs">{t("common.edit")}</button>
+                        <button onClick={() => remove(r)} className="btn-mini btn-mini-danger ml-2 px-2.5 py-1 text-xs">{t("common.delete")}</button>
                       </td>
                     </tr>
                   ))
@@ -600,14 +586,14 @@ export default function AdminPage() {
                 <button
                   onClick={() => setPage(1)}
                   disabled={current === 1}
-                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
+                  className="btn-mini px-2.5 py-1"
                 >
                   {t("admin.pageFirst")}
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={current === 1}
-                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
+                  className="btn-mini px-2.5 py-1"
                 >
                   {t("admin.pagePrev")}
                 </button>
@@ -617,14 +603,14 @@ export default function AdminPage() {
                 <button
                   onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                   disabled={current === pageCount}
-                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
+                  className="btn-mini px-2.5 py-1"
                 >
                   {t("admin.pageNext")}
                 </button>
                 <button
                   onClick={() => setPage(pageCount)}
                   disabled={current === pageCount}
-                  className="rounded-lg border border-line px-2.5 py-1 disabled:opacity-40 hover:bg-sand"
+                  className="btn-mini px-2.5 py-1"
                 >
                   {t("admin.pageLast")}
                 </button>
@@ -644,8 +630,8 @@ export default function AdminPage() {
                   key={scope}
                   onClick={() => setTxnScope(scope)}
                   aria-pressed={txnScope === scope}
-                  className={`rounded-lg px-3 py-1.5 font-semibold transition ${
-                    txnScope === scope ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
+                  className={`btn-tab rounded-lg px-3 py-1.5 ${
+                    txnScope === scope ? "btn-tab-on" : ""
                   }`}
                 >
                   {t(TXN_SCOPE_LABEL[scope])}
@@ -807,7 +793,8 @@ export default function AdminPage() {
           onError={setError}
         />
       )}
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 
@@ -899,8 +886,8 @@ function BotsPanel({ onError }: { onError: (m: string) => void }) {
             <button
               key={m}
               onClick={() => setConfig({ ...config, mode: m })}
-              className={`flex-1 rounded-lg px-3 py-2 font-semibold transition ${
-                config.mode === m ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
+              className={`btn-tab flex-1 rounded-lg px-3 py-2 ${
+                config.mode === m ? "btn-tab-on" : ""
               }`}
             >
               {m === "manual" ? t("admin.botModeManual") : t("admin.botModeAuto")}
@@ -1024,7 +1011,8 @@ function UserModal({
     nickname: row?.nickname ?? "",
     email: row?.email ?? "",
     password: "",
-    nationality: row?.nationality ?? "",
+    chatwork_id: row?.chatwork_id ?? "",
+    phone: row?.phone ?? "",
     discord_id: row?.discord_id ?? "",
     gold: row?.gold ?? 0,
     silver: row?.silver ?? 0,
@@ -1058,7 +1046,7 @@ function UserModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
       <div className="card relative w-full max-w-lg p-6 animate-pop" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-4 top-4 text-muted hover:text-body">✕</button>
+        <button onClick={onClose} className="btn-close absolute right-3 top-3">✕</button>
         <h2 className="text-xl font-bold">
           {isNew ? t("admin.createUser") : t("admin.editUser", { nickname: row!.nickname })}
         </h2>
@@ -1077,10 +1065,14 @@ function UserModal({
             <input className="input" type="text" value={f.password} onChange={(e) => upd("password", e.target.value)} required={isNew} placeholder={isNew ? "" : "••••••"} />
           </div>
           <div>
-            <label className="label">{t("profile.nationality")}</label>
-            <input className="input" value={f.nationality} onChange={(e) => upd("nationality", e.target.value)} />
+            <label className="label">{t("profile.chatworkId")}</label>
+            <input className="input" value={f.chatwork_id} onChange={(e) => upd("chatwork_id", e.target.value)} />
           </div>
           <div>
+            <label className="label">{t("profile.phone")}</label>
+            <input className="input" type="tel" value={f.phone} onChange={(e) => upd("phone", e.target.value)} />
+          </div>
+          <div className="col-span-2">
             <label className="label">{t("profile.discordId")}</label>
             <input className="input" value={f.discord_id} onChange={(e) => upd("discord_id", e.target.value)} />
           </div>

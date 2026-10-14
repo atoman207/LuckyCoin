@@ -30,7 +30,7 @@ export default function WelcomeModal() {
         <button
           onClick={closeWelcome}
           aria-label={t("common.close")}
-          className="absolute right-4 top-4 text-muted hover:text-body"
+          className="btn-close absolute right-3 top-3"
         >
           ✕
         </button>

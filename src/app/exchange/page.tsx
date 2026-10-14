@@ -147,10 +147,10 @@ export default function ExchangePage() {
                   setFrom(p.from);
                   setAmount(p.amount);
                 }}
-                className="flex w-full items-center justify-between rounded-xl border border-line bg-cream px-4 py-3 text-left text-sm transition hover:border-amber-400 hover:bg-cream"
+                className="btn-option flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm"
               >
                 <span>{t(p.label)}</span>
-                <span className="text-amber-600">›</span>
+                <span className="btn-option-arrow text-amber-600">›</span>
               </button>
             ))}
           </div>

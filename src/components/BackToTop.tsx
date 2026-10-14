@@ -27,7 +27,7 @@ export default function BackToTop() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label={t("backToTop.label")}
       title={t("backToTop.label")}
-      className="anim-bob fixed bottom-4 right-4 z-50 grid h-12 w-12 place-items-center rounded-full bg-amber-400 text-2xl font-black text-slate-900 shadow-lg transition hover:scale-105 hover:bg-amber-300"
+      className="btn-fab btn-fab-top fixed bottom-4 right-4 z-50 h-12 w-12 text-2xl"
     >
       ↑
     </button>

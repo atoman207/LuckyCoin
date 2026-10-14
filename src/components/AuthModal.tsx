@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/components/UserProvider";
 import Avatar from "@/components/Avatar";
+import PasswordInput from "@/components/PasswordInput";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n";
 import { authErrorMessage } from "@/lib/i18n/auth-errors";
@@ -32,7 +33,8 @@ export default function AuthModal() {
     email: "",
     password: "",
     confirm: "",
-    nationality: "",
+    chatwork_id: "",
+    phone: "",
   });
 
   // Avatar chosen during registration (uploaded right after sign-in).
@@ -142,7 +144,8 @@ export default function AuthModal() {
         fd.append("nickname", form.nickname);
         fd.append("email", email);
         fd.append("password", form.password);
-        fd.append("nationality", form.nationality);
+        fd.append("chatwork_id", form.chatwork_id);
+        fd.append("phone", form.phone);
         if (avatarFile) fd.append("avatar", avatarFile);
 
         const res = await fetch("/api/register", { method: "POST", body: fd });
@@ -187,25 +190,29 @@ export default function AuthModal() {
     >
       <div className="absolute inset-0 bg-[#4a3f31]/35 backdrop-blur-sm" />
       <div
-        className="card relative w-full max-w-md p-6 sm:p-8 animate-pop"
+        className={`card relative w-full animate-pop ${
+          mode === "register"
+            ? "max-w-lg p-5 sm:p-6"
+            : "max-w-md p-6 sm:p-8"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={closeAuth}
-          className="absolute right-4 top-4 text-muted hover:text-body"
+          className="btn-close absolute right-3 top-3"
           aria-label={t("common.close")}
         >
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold">
+        <h2 className="text-center text-2xl font-bold">
           {mode === "login"
             ? t("auth.loginTitle")
             : mode === "register"
               ? t("auth.registerTitle")
               : t("auth.forgotTitle")}
         </h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-center text-sm text-muted">
           {mode === "login"
             ? t("auth.loginLead")
             : mode === "register"
@@ -219,9 +226,7 @@ export default function AuthModal() {
               <button
                 key={m}
                 onClick={() => switchMode(m)}
-                className={`rounded-lg py-2 text-sm font-semibold transition ${
-                  mode === m ? "bg-amber-400 text-slate-900" : "text-body hover:text-body"
-                }`}
+                className={`btn-tab rounded-lg py-2 text-sm ${mode === m ? "btn-tab-on" : ""}`}
               >
                 {t(TAB_LABEL[m])}
               </button>
@@ -235,7 +240,7 @@ export default function AuthModal() {
               type="button"
               onClick={handleOAuth}
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2.5 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-body transition hover:bg-cream disabled:cursor-not-allowed disabled:opacity-55"
             >
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                 <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.5 29.6 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.3-.4-3.5z" />
@@ -284,7 +289,10 @@ export default function AuthModal() {
           )}
           {mode === "register" && (
             <div>
-              <label className="label">{t("auth.nickname")}</label>
+              <label className="label">
+                {t("auth.nickname")}
+                <span className="ml-0.5 align-super text-xs font-bold text-red-500" aria-hidden="true">*</span>
+              </label>
               <input
                 className="input"
                 value={form.nickname}
@@ -295,7 +303,10 @@ export default function AuthModal() {
             </div>
           )}
           <div>
-            <label className="label">{t("auth.email")}</label>
+            <label className="label">
+              {t("auth.email")}
+              <span className="ml-0.5 align-super text-xs font-bold text-red-500" aria-hidden="true">*</span>
+            </label>
             <input
               className="input"
               type="email"
@@ -308,15 +319,17 @@ export default function AuthModal() {
 
           {mode !== "forgot" && (
             <div>
-              <label className="label">{t("auth.password")}</label>
-              <input
-                className="input"
-                type="password"
+              <label className="label">
+                {t("auth.password")}
+                <span className="ml-0.5 align-super text-xs font-bold text-red-500" aria-hidden="true">*</span>
+              </label>
+              <PasswordInput
                 value={form.password}
                 onChange={set("password")}
                 required
                 placeholder={t("auth.passwordPlaceholder")}
                 minLength={MIN_PASSWORD}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
               />
               {mode === "register" && (
                 <p className="mt-1 text-xs text-faint">{t("auth.passwordHint", { min: MIN_PASSWORD })}</p>
@@ -326,15 +339,17 @@ export default function AuthModal() {
 
           {mode === "register" && (
             <div>
-              <label className="label">{t("auth.confirmPassword")}</label>
-              <input
-                className="input"
-                type="password"
+              <label className="label">
+                {t("auth.confirmPassword")}
+                <span className="ml-0.5 align-super text-xs font-bold text-red-500" aria-hidden="true">*</span>
+              </label>
+              <PasswordInput
                 value={form.confirm}
                 onChange={set("confirm")}
                 required
                 placeholder={t("auth.confirmPlaceholder")}
                 minLength={MIN_PASSWORD}
+                autoComplete="new-password"
               />
             </div>
           )}
@@ -350,14 +365,28 @@ export default function AuthModal() {
           )}
 
           {mode === "register" && (
-            <div>
-              <label className="label">{t("auth.nationality")}</label>
-              <input
-                className="input"
-                value={form.nationality}
-                onChange={set("nationality")}
-                placeholder={t("auth.nationalityPlaceholder")}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <label className="label">{t("auth.chatworkId")}</label>
+                <input
+                  className="input"
+                  value={form.chatwork_id}
+                  onChange={set("chatwork_id")}
+                  placeholder={t("auth.chatworkPlaceholder")}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="label">{t("auth.phone")}</label>
+                <input
+                  className="input"
+                  type="tel"
+                  value={form.phone}
+                  onChange={set("phone")}
+                  placeholder={t("auth.phonePlaceholder")}
+                  autoComplete="tel"
+                />
+              </div>
             </div>
           )}
 

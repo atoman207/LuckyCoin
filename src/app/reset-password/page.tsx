@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PasswordInput from "@/components/PasswordInput";
 import { useI18n } from "@/lib/i18n/provider";
 import { authErrorMessage } from "@/lib/i18n/auth-errors";
 
@@ -49,26 +50,24 @@ export default function ResetPasswordPage() {
           <form onSubmit={submit} className="mt-5 space-y-3">
             <div>
               <label className="label">{t("reset.newPassword")}</label>
-              <input
-                type="password"
-                className="input"
+              <PasswordInput
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
                 placeholder={t("auth.passwordPlaceholder")}
+                autoComplete="new-password"
               />
             </div>
             <div>
               <label className="label">{t("reset.confirmPassword")}</label>
-              <input
-                type="password"
-                className="input"
+              <PasswordInput
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
                 minLength={8}
                 placeholder={t("auth.confirmPlaceholder")}
+                autoComplete="new-password"
               />
             </div>
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}

@@ -293,6 +293,8 @@ export type Profile = {
   email: string;
   nationality: string | null;
   discord_id: string | null;
+  chatwork_id: string | null;
+  phone: string | null;
   avatar_url: string | null;
   gold: number;
   silver: number;

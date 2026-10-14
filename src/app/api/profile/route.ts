@@ -19,8 +19,9 @@ export async function PATCH(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const nickname = typeof body.nickname === "string" ? body.nickname.trim() : undefined;
-  const nationality =
-    typeof body.nationality === "string" ? body.nationality.trim() || null : undefined;
+  const chatwork_id =
+    typeof body.chatwork_id === "string" ? body.chatwork_id.trim() || null : undefined;
+  const phone = typeof body.phone === "string" ? body.phone.trim() || null : undefined;
   const discord_id =
     typeof body.discord_id === "string" ? body.discord_id.trim() || null : undefined;
 
@@ -52,7 +53,8 @@ export async function PATCH(req: Request) {
 
   const patch: Record<string, unknown> = {};
   if (nickname !== undefined) patch.nickname = nickname;
-  if (nationality !== undefined) patch.nationality = nationality;
+  if (chatwork_id !== undefined) patch.chatwork_id = chatwork_id;
+  if (phone !== undefined) patch.phone = phone;
   if (discord_id !== undefined) patch.discord_id = discord_id;
   if (payout_address !== undefined) patch.payout_address = payout_address;
   if (payout_method !== undefined) patch.payout_method = payout_method;

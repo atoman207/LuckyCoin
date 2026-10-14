@@ -13,6 +13,8 @@ create table if not exists public.profiles (
   email         text        not null,
   nationality   text,
   discord_id    text,
+  chatwork_id   text,
+  phone         text,
   avatar_url    text,                                   -- public URL; file lives in the "avatar" storage bucket
   gold          integer     not null default 0,
   silver        integer     not null default 0,
@@ -87,6 +89,9 @@ alter table public.profiles  add column if not exists payout_method  text;
 -- Free rounds banked from picking "free turn" gems in Multiplier Play. While > 0,
 -- the next round's silver/bronze entry cost is waived (one per round).
 alter table public.profiles  add column if not exists free_rounds integer not null default 0;
+-- Optional contact fields (ChatWork ID / phone). Safe on existing DBs.
+alter table public.profiles  add column if not exists chatwork_id text;
+alter table public.profiles  add column if not exists phone text;
 -- Existing/established accounts have already logged in — don't gate them.
 update public.profiles set first_login_done = true
   where first_login_done = false

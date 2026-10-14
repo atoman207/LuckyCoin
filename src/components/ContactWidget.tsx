@@ -15,7 +15,7 @@ export default function ContactWidget() {
       href="/contact"
       aria-label={t("contact.widgetLabel")}
       title={t("contact.widgetLabel")}
-      className="fixed bottom-4 left-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-amber-400 text-slate-900 shadow-lg transition hover:scale-105 hover:bg-amber-300"
+      className="btn-fab btn-fab-chat fixed bottom-4 left-4 z-50 h-14 w-14"
     >
       {/* message / chat bubble icon */}
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">

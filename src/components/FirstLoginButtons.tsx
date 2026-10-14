@@ -19,13 +19,13 @@ export default function FirstLoginButtons() {
         </span>
         <span className="hidden md:inline">{t("firstLogin.claim")}</span>
       </Link>
-      <Link href="/draw" className="btn-silver btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.lotteryTitle")}>
+      <Link href="/draw" className="btn-sky btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.lotteryTitle")}>
         <span className="md:hidden" aria-hidden>
           ◯
         </span>
         <span className="hidden md:inline">{t("firstLogin.lottery")}</span>
       </Link>
-      <Link href="/help" className="btn-bronze btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.helpTitle")}>
+      <Link href="/help" className="btn-pink btn-attn !px-3 !py-1.5 text-sm" title={t("firstLogin.helpTitle")}>
         <span className="md:hidden" aria-hidden>
           ?
         </span>

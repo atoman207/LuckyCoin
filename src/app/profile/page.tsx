@@ -12,7 +12,7 @@ export default function ProfilePage() {
   const { t, intlLocale } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState({ nickname: "", nationality: "", discord_id: "" });
+  const [form, setForm] = useState({ nickname: "", chatwork_id: "", phone: "", discord_id: "" });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -22,7 +22,8 @@ export default function ProfilePage() {
     if (profile) {
       setForm({
         nickname: profile.nickname ?? "",
-        nationality: profile.nationality ?? "",
+        chatwork_id: profile.chatwork_id ?? "",
+        phone: profile.phone ?? "",
         discord_id: profile.discord_id ?? "",
       });
     }
@@ -157,15 +158,25 @@ export default function ProfilePage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">{t("profile.nationality")}</label>
+              <label className="label">{t("profile.chatworkId")}</label>
               <input
                 className="input"
-                value={form.nationality}
-                onChange={set("nationality")}
-                placeholder={t("profile.nationalityPlaceholder")}
+                value={form.chatwork_id}
+                onChange={set("chatwork_id")}
+                placeholder={t("profile.chatworkPlaceholder")}
               />
             </div>
             <div>
+              <label className="label">{t("profile.phone")}</label>
+              <input
+                className="input"
+                type="tel"
+                value={form.phone}
+                onChange={set("phone")}
+                placeholder={t("profile.phonePlaceholder")}
+              />
+            </div>
+            <div className="sm:col-span-2">
               <label className="label">{t("profile.discordId")}</label>
               <input className="input" value={form.discord_id} onChange={set("discord_id")} placeholder="name#0000" />
             </div>

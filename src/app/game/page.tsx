@@ -711,7 +711,7 @@ export default function GamePage() {
                             setChoice(c);
                           }
                         }}
-                        className="flex items-center justify-between rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
+                        className="flex items-center justify-between btn-option rounded-xl px-4 py-3 text-left"
                       >
                         <span className="flex items-center gap-3">
                           <CoinIcon type={c} size={32} />
@@ -910,7 +910,7 @@ export default function GamePage() {
               <button
                 onClick={() => startRound(lastCurrency, "restart", "continuous")}
                 disabled={busy}
-                className="rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
+                className="btn-option rounded-xl px-4 py-3 text-left"
               >
                 <div className="font-bold">{t("game.modeContinuous")}</div>
                 <div className="text-xs text-muted">{t("game.modeContinuousDesc")}</div>
@@ -918,7 +918,7 @@ export default function GamePage() {
               <button
                 onClick={() => startRound(lastCurrency, "restart", "multiplier")}
                 disabled={busy}
-                className="rounded-xl border border-line px-4 py-3 text-left transition hover:border-amber-400 hover:bg-amber-50"
+                className="btn-option rounded-xl px-4 py-3 text-left"
               >
                 <div className="font-bold">{t("game.modeMultiplier")}</div>
                 <div className="text-xs text-muted">{t("game.modeMultiplierDesc", { max: MAX_RESTARTS })}</div>

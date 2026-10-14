@@ -38,9 +38,9 @@ const C = {
   page: "#fff8ec",
   card: "#ffffff",
   line: "#f2e6d2",
-  body: "#4a3f31",
-  muted: "#8a7b66",
-  faint: "#ab9d89",
+  body: "#2a2018",
+  muted: "#4e4335",
+  faint: "#6b5d4b",
   gold: "#f7bd4a",
   goldInk: "#5a3a06",
 };

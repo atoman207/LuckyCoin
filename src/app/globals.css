@@ -14,17 +14,35 @@
   --color-line: #e0d4c0; /* 通常の枠線 */
   --color-line-strong: #c9b89a; /* 入力欄・表の区切り */
 
-  /* 文字 — 白／クリーム背景で WCAG AA（4.5:1）以上。 */
-  --color-body: #3f372c; /* 本文 */
-  --color-muted: #6a5f50; /* 補助テキスト */
-  --color-faint: #857866; /* placeholder・注釈 */
+  /* 文字 — 以前は薄く見えたので全体を一段濃くしています。いちばん薄い
+     注釈でも白／クリーム背景で 5.9:1 以上（WCAG AA は 4.5:1）。 */
+  --color-body: #2a2018; /* 本文 */
+  --color-muted: #4e4335; /* 補助テキスト */
+  --color-faint: #6b5d4b; /* placeholder・注釈 */
 
   /* 差し色の文字（金）。 */
-  --color-gold-ink: #8f6209;
+  --color-gold-ink: #7a4a00;
 
-  /* 全体の書体 — 子供向けのやさしい丸ゴシック。 */
-  --font-sans: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4",
+  /* Tailwind 標準の amber / orange / emerald / sky は、このサイトでは文字色
+     （text-amber-600 など）としてしか使っていません。標準値のままだと白地で
+     3:1 前後しかなく読みにくいため、文字に使う濃さだけ深くしています。
+     背景・枠線に使う 50〜500 は標準のままです。 */
+  --color-amber-600: #a35400;
+  --color-amber-700: #8a4500;
+  --color-amber-800: #6e3600;
+  --color-orange-600: #b5400a;
+  --color-orange-700: #96330a;
+  --color-emerald-600: #0a7a52;
+  --color-sky-600: #0b6aa8;
+
+  /* 全体の書体 — 「Zen Maru Gothic」。絵本や子供向け教材でよく見る、
+     角のない太めの丸ゴシックです。 */
+  --font-sans: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4",
     "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif;
+  /* 等幅指定（カウントダウンや ID）でも、日本語の字は丸ゴシックで出るように
+     最後の monospace の手前に同じ書体を挟みます。数字と英字は等幅のまま。 */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", "Zen Maru Gothic", "Hiragino Maru Gothic ProN", monospace;
 }
 
 :root {
@@ -51,6 +69,8 @@ body {
   color: var(--color-body);
   -webkit-font-smoothing: antialiased;
   font-family: var(--font-sans);
+  /* 細い字は薄く見えるので、本文の基準を Regular ではなく Medium にします。 */
+  font-weight: 500;
 }
 
 /* 細くて主張しないスクロールバー */
@@ -58,60 +78,14 @@ body {
 *::-webkit-scrollbar-thumb { background: #e8dcc6; border-radius: 999px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
-/* 操作ボタンは「打刻されたコイン」に見えるよう仕上げます（縁に面取りと
-   ギザギザのある丸ボタン／円盤）。ゲームのマス目やセグメント切り替え、
-   メニュー行などの素のボタンは、レイアウトが崩れないよう小さな角丸のまま。 */
-.btn,
-.btn-gold,
-.btn-ghost,
-.btn-silver,
-.btn-bronze,
-.btn-coin {
-  border-radius: 9999px !important;
-}
-button:not(.btn):not(.btn-gold):not(.btn-ghost):not(.btn-silver):not(.btn-bronze):not(.btn-coin) {
+/* btn 系のクラスを持たない素のボタン（ゲームのマス目やメニュー行など）は、
+   レイアウトが崩れないよう小さな角丸のまま。btn-* の見た目は下の
+   「ボタン」の節でまとめて定義しています。 */
+button:not([class*="btn"]) {
   border-radius: 6px !important;
 }
 table { border-radius: 6px; }
 .card:has(table) { border-radius: 6px; }
-
-/* 金属ボタン — コイン感は残しつつ、影とインセットを控えめに。 */
-.btn-gold,
-.btn-silver,
-.btn-bronze,
-.btn-coin {
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.55),
-    inset 0 -1px 2px rgba(120, 80, 10, 0.12),
-    0 4px 12px -8px rgba(140, 100, 30, 0.35);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-.btn-ghost {
-  box-shadow: none;
-}
-.btn-gold:hover,
-.btn-silver:hover,
-.btn-bronze:hover { filter: brightness(1.03); }
-
-/* トップの「PLAY」ボタン — 丸い打刻コイン（ヒーローの唯一の強いアクセント）。 */
-.btn-coin {
-  display: inline-grid;
-  place-items: center;
-  width: 7.5rem;
-  height: 7.5rem;
-  font-weight: 800;
-  font-size: 1.4rem;
-  letter-spacing: 0.08em;
-  color: #6b4508;
-  background: radial-gradient(circle at 35% 30%, #fff6d2 0%, #ffdd85 24%, #f7bd4a 56%, #dd971f 100%);
-  transition: transform 0.15s ease, filter 0.15s ease;
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.7),
-    inset 0 -2px 3px rgba(120, 80, 10, 0.18),
-    0 10px 28px -10px rgba(180, 120, 20, 0.45);
-}
-.btn-coin:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.05); }
-.btn-coin:active { transform: scale(0.97); }
 
 /* モーダル本体（全画面オーバーレイの中のカード）: 背後のページが透けない
    よう不透明な白にします。 */
@@ -121,37 +95,428 @@ table { border-radius: 6px; }
   box-shadow: 0 24px 60px -24px rgba(90, 66, 30, 0.35);
 }
 
-/* 使い回すパーツ --------------------------------------------------- */
+@layer base {
+  /* Tailwind v4 はボタンのカーソルを矢印のままにするので、押せるものは
+     指カーソルに戻します。 */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* =====================================================================
+   ボタン — 「おもちゃのボタン」のつもりで、はっきりした色・太いフチ・
+   下側の厚みで作ります。触ると少し浮き、押すと厚みのぶん沈みます。
+   種類ごとに色と動きを変えています。
+
+     .btn-gold    主ボタン       おひさま色     ぷるんと弾む＋光が横切る
+     .btn-ghost   副ボタン       白地に青フチ   下から水色が満ちる＋ゆらゆら
+     .btn         中立ボタン     白             こくんと傾く
+     .btn-sky     ヘッダー       みずいろ       ぴょんぴょん跳ねる
+     .btn-pink    ヘッダー       ピンク         どきどき（鼓動）
+     .btn-coin    PLAY           朱色の丸       ふくらむ＋輪が広がる
+     .btn-fab     画面隅の丸     黄／ピンク     打ち上げ／着信ベル
+     .btn-tab     切り替えタブ   選択中は黄色   選ぶとポンと弾む
+     .btn-option  選択カード     白 → 黄        浮き上がる
+     .btn-mini    管理画面の小   白 → 青／赤    小さく沈む（削除は震える）
+     .btn-close   閉じる ✕                      くるっと回る
+
+   浮き沈みは translate、動きのアニメーションは transform で付けています。
+   別のプロパティなので、アニメーションの最中に押しても沈む手ごたえが
+   消えません。文字色はどれも面の色に対して 4.5:1 以上です。
+   ===================================================================== */
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-bold transition active:scale-[.98] disabled:opacity-50
-           disabled:cursor-not-allowed;
+  .btn,
+  .btn-gold,
+  .btn-ghost,
+  .btn-sky,
+  .btn-pink,
+  .btn-fab {
+    /* 色は種類ごとに下の変数を差し替えます。 */
+    --btn-a: #ffffff; /* 面の上側 */
+    --btn-b: #f6efe3; /* 面の下側 */
+    --btn-edge: #a8926b; /* フチと厚み */
+    --btn-ink: var(--color-body); /* 文字 */
+    --btn-glow: rgba(120, 90, 40, 0.35); /* 足元の色つきの影 */
+    --btn-ledge: 4px; /* 厚み */
+    --btn-drop: var(--btn-ledge); /* いま見えている厚み */
+
+    border: 2px solid var(--btn-edge);
+    border-radius: 9999px;
+    color: var(--btn-ink);
+    background: linear-gradient(180deg, var(--btn-a) 0%, var(--btn-b) 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.6),
+      0 var(--btn-drop) 0 var(--btn-edge),
+      0 calc(var(--btn-drop) + 5px) 12px -5px var(--btn-glow);
+    transition:
+      translate 0.12s ease,
+      box-shadow 0.12s ease,
+      filter 0.15s ease,
+      background-size 0.28s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
+  .btn,
+  .btn-gold,
+  .btn-ghost,
+  .btn-sky,
+  .btn-pink {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-align: center;
+  }
+
+  @media (hover: hover) {
+    :is(.btn, .btn-gold, .btn-ghost, .btn-sky, .btn-pink, .btn-fab):not(:disabled):hover {
+      --btn-drop: calc(var(--btn-ledge) + 2px);
+      translate: 0 -2px;
+      filter: brightness(1.04) saturate(1.08);
+    }
+  }
+  :is(.btn, .btn-gold, .btn-ghost, .btn-sky, .btn-pink, .btn-fab):not(:disabled):active {
+    --btn-drop: 1px;
+    translate: 0 calc(var(--btn-ledge) - 1px);
+    filter: brightness(0.96);
+    transition-duration: 0.05s;
+  }
+  :is(.btn, .btn-gold, .btn-ghost, .btn-sky, .btn-pink):disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    filter: saturate(0.45);
+    animation: none;
+  }
+
+  /* 主ボタン — おひさま色。待っているあいだもときどき光が横切り、
+     触るとぷるんと弾みます。 */
   .btn-gold {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-bold transition active:scale-[.98]
-           disabled:opacity-50 disabled:cursor-not-allowed;
-    color: #5a3a06;
-    background: linear-gradient(180deg, #f8e4a8 0%, #efc258 55%, #d9a328 100%);
+    --btn-a: #ffe45c;
+    --btn-b: #ffa200;
+    --btn-edge: #b85500;
+    --btn-ink: #3b1c00;
+    --btn-glow: rgba(255, 138, 0, 0.6);
+    background:
+      linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.8) 50%, transparent 58%)
+        no-repeat 160% 0 / 220% 100%,
+      linear-gradient(180deg, var(--btn-a) 0%, #ffc61a 50%, var(--btn-b) 100%);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+    animation: btnShine 3.6s ease-in-out infinite;
   }
+
+  /* 副ボタン — 白地に青フチ。触ると下から水色が満ちて、ゆらゆら揺れます。 */
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
-           font-bold transition active:scale-[.98] disabled:opacity-50
-           disabled:cursor-not-allowed border border-line bg-transparent
-           text-body hover:bg-sand/60;
+    --btn-edge: #1668e3;
+    --btn-ink: #0f4fc0;
+    --btn-glow: rgba(22, 104, 227, 0.4);
+    background:
+      linear-gradient(#d6e9ff, #d6e9ff) no-repeat bottom / 100% 0%,
+      #ffffff;
   }
-  /* コイン色の注目ボタン（初回ログイン時のヘッダー） */
-  .btn-silver {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
-           font-bold text-slate-700 transition active:scale-[.98];
-    background: linear-gradient(180deg, #ffffff 0%, #e8edf3 60%, #c5ced9 100%);
+
+  /* ヘッダーの注目ボタン（初回ログイン時）— みずいろとピンク。 */
+  .btn-sky {
+    --btn-a: #7fe3ff;
+    --btn-b: #1fb1f2;
+    --btn-edge: #0a6fa8;
+    --btn-ink: #04263d;
+    --btn-glow: rgba(31, 177, 242, 0.6);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
   }
-  .btn-bronze {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2
-           font-bold text-white transition active:scale-[.98];
-    background: linear-gradient(180deg, #e4b07e 0%, #c9843f 60%, #9a5f24 100%);
+  .btn-pink {
+    --btn-a: #ffa3c8;
+    --btn-b: #ff5c9e;
+    --btn-edge: #c2185b;
+    --btn-ink: #4a0a2a;
+    --btn-glow: rgba(255, 92, 158, 0.6);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
   }
+
+  @media (hover: hover) {
+    .btn:not(:disabled):hover {
+      animation: btnTilt 0.45s ease-in-out;
+    }
+    .btn-gold:not(:disabled):hover {
+      animation:
+        btnJelly 0.6s ease-out,
+        btnShineOnce 0.9s ease-out;
+    }
+    .btn-ghost:not(:disabled):hover {
+      background-size: 100% 100%, auto;
+      animation: btnWobble 0.6s ease-in-out;
+    }
+    .btn-sky:not(:disabled):hover {
+      animation: btnHop 0.7s ease-out;
+    }
+    .btn-pink:not(:disabled):hover {
+      animation: btnHeartbeat 0.8s ease-in-out;
+    }
+  }
+
+  /* まだ受け取っていない報酬があるあいだ、ヘッダーの 3 つを順番に小さく
+     跳ねさせます。触っているあいだは各ボタン自身の動きに譲ります。 */
+  .btn-attn:not(:hover) {
+    animation: attnHop 2.4s ease-in-out infinite;
+  }
+  .btn-gold.btn-attn:not(:hover) {
+    animation:
+      attnHop 2.4s ease-in-out infinite,
+      btnShine 3.6s ease-in-out infinite;
+  }
+  .btn-attn:nth-child(2):not(:hover) { animation-delay: 0.25s; }
+  .btn-attn:nth-child(3):not(:hover) { animation-delay: 0.5s; }
+
+  /* トップの「PLAY」— 朱色の大きな丸ボタン（ヒーローでいちばん目立たせる）。
+     ゆっくりふくらみ、まわりに輪が広がって「押してね」と誘います。 */
+  .btn-coin {
+    --coin-drop: 8px;
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 8rem;
+    height: 8rem;
+    border: 5px solid #ffd84a;
+    border-radius: 9999px;
+    color: #ffffff;
+    font-weight: 900;
+    font-size: 1.6rem;
+    letter-spacing: 0.08em;
+    text-shadow: 0 2px 0 rgba(110, 16, 0, 0.6);
+    background: radial-gradient(circle at 32% 24%, #ff9a7a 0%, #ff5a36 24%, #e8300f 60%, #c21f06 100%);
+    box-shadow:
+      inset 0 3px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -7px 0 rgba(110, 16, 0, 0.25),
+      0 var(--coin-drop) 0 #8f1403,
+      0 calc(var(--coin-drop) + 12px) 22px -8px rgba(200, 40, 10, 0.65);
+    transition:
+      translate 0.12s ease,
+      scale 0.15s ease,
+      box-shadow 0.12s ease,
+      filter 0.15s ease;
+    animation: coinBreath 1.8s ease-in-out infinite;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-coin::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border: 4px solid #ffffff;
+    border-radius: inherit;
+    pointer-events: none;
+    animation: coinRing 1.8s ease-out infinite;
+  }
+  @media (hover: hover) {
+    .btn-coin:hover {
+      --coin-drop: 11px;
+      translate: 0 -3px;
+      scale: 1.08;
+      filter: brightness(1.08) saturate(1.1);
+      animation: coinWiggle 0.5s ease-in-out infinite;
+    }
+  }
+  .btn-coin:active {
+    --coin-drop: 2px;
+    translate: 0 6px;
+    scale: 0.98;
+    transition-duration: 0.05s;
+  }
+
+  /* 画面の隅に浮かぶ丸ボタン（上へ戻る／お問い合わせ）。大きさと位置は
+     使う側のユーティリティで決めます。 */
+  .btn-fab {
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+  }
+  .btn-fab-top {
+    --btn-a: #ffe45c;
+    --btn-b: #ffa200;
+    --btn-edge: #b85500;
+    --btn-ink: #3b1c00;
+    --btn-glow: rgba(255, 138, 0, 0.6);
+    animation: floatBob 2s ease-in-out infinite;
+  }
+  .btn-fab-chat {
+    --btn-a: #ffa3c8;
+    --btn-b: #ff5c9e;
+    --btn-edge: #c2185b;
+    --btn-ink: #4a0a2a;
+    --btn-glow: rgba(255, 92, 158, 0.6);
+  }
+  @media (hover: hover) {
+    .btn-fab-top:hover { animation: fabLaunch 0.5s ease-in-out infinite; }
+    .btn-fab-chat:hover { animation: fabRing 0.7s ease-in-out infinite; }
+  }
+
+  /* 切り替えタブ（ログイン／新規登録、グラフの種類など）。選んだ側だけ
+     おひさま色のボタンになり、切り替えた瞬間にポンと弾みます。 */
+  .btn-tab {
+    color: var(--color-muted);
+    font-weight: 700;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      translate 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+  @media (hover: hover) {
+    .btn-tab:not(.btn-tab-on):hover {
+      color: var(--color-body);
+      background-color: #ffffff;
+      box-shadow: 0 2px 0 var(--color-line-strong);
+      translate: 0 -1px;
+    }
+  }
+  .btn-tab:active { translate: 0 1px; }
+  .btn-tab-on {
+    color: #3b1c00;
+    font-weight: 900;
+    background: linear-gradient(180deg, #ffe45c 0%, #ffb21a 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 2px 0 #b85500;
+    animation: tabPop 0.32s ease-out;
+  }
+
+  /* 選択カード（支払い方法・コインパック・両替のおすすめなど）。 */
+  .btn-option {
+    border: 2px solid var(--color-line-strong);
+    background-color: #ffffff;
+    box-shadow: 0 3px 0 var(--color-line-strong);
+    transition:
+      translate 0.12s ease,
+      box-shadow 0.12s ease,
+      border-color 0.15s ease,
+      background-color 0.15s ease;
+  }
+  @media (hover: hover) {
+    .btn-option:not(:disabled):hover {
+      border-color: #ff9a00;
+      background-color: #fff6d6;
+      box-shadow: 0 5px 0 #ff9a00;
+      translate: 0 -2px;
+    }
+    .btn-option:hover .btn-option-arrow { translate: 5px 0; }
+  }
+  /* 沈むのは本物のボタンだけ（自由入力カードは中の入力欄を押しても沈ませない）。 */
+  button.btn-option:not(:disabled):active {
+    box-shadow: 0 1px 0 #ff9a00;
+    translate: 0 2px;
+    transition-duration: 0.05s;
+  }
+  .btn-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  /* 選択中のカード。 */
+  .btn-option-on,
+  .btn-option-on:not(:disabled):hover {
+    border-color: #ff8a00;
+    background-color: #fff1c2;
+    box-shadow:
+      0 3px 0 #b85500,
+      0 0 0 3px rgba(255, 170, 0, 0.35);
+  }
+  .btn-option-on { animation: tabPop 0.32s ease-out; }
+  .btn-option-arrow {
+    display: inline-block;
+    transition: translate 0.15s ease;
+  }
+
+  /* 管理画面の小さな操作ボタン（編集・ページ送りなど）。余白と文字の
+     大きさは使う側のユーティリティで決めます。 */
+  .btn-mini {
+    border: 2px solid var(--color-line-strong);
+    border-radius: 9999px;
+    color: var(--color-body);
+    font-weight: 700;
+    background-color: #ffffff;
+    box-shadow: 0 2px 0 var(--color-line-strong);
+    transition:
+      translate 0.1s ease,
+      box-shadow 0.1s ease,
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background-color 0.15s ease;
+  }
+  .btn-mini-danger {
+    border-color: #e8300f;
+    color: #c2140a;
+    box-shadow: 0 2px 0 #e8300f;
+  }
+  @media (hover: hover) {
+    .btn-mini:not(:disabled):hover {
+      border-color: #1668e3;
+      color: #0f4fc0;
+      background-color: #e9f3ff;
+      box-shadow: 0 3px 0 #1668e3;
+      translate: 0 -1px;
+    }
+    .btn-mini-danger:not(:disabled):hover {
+      border-color: #b81a06;
+      color: #ffffff;
+      background-color: #d92410;
+      box-shadow: 0 3px 0 #b81a06;
+      animation: btnShake 0.35s ease-in-out;
+    }
+  }
+  .btn-mini:not(:disabled):active {
+    box-shadow: 0 0 0 transparent;
+    translate: 0 2px;
+  }
+  .btn-mini:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* モーダル右上の ✕。触るとくるっと回って赤くなります。 */
+  .btn-close {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    color: var(--color-muted);
+    font-weight: 900;
+    background-color: var(--color-sand);
+    transition:
+      rotate 0.25s ease,
+      scale 0.1s ease,
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+  @media (hover: hover) {
+    .btn-close:hover {
+      rotate: 90deg;
+      color: #c2140a;
+      background-color: #ffd9d2;
+    }
+  }
+  .btn-close:active { scale: 0.88; }
+
+  /* btn 系でない素のボタン（メニュー行・文字だけのリンクなど）にも、
+     押した手ごたえだけは付けます。ゲームのマス目は独自の演出があるので除外。 */
+  button:not([class*="btn"]):not(.coin-board-tile):not(:disabled):active {
+    scale: 0.97;
+  }
+
+  /* キーボード操作のときの輪郭。 */
+  :is(.btn, [class*="btn-"]):focus-visible {
+    outline: 3px solid #1668e3;
+    outline-offset: 3px;
+  }
+
+  /* 「動きを減らす」設定のときは、色と厚みだけ残して動きを止めます。 */
+  @media (prefers-reduced-motion: reduce) {
+    .btn,
+    [class*="btn-"],
+    .btn-coin::after {
+      animation: none !important;
+    }
+  }
+
+  /* 使い回すパーツ ------------------------------------------------- */
   .card {
     /* 枠付きの箱は「入力や操作のまとまり」だけに使う想定。
        影はほぼ付けず、線も淡くしてページを細切れに見せません。 */
@@ -160,7 +525,7 @@ table { border-radius: 6px; }
   .input {
     @apply w-full rounded-lg bg-white px-4 py-2.5
            text-body placeholder:text-faint outline-none
-           focus:border-amber-600/50 focus:ring-1 focus:ring-amber-500/30;
+           focus:border-amber-500 focus:ring-2 focus:ring-amber-400/40;
     border: 1px solid var(--color-line-strong);
   }
   .label {
@@ -214,12 +579,95 @@ hr {
 }
 .animate-pop { animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
 
-/* 初回ログイン報酬ボタンの注目パルス（控えめ）。 */
-@keyframes attnPulse {
-  0%, 100% { transform: translateY(0) scale(1); filter: brightness(1); }
-  50% { transform: translateY(-1px) scale(1.02); filter: brightness(1.03); }
+/* ボタンの動き ------------------------------------------------------- */
+/* 主ボタン: 白い光が左から右へ横切ります（待機中は周期の終わりだけ）。 */
+@keyframes btnShine {
+  0%, 62% { background-position: 160% 0, 0 0; }
+  100% { background-position: -60% 0, 0 0; }
 }
-.btn-attn { animation: attnPulse 2.2s ease-in-out infinite; }
+@keyframes btnShineOnce {
+  from { background-position: 160% 0, 0 0; }
+  to { background-position: -60% 0, 0 0; }
+}
+/* 主ボタン: ゼリーのようにつぶれて戻ります。 */
+@keyframes btnJelly {
+  0%, 100% { transform: scale(1, 1); }
+  30% { transform: scale(1.04, 0.9); }
+  52% { transform: scale(0.97, 1.07); }
+  74% { transform: scale(1.01, 0.98); }
+}
+/* 副ボタン: 左右にゆらゆら。 */
+@keyframes btnWobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.3deg); }
+  75% { transform: rotate(-0.7deg); }
+}
+/* 中立ボタン: こくんと一度うなずく。 */
+@keyframes btnTilt {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-1.5deg); }
+}
+/* みずいろ: 2 回跳ねて、着地で少しつぶれます。 */
+@keyframes btnHop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  25% { transform: translateY(-8px) scale(1, 1); }
+  45% { transform: translateY(0) scale(1.06, 0.92); }
+  62% { transform: translateY(-4px) scale(1, 1); }
+  80% { transform: translateY(0) scale(1.03, 0.96); }
+}
+/* ピンク: どきどき（2 拍）。 */
+@keyframes btnHeartbeat {
+  0%, 30%, 60%, 100% { transform: scale(1); }
+  15% { transform: scale(1.1); }
+  45% { transform: scale(1.06); }
+}
+/* 削除: いやいやと首を振る。 */
+@keyframes btnShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+/* タブ・選択カード: 選んだ瞬間にポン。 */
+@keyframes tabPop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+/* PLAY: ゆっくり呼吸して、外側へ輪が広がります。触ると左右に首を振ります。 */
+@keyframes coinBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes coinRing {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes coinWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+/* 上へ戻る: ロケットのように上へ。 お問い合わせ: 着信ベルのように震える。 */
+@keyframes fabLaunch {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes fabRing {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-14deg); }
+  40% { transform: rotate(12deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+}
+/* 初回ログイン報酬ボタン: 周期の終わりにぴょこんと跳ねて気づかせます。 */
+@keyframes attnHop {
+  0%, 68%, 100% { transform: translateY(0) rotate(0deg); }
+  76% { transform: translateY(-5px) rotate(-4deg); }
+  84% { transform: translateY(0) rotate(3deg); }
+  92% { transform: translateY(-2px) rotate(0deg); }
+}
 
 /* 倍率が上がったときの画面振動。 */
 @keyframes screenShake {
@@ -235,8 +683,6 @@ hr {
   90% { transform: translate(-1px, 0); }
 }
 .screen-shake { animation: screenShake 0.5s ease-in-out; }
-.btn-attn:nth-child(2) { animation-delay: 0.2s; }
-.btn-attn:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes flip {
   0% { transform: rotateY(0deg); }
@@ -452,7 +898,7 @@ hr {
   font-weight: 800;
   letter-spacing: 0.1em;
   white-space: nowrap;
-  color: #4a3f31;
+  color: var(--color-body);
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.9);
 }
 
@@ -503,13 +949,13 @@ hr {
   letter-spacing: 0.02em;
   word-break: keep-all;
   overflow-wrap: normal;
-  color: #5b4e3d;
+  color: var(--color-muted);
 }
 
 .hero-subtitle strong {
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: #4a3f31;
+  color: var(--color-body);
 }
 
 .hero-subtitle em {
@@ -540,7 +986,7 @@ hr {
   font-size: clamp(1.75rem, 4vw, 2.25rem);
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #3f372c;
+  color: var(--color-body);
 }
 
 .landing-section-lead {
@@ -573,7 +1019,7 @@ hr {
   font-size: clamp(2rem, 5vw, 2.75rem);
   font-weight: 800;
   letter-spacing: 0.01em;
-  color: #3f372c;
+  color: var(--color-body);
 }
 
 .landing-cta {
@@ -602,4 +1048,57 @@ hr {
   height: 100%;
   object-fit: cover;
   object-position: top center;
+}
+
+/* =====================================================================
+   Admin simple � white, no fancy buttons / animations (scoped)
+   ===================================================================== */
+.admin-simple,
+.admin-simple * {
+  animation: none !important;
+  transition: none !important;
+}
+.admin-simple :is(.btn, .btn-gold, .btn-ghost, .btn-tab, .btn-tab-on, .btn-mini, .btn-mini-danger, .btn-close, .btn-option, .btn-coin, .btn-sky, .btn-pink, .btn-fab) {
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  translate: none !important;
+  background-image: none !important;
+  letter-spacing: normal !important;
+}
+.admin-simple .btn-gold,
+.admin-simple .btn-tab-on {
+  background: #262626 !important;
+  border: 1px solid #262626 !important;
+  color: #fff !important;
+}
+.admin-simple .btn,
+.admin-simple .btn-ghost,
+.admin-simple .btn-mini,
+.admin-simple .btn-tab {
+  background: #fff !important;
+  border: 1px solid #d4d4d4 !important;
+  color: #262626 !important;
+}
+.admin-simple .btn-mini-danger {
+  border-color: #fca5a5 !important;
+  color: #b91c1c !important;
+  background: #fff !important;
+}
+.admin-simple .card {
+  border: 1px solid #e5e5e5 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  border-radius: 4px !important;
+}
+.admin-simple .input,
+.admin-simple select.input {
+  border: 1px solid #d4d4d4 !important;
+  border-radius: 4px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.admin-simple .bg-cream {
+  background: #f5f5f5 !important;
 }
